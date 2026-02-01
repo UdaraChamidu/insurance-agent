@@ -423,31 +423,35 @@ app.post('/api/bookings/appointments/:id/send-invitation', async (req, res) => {
     const { id } = req.params;
     const { meetingUrl } = req.body;
     
+    console.log(`📧 Sending invitation for appointment ${id}...`);
+    
     // Get appointment details
     const appointment = await bookingsService.getAppointmentById(id);
     
     // Generate meeting URL if not provided
-    const finalMeetingUrl = meetingUrl || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/meeting?meetingId=${uuidv4()}`;
+    const baseUrl = process.env.MEETING_BASE_URL || 'http://localhost:5173';
+    const meetingId = uuidv4();
+    const finalMeetingUrl = meetingUrl || `${baseUrl}/meeting?meetingId=${meetingId}&role=client`;
+    
+    console.log(`🔗 Meeting URL: ${finalMeetingUrl}`);
     
     // Send invitation
     const result = await bookingsService.sendInvitation(id, finalMeetingUrl);
     
-    // In a real implementation, send email here
-    // For now, we'll just return success
     res.json({
       success: true,
       message: `Invitation sent to ${appointment.customerEmailAddress}`,
       appointment: appointment,
       meetingUrl: finalMeetingUrl,
-      emailPreview: {
-        to: appointment.customerEmailAddress,
-        subject: `Your Insurance Consultation is Scheduled - ${new Date(appointment.startDateTime).toLocaleDateString()}`,
-        body: `Hello ${appointment.customerName},\n\nYour ${appointment.serviceName} meeting is scheduled to start in 15 minutes.\n\nMeeting Details:\n- Date: ${new Date(appointment.startDateTime).toLocaleDateString()}\n- Time: ${new Date(appointment.startDateTime).toLocaleTimeString()}\n- Duration: ${Math.round((new Date(appointment.endDateTime) - new Date(appointment.startDateTime)) / 60000)} minutes\n\nJoin Meeting: ${finalMeetingUrl}\n\nPlease join a few minutes early to test your audio and video.\n\nBest regards,\nSecureLife Insurance Team`
-      }
+      result: result
     });
   } catch (error) {
-    console.error('Error sending invitation:', error);
-    res.status(500).json({ error: 'Failed to send invitation', message: error.message });
+    console.error('❌ Error in send-invitation endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: error.stack
+    });
   }
 });
 

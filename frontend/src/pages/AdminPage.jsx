@@ -34,28 +34,45 @@ export default function AdminPage() {
   }, []);
 
   const loadMeetings = async () => {
-    // In a real app, fetch from Microsoft Bookings API
-    // For now, we'll use mock data
-    setMeetings([
-      {
-        id: 'meeting-1',
-        clientName: 'John Smith',
-        email: 'john@example.com',
-        date: '2024-01-15',
-        time: '10:00 AM',
-        type: 'Life Insurance',
-        status: 'scheduled'
-      },
-      {
-        id: 'meeting-2',
-        clientName: 'Sarah Johnson',
-        email: 'sarah@example.com',
-        date: '2024-01-15',
-        time: '2:00 PM',
-        type: 'Auto Insurance',
-        status: 'scheduled'
+    try {
+      console.log('📅 Loading real appointments from Microsoft Bookings...');
+      
+      // Fetch real appointments from the API
+      const response = await fetch(`${API_URL}/api/bookings/appointments`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    ]);
+      
+      const appointments = await response.json();
+      console.log(`✅ Loaded ${appointments.length} appointments`);
+      
+      // Transform appointments to match our UI structure
+      const transformedMeetings = appointments.map(apt => ({
+        id: apt.id,
+        clientName: apt.customerName || 'Unknown',
+        email: apt.customerEmailAddress || 'N/A',
+        date: new Date(apt.startDateTime?.dateTime || apt.startDateTime).toLocaleDateString(),
+        time: new Date(apt.startDateTime?.dateTime || apt.startDateTime).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        type: apt.serviceName || 'Consultation',
+        status: 'scheduled'
+      }));
+      
+      setMeetings(transformedMeetings);
+    } catch (error) {
+      console.error('Error loading meetings:', error);
+      // If API fails, use empty array
+      setMeetings([]);
+    }
   };
 
   const createMeetingRoom = async () => {

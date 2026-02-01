@@ -13,12 +13,20 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Shield className="h-8 w-8 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">SecureLife Insurance</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Elite Deal Broker</h1>
             </div>
-            <nav className="hidden md:flex space-x-8">
-              <a href="#services" className="text-gray-700 hover:text-blue-600">Services</a>
-              <a href="#about" className="text-gray-700 hover:text-blue-600">About</a>
-              <a href="#contact" className="text-gray-700 hover:text-blue-600">Contact</a>
+            <nav className="flex items-center space-x-6">
+              <div className="hidden md:flex space-x-8">
+                <a href="#services" className="text-gray-700 hover:text-blue-600">Services</a>
+                <a href="#about" className="text-gray-700 hover:text-blue-600">About</a>
+                <a href="#contact" className="text-gray-700 hover:text-blue-600">Contact</a>
+              </div>
+              <button
+                onClick={() => navigate('/admin')}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors"
+              >
+                Admin Login
+              </button>
             </nav>
           </div>
         </div>
@@ -35,13 +43,15 @@ export default function HomePage() {
             with our licensed agents and discover the perfect coverage for your needs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => navigate('/schedule')}
-              className="btn-primary text-lg px-8 py-4 inline-flex items-center"
+            <a
+              href="https://outlook.office.com/book/EliteDealBroker6@helmygenesis.com/?ismsaljsauthenabled"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary text-lg px-8 py-4 inline-flex items-center justify-center"
             >
               <Calendar className="mr-2 h-5 w-5" />
               Schedule Consultation
-            </button>
+            </a>
             <button className="btn-secondary text-lg px-8 py-4">
               Learn More
             </button>
@@ -91,12 +101,14 @@ export default function HomePage() {
           <p className="text-xl mb-8 opacity-90">
             Book a free consultation with one of our insurance experts today.
           </p>
-          <button
-            onClick={() => navigate('/schedule')}
-            className="bg-white text-blue-600 hover:bg-gray-100 font-bold py-3 px-8 rounded-lg text-lg transition-colors"
+          <a
+            href="https://outlook.office.com/book/EliteDealBroker6@helmygenesis.com/?ismsaljsauthenabled"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white text-blue-600 hover:bg-gray-100 font-bold py-3 px-8 rounded-lg text-lg transition-colors inline-block"
           >
             Schedule Now
-          </button>
+          </a>
         </div>
       </section>
 

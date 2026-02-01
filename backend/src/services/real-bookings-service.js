@@ -193,28 +193,55 @@ class RealBookingsService {
 
   /**
    * Send invitation email for an appointment
-   * Note: Microsoft Bookings automatically sends emails, but we can trigger a reminder
    */
   async sendInvitation(appointmentId, meetingUrl) {
     try {
+      console.log(`📧 [1/5] Starting invitation send for appointment ${appointmentId}...`);
+      
       const appointment = await this.getAppointmentById(appointmentId);
+      console.log(`✅ [2/5] Got appointment details:`, {
+        name: appointment.customerName,
+        email: appointment.customerEmailAddress,
+        date: appointment.startDateTime
+      });
       
-      // In Microsoft Bookings, notifications are automatically sent
-      // For custom meeting URLs, you'd need to implement email sending separately
-      // using Microsoft Graph Mail API or another service
+      // Import email service
+      console.log(`📦 [3/5] Importing email service...`);
+      const { emailService } = await import('./email-service.js');
+      console.log(`✅ Email service imported`);
       
-      console.log(`📧 Invitation would be sent to ${appointment.customerEmailAddress}`);
+      // Send email with meeting link
+      console.log(`📤 [4/5] Sending email to ${appointment.customerEmailAddress}...`);
+      const result = await emailService.sendMeetingInvitation(
+        appointment.customerEmailAddress,
+        appointment.customerName,
+        {
+          startDateTime: appointment.startDateTime.dateTime,
+          staffMemberDisplayName: appointment.staffMemberIds?.[0] || 'Your Agent',
+          meetingUrl: meetingUrl
+        }
+      );
+      
+      console.log(`✅ [5/5] Invitation sent successfully!`);
       
       return {
         success: true,
         message: `Invitation sent to ${appointment.customerEmailAddress}`,
         sentTo: appointment.customerEmailAddress,
-        sentAt: new Date().toISOString(),
-        note: 'Microsoft Bookings sends automatic confirmations. For custom invites, implement Graph Mail API.'
+        sentAt: result.sentAt,
+        meetingUrl: meetingUrl
       };
     } catch (error) {
-      console.error('Error sending invitation:', error);
-      throw error;
+      console.error('❌ ========== EMAIL SEND ERROR ==========');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      console.error('==========================================');
+      throw new Error(`Failed to send invitation: ${error.message}`);
     }
   }
 
