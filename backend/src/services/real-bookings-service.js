@@ -61,21 +61,41 @@ class RealBookingsService {
   async getAppointments(startDate = null, endDate = null, status = null) {
     try {
       const client = await authService.getGraphClient();
-      const businessId = await this.getBookingBusinessId();
+      
+      // Get ALL booking businesses instead of just the first one
+      const businesses = await this.getBookingBusinesses();
 
       // Default to next 30 days if no dates provided
       const start = startDate || new Date().toISOString();
       const end = endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      console.log(`📅 Fetching appointments from ${start} to ${end}`);
+      console.log(`📅 Fetching appointments from ALL ${businesses.length} booking businesses`);
+      console.log(`   Date range: ${start} to ${end}`);
 
-      // Use calendarView to get appointments in date range
-      const response = await client
-        .api(`/solutions/bookingBusinesses/${businessId}/calendarView`)
-        .query({ start, end })
-        .get();
+      // Fetch appointments from ALL booking businesses
+      let allAppointments = [];
+      
+      for (const business of businesses) {
+        try {
+          console.log(`   ⏳ Querying: ${business.displayName} (${business.id})`);
+          
+          const response = await client
+            .api(`/solutions/bookingBusinesses/${business.id}/calendarView`)
+            .query({ start, end })
+            .get();
 
-      let appointments = response.value || [];
+          const businessAppointments = response.value || [];
+          console.log(`      ✅ Found ${businessAppointments.length} appointment(s)`);
+          
+          allAppointments.push(...businessAppointments);
+        } catch (error) {
+          console.error(`      ❌ Error fetching from ${business.displayName}:`, error.message);
+          // Continue with other businesses even if one fails
+        }
+      }
+
+      let appointments = allAppointments;
+      console.log(`📊 Total appointments from all businesses: ${appointments.length}`);
 
       // Transform to our format
       appointments = appointments.map(apt => ({
