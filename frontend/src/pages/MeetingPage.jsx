@@ -11,6 +11,8 @@ export default function MeetingPage() {
   const meetingId = searchParams.get('meetingId');
   const role = searchParams.get('role') || 'client';
   
+  const [error, setError] = useState(null); // Add error state
+
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
