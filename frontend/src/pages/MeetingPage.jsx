@@ -16,6 +16,8 @@ export default function MeetingPage() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [userName, setUserName] = useState('');
   const [isJoined, setIsJoined] = useState(false);
+  const [transcriptions, setTranscriptions] = useState([]);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -43,17 +45,37 @@ export default function MeetingPage() {
       // Connect to WebSocket
       await meetingService.connect(WS_URL);
       
-      // Set up callbacks
+      // Set up callback for remote stream
       meetingService.onRemoteStream = (stream) => {
+        console.log('📹 Setting remote stream');
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = stream;
         }
       };
       
-      // Join meeting as client
+      // Set up callbacks for transcriptions and AI suggestions (admin only)
+      if (role === 'admin') {
+        meetingService.onTranscription = (data) => {
+          console.log('📝 Transcription received:', data);
+          setTranscriptions(prev => [...prev, {
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
+        };
+        
+        meetingService.onAISuggestion = (data) => {
+          console.log('💡 AI Suggestion received:', data);
+          setAiSuggestions(prev => [...prev, {
+            suggestion: data.suggestion,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
+        };
+      }
+      
+      // Join meeting (peer connections handled automatically)
       const stream = await meetingService.joinMeeting(
         meetingId,
-        `client-${userName.replace(/\s+/g, '-')}-${Date.now()}`,
+        `${role}-${userName.replace(/\s+/g, '-')}-${Date.now()}`,
         role
       );
       
@@ -146,79 +168,139 @@ export default function MeetingPage() {
   }
 
   return (
-    <div className="h-screen bg-black flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-900 px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-white">SecureLife Insurance - Consultation</h1>
-          </div>
-          <div className="text-sm text-gray-400">
-            {userName}
-          </div>
-        </div>
-      </header>
-
-      {/* Video Section */}
-      <div className="flex-1 relative">
-        {/* Remote Video (Agent) */}
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-        />
-        
-        {!isConnected && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-            <div className="text-center text-gray-400">
-              <Video className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p>Connecting to agent...</p>
+    <div className="h-screen bg-black flex">
+      {/* Main Video Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="bg-gray-900 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-lg font-semibold text-white">SecureLife Insurance - Consultation</h1>
+              {role === 'admin' && <span className="text-xs bg-blue-600 px-2 py-1 rounded text-white">Admin</span>}
+            </div>
+            <div className="text-sm text-gray-400">
+              {userName}
             </div>
           </div>
-        )}
+        </header>
 
-        {/* Local Video (Client) */}
-        <div className="absolute bottom-24 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700">
+        {/* Video Section */}
+        <div className="flex-1 relative">
+          {/* Remote Video */}
           <video
-            ref={localVideoRef}
+            ref={remoteVideoRef}
             autoPlay
             playsInline
-            muted
             className="w-full h-full object-cover"
           />
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 px-2 py-1 rounded text-xs text-white">
-            You
+          
+          {!isConnected && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <div className="text-center text-gray-400">
+                <Video className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p>Connecting to {role === 'admin' ? 'client' : 'agent'}...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Local Video */}
+          <div className="absolute bottom-24 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 px-2 py-1 rounded text-xs text-white">
+              You
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
+            <button
+              onClick={toggleMute}
+              className={`p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
+            </button>
+            
+            <button
+              onClick={toggleVideo}
+              className={`p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+              title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+            >
+              {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
+            </button>
+            
+            <button
+              onClick={endCall}
+              className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
+              title="Leave meeting"
+            >
+              <Phone className="h-6 w-6 text-white transform rotate-135" />
+            </button>
           </div>
         </div>
-
-        {/* Controls */}
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
-          <button
-            onClick={toggleMute}
-            className={`p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
-          </button>
-          
-          <button
-            onClick={toggleVideo}
-            className={`p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
-            title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
-          >
-            {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
-          </button>
-          
-          <button
-            onClick={endCall}
-            className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
-            title="Leave meeting"
-          >
-            <Phone className="h-6 w-6 text-white transform rotate-135" />
-          </button>
-        </div>
       </div>
+
+      {/* Admin Sidebar - Transcription & AI Suggestions */}
+      {role === 'admin' && (
+        <div className="w-1/3 bg-gray-900 flex flex-col">
+          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700">
+            <h2 className="text-sm font-semibold text-white">Admin Panel</h2>
+          </div>
+          
+          <div className="flex-1 flex overflow-hidden">
+            {/* Transcriptions */}
+            <div className="flex-1 border-r border-gray-700 flex flex-col">
+              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
+                <h3 className="text-xs font-semibold text-white">Live Transcription</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {transcriptions.length === 0 ? (
+                  <div className="text-center text-gray-500 text-xs mt-4">
+                    <p>Waiting for customer...</p>
+                  </div>
+                ) : (
+                  transcriptions.map((item, index) => (
+                    <div key={index} className="bg-gray-800 rounded p-2">
+                      <div className="text-xs text-gray-400 mb-1">{item.timestamp}</div>
+                      <div className="text-xs text-white">{item.text}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* AI Suggestions */}
+            <div className="flex-1 flex flex-col">
+              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
+                <h3 className="text-xs font-semibold text-white flex items-center">
+                  <span className="mr-1">💡</span>
+                  AI Suggestions
+                </h3>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {aiSuggestions.length === 0 ? (
+                  <div className="text-center text-gray-500 text-xs mt-4">
+                    <p>AI suggestions...</p>
+                  </div>
+                ) : (
+                  aiSuggestions.map((item, index) => (
+                    <div key={index} className="bg-blue-900 bg-opacity-30 border border-blue-700 rounded p-2">
+                      <div className="text-xs text-blue-300 mb-1">{item.timestamp}</div>
+                      <div className="text-xs text-white">{item.suggestion}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

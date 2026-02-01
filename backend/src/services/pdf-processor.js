@@ -1,5 +1,3 @@
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
-
 /**
  * PDF Processing Service
  * Extracts text from PDF files and prepares for chunking
@@ -10,6 +8,15 @@ class PDFProcessor {
       max: 0, // Process all pages
       version: 'v2.0.550', // Use latest PDF.js version
     };
+    this.pdfParse = null;
+  }
+  
+  async init() {
+    if (!this.pdfParse) {
+      // Use dynamic import for pdf-parse (CommonJS module)
+      const module = await import('pdf-parse');
+      this.pdfParse = module.default;
+    }
   }
   
   /**
@@ -17,9 +24,11 @@ class PDFProcessor {
    */
   async extractText(pdfBuffer) {
     try {
+      await this.init();
+      
       console.log('📄 Extracting text from PDF...');
       
-      const data = await pdfParse(pdfBuffer, this.options);
+      const data = await this.pdfParse(pdfBuffer, this.options);
       
       const result = {
         text: data.text,

@@ -1,9 +1,9 @@
-import SimplePeer from 'simple-peer';
+// Native WebRTC Meeting Service (no SimplePeer dependency)
 
 class MeetingService {
   constructor() {
     this.ws = null;
-    this.peer = null;
+    this.peerConnection = null;
     this.localStream = null;
     this.remoteStream = null;
     this.meetingId = null;
@@ -12,6 +12,9 @@ class MeetingService {
     this.audioContext = null;
     this.audioProcessor = null;
     this.isRecording = false;
+    this.targetUserId = null;
+    this.makingOffer = false;
+    this.ignoreOffer = false;
     
     // Callbacks
     this.onTranscription = null;
@@ -19,6 +22,13 @@ class MeetingService {
     this.onParticipantJoined = null;
     this.onParticipantLeft = null;
     this.onRemoteStream = null;
+    
+    // ICE servers
+    this.iceServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' }
+    ];
   }
 
   connect(wsUrl) {
@@ -26,12 +36,12 @@ class MeetingService {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('✅ WebSocket connected');
         resolve();
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
         reject(error);
       };
       
@@ -40,7 +50,7 @@ class MeetingService {
       };
       
       this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        console.log('🔌 WebSocket disconnected');
         this.cleanup();
       };
     });
@@ -49,18 +59,38 @@ class MeetingService {
   handleMessage(data) {
     switch (data.type) {
       case 'joined-meeting':
-        console.log('Joined meeting:', data);
+        console.log('✅ Joined meeting:', data);
+        
+        // If there are existing participants, WE are the newcomer - we should initiate
+        if (data.participants && data.participants.length > 1) {
+          const otherParticipants = data.participants.filter(p => p.userId !== this.userId);
+          console.log(`🔗 Found ${otherParticipants.length} existing participant(s)`);
+          
+          if (otherParticipants.length > 0) {
+            this.targetUserId = otherParticipants[0].userId;
+            console.log('📞 I am newcomer, will initiate call to:', this.targetUserId);
+            // Create connection and make offer
+            setTimeout(() => this.createOffer(), 1000);
+          }
+        }
         break;
       
       case 'participant-joined':
-        console.log('Participant joined:', data);
+        console.log('👤 Participant joined:', data);
         if (this.onParticipantJoined) {
           this.onParticipantJoined(data);
+        }
+        
+        // DON'T initiate here - let the newcomer initiate
+        // We just wait for their offer
+        if (!this.targetUserId && data.userId !== this.userId) {
+          this.targetUserId = data.userId;
+          console.log('👋 New participant will call me, waiting for offer from:', data.userId);
         }
         break;
       
       case 'participant-left':
-        console.log('Participant left:', data);
+        console.log('👋 Participant left:', data);
         if (this.onParticipantLeft) {
           this.onParticipantLeft(data);
         }
@@ -79,21 +109,21 @@ class MeetingService {
         break;
       
       case 'transcription':
-        console.log('Transcription received:', data);
+        console.log('📝 Transcription received:', data);
         if (this.onTranscription) {
           this.onTranscription(data);
         }
         break;
       
       case 'ai-suggestion':
-        console.log('AI suggestion received:', data);
+        console.log('💡 AI suggestion received:', data);
         if (this.onAISuggestion) {
           this.onAISuggestion(data);
         }
         break;
       
       case 'error':
-        console.error('Server error:', data.message);
+        console.error('❌ Server error:', data.message);
         break;
     }
   }
@@ -103,8 +133,8 @@ class MeetingService {
     this.userId = userId;
     this.role = role;
     
-    // Get user media
     try {
+      // Get user media
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: {
@@ -114,6 +144,8 @@ class MeetingService {
           sampleRate: 16000
         }
       });
+      
+      console.log('✅ Got local media stream');
       
       // Start audio processing for transcription
       this.startAudioProcessing();
@@ -128,22 +160,169 @@ class MeetingService {
       
       return this.localStream;
     } catch (error) {
-      console.error('Error getting user media:', error);
+      console.error('❌ Error getting user media:', error);
       throw error;
     }
   }
 
+  createPeerConnection() {
+    if (this.peerConnection) {
+      console.log('🔄 Closing existing peer connection');
+      this.peerConnection.close();
+    }
+
+    console.log('🔗 Creating new RTCPeerConnection');
+    
+    this.peerConnection = new RTCPeerConnection({
+      iceServers: this.iceServers
+    });
+
+    // Add local stream tracks
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        console.log('➕ Adding track to peer connection:', track.kind);
+        this.peerConnection.addTrack(track, this.localStream);
+      });
+    }
+
+    // Handle incoming tracks
+    this.peerConnection.ontrack = (event) => {
+      console.log('📹 Received remote track:', event.track.kind);
+      
+      // Use the stream from the event directly
+      this.remoteStream = event.streams[0];
+      
+      console.log('📹 Setting remote stream');
+      if (this.onRemoteStream) {
+        this.onRemoteStream(this.remoteStream);
+      }
+    };
+
+    // Handle ICE candidates
+    this.peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log('🧊 Sending ICE candidate');
+        this.send({
+          type: 'ice-candidate',
+          meetingId: this.meetingId,
+          targetUserId: this.targetUserId,
+          signal: { candidate: event.candidate }
+        });
+      }
+    };
+
+    // Handle connection state
+    this.peerConnection.onconnectionstatechange = () => {
+      console.log('🔗 Connection state:', this.peerConnection.connectionState);
+      if (this.peerConnection.connectionState === 'connected') {
+        console.log('✅ Peer connected successfully!');
+      }
+    };
+
+    // Handle ICE connection state
+    this.peerConnection.oniceconnectionstatechange = () => {
+      console.log('🧊 ICE connection state:', this.peerConnection.iceConnectionState);
+    };
+
+    return this.peerConnection;
+  }
+
+  async createOffer() {
+    try {
+      console.log('📤 Creating offer...');
+      
+      this.createPeerConnection();
+      
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      
+      await this.peerConnection.setLocalDescription(offer);
+      
+      console.log('📤 Sending offer');
+      this.send({
+        type: 'offer',
+        meetingId: this.meetingId,
+        targetUserId: this.targetUserId,
+        signal: { 
+          type: 'offer',
+          sdp: offer.sdp 
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error creating offer:', error);
+    }
+  }
+
+  async handleOffer(data) {
+    try {
+      console.log('📥 Received offer from:', data.fromUserId);
+      
+      this.targetUserId = data.fromUserId;
+      this.createPeerConnection();
+      
+      await this.peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.signal)
+      );
+      
+      const answer = await this.peerConnection.createAnswer();
+      await this.peerConnection.setLocalDescription(answer);
+      
+      console.log('📤 Sending answer');
+      this.send({
+        type: 'answer',
+        meetingId: this.meetingId,
+        targetUserId: this.targetUserId,
+        signal: {
+          type: 'answer',
+          sdp: answer.sdp
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error handling offer:', error);
+    }
+  }
+
+  async handleAnswer(data) {
+    try {
+      console.log('📥 Received answer from:', data.fromUserId);
+      
+      await this.peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.signal)
+      );
+    } catch (error) {
+      console.error('❌ Error handling answer:', error);
+    }
+  }
+
+  async handleIceCandidate(data) {
+    try {
+      if (data.signal && data.signal.candidate) {
+        console.log('🧊 Adding ICE candidate');
+        await this.peerConnection.addIceCandidate(
+          new RTCIceCandidate(data.signal.candidate)
+        );
+      }
+    } catch (error) {
+      console.error('❌ Error handling ICE candidate:', error);
+    }
+  }
+
   startAudioProcessing() {
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 16000 // Force 16kHz for Whisper
+    });
     const source = this.audioContext.createMediaStreamSource(this.localStream);
     
-    // Create script processor for audio chunks
     this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
     
     let audioChunks = [];
     let chunkCount = 0;
     const CHUNKS_PER_SECOND = Math.floor(this.audioContext.sampleRate / 4096);
-    const SEND_INTERVAL = CHUNKS_PER_SECOND * 2; // Send every 2 seconds
+    const SEND_INTERVAL = CHUNKS_PER_SECOND * 8; // Send every 8 seconds for better quality
+    
+    console.log(`🎤 Audio processing started at ${this.audioContext.sampleRate}Hz, sending every ${SEND_INTERVAL} chunks (${8}s)`);
     
     this.audioProcessor.onaudioprocess = (e) => {
       if (!this.isRecording) return;
@@ -153,8 +332,8 @@ class MeetingService {
       audioChunks.push(audioData);
       chunkCount++;
       
-      // Send audio chunks every 2 seconds
       if (chunkCount >= SEND_INTERVAL) {
+        console.log(`🎵 Sending ${audioChunks.length} audio chunks`);
         this.sendAudioChunk(audioChunks);
         audioChunks = [];
         chunkCount = 0;
@@ -167,7 +346,6 @@ class MeetingService {
   }
 
   sendAudioChunk(audioChunks) {
-    // Combine chunks
     const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
     const combined = new Float32Array(totalLength);
     let offset = 0;
@@ -177,18 +355,15 @@ class MeetingService {
       offset += chunk.length;
     }
     
-    // Convert Float32Array to Int16Array (PCM)
     const int16Array = new Int16Array(combined.length);
     for (let i = 0; i < combined.length; i++) {
       const s = Math.max(-1, Math.min(1, combined[i]));
       int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     
-    // Convert to base64
     const arrayBuffer = int16Array.buffer;
     const base64 = this.arrayBufferToBase64(arrayBuffer);
     
-    // Send to server
     this.send({
       type: 'audio-chunk',
       meetingId: this.meetingId,
@@ -204,71 +379,6 @@ class MeetingService {
       binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
-  }
-
-  createPeerConnection(initiator, targetUserId) {
-    this.peer = new SimplePeer({
-      initiator,
-      stream: this.localStream,
-      trickle: true,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-    
-    this.peer.on('signal', (signal) => {
-      const messageType = signal.type === 'offer' ? 'offer' : 
-                         signal.type === 'answer' ? 'answer' : 'ice-candidate';
-      
-      this.send({
-        type: messageType,
-        meetingId: this.meetingId,
-        targetUserId,
-        signal
-      });
-    });
-    
-    this.peer.on('stream', (stream) => {
-      console.log('Received remote stream');
-      this.remoteStream = stream;
-      if (this.onRemoteStream) {
-        this.onRemoteStream(stream);
-      }
-    });
-    
-    this.peer.on('error', (err) => {
-      console.error('Peer error:', err);
-    });
-    
-    this.peer.on('close', () => {
-      console.log('Peer connection closed');
-    });
-  }
-
-  handleOffer(data) {
-    if (!this.peer) {
-      this.createPeerConnection(false, data.fromUserId);
-    }
-    this.peer.signal(data.signal);
-  }
-
-  handleAnswer(data) {
-    if (this.peer) {
-      this.peer.signal(data.signal);
-    }
-  }
-
-  handleIceCandidate(data) {
-    if (this.peer) {
-      this.peer.signal(data.signal);
-    }
-  }
-
-  initiateCall(targetUserId) {
-    this.createPeerConnection(true, targetUserId);
   }
 
   send(data) {
@@ -304,9 +414,9 @@ class MeetingService {
       this.localStream = null;
     }
     
-    if (this.peer) {
-      this.peer.destroy();
-      this.peer = null;
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
     }
     
     if (this.ws) {

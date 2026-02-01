@@ -3,7 +3,7 @@ import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
@@ -29,7 +29,7 @@ const connections = new Map();
 // WebSocket connection handler
 wss.on('connection', (ws) => {
   const connectionId = uuidv4();
-  connections.set(connectionId, ws);
+  connections.set(connectionId, { ws, userId: null }); // Store object with ws and userId
 
   console.log(`New connection: ${connectionId}`);
 
@@ -58,7 +58,10 @@ wss.on('connection', (ws) => {
       }
     } catch (error) {
       console.error('Error handling message:', error);
-      ws.send(JSON.stringify({ type: 'error', message: error.message }));
+      const connection = connections.get(connectionId);
+      if (connection && connection.ws) {
+        connection.ws.send(JSON.stringify({ type: 'error', message: error.message }));
+      }
     }
   });
 
@@ -78,6 +81,12 @@ wss.on('connection', (ws) => {
 async function handleJoinMeeting(ws, data, connectionId) {
   const { meetingId, userId, role } = data;
   
+  // Store userId in connection for later signaling
+  const connection = connections.get(connectionId);
+  if (connection) {
+    connection.userId = userId;
+  }
+  
   if (!meetings.has(meetingId)) {
     meetings.set(meetingId, {
       id: meetingId,
@@ -95,6 +104,9 @@ async function handleJoinMeeting(ws, data, connectionId) {
     role,
     ws
   });
+  
+  console.log(`✅ ${userId} joined meeting ${meetingId} as ${role}`);
+  console.log(`   Total participants: ${meeting.participants.length}`);
   
   // Notify all participants
   broadcastToMeeting(meetingId, {
@@ -117,12 +129,20 @@ async function handleWebRTCSignaling(data, connectionId) {
   
   if (!meeting) return;
   
+  // Get sender's userId from connections
+  const senderConnection = connections.get(connectionId);
+  const fromUserId = senderConnection ? senderConnection.userId : null;
+  
+  console.log(`📡 Relaying ${data.type} from ${fromUserId} to ${targetUserId}`);
+  
   const targetParticipant = meeting.participants.find(p => p.userId === targetUserId);
   if (targetParticipant) {
     targetParticipant.ws.send(JSON.stringify({
       ...signalData,
-      fromUserId: connections.get(connectionId)?.userId
+      fromUserId: fromUserId  // Properly attach sender's userId
     }));
+  } else {
+    console.log(`⚠️  Target participant ${targetUserId} not found`);
   }
 }
 
@@ -139,12 +159,15 @@ async function handleAudioChunk(data, connectionId) {
     // Append to meeting's audio buffer
     meeting.audioBuffer = Buffer.concat([meeting.audioBuffer, audioBuffer]);
     
-    // Process every 3 seconds of audio (adjust based on needs)
-    // At 16kHz mono, 3 seconds ≈ 96KB
-    if (meeting.audioBuffer.length >= 96000 && !meeting.isTranscribing) {
+    console.log(`🎤 Audio buffer: ${meeting.audioBuffer.length} bytes`);
+    
+    // Process every 8 seconds of audio (at 16kHz mono, 8 seconds ≈ 256KB)
+    if (meeting.audioBuffer.length >= 256000 && !meeting.isTranscribing) {
       meeting.isTranscribing = true;
       const audioToProcess = meeting.audioBuffer;
       meeting.audioBuffer = Buffer.alloc(0);
+      
+      console.log(`📤 Processing ${audioToProcess.length} bytes of audio`);
       
       // Transcribe in background
       processAudioForTranscription(meetingId, audioToProcess, userId);
@@ -154,23 +177,59 @@ async function handleAudioChunk(data, connectionId) {
   }
 }
 
+// Helper function to convert PCM to WAV format
+function convertPCMtoWAV(pcmBuffer) {
+  const sampleRate = 16000;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  
+  const dataSize = pcmBuffer.length;
+  const headerSize = 44;
+  const fileSize = headerSize + dataSize;
+  
+  const wavBuffer = Buffer.alloc(fileSize);
+  
+  // WAV header
+  wavBuffer.write('RIFF', 0);
+  wavBuffer.writeUInt32LE(fileSize - 8, 4);
+  wavBuffer.write('WAVE', 8);
+  wavBuffer.write('fmt ', 12);
+  wavBuffer.writeUInt32LE(16, 16); // fmt chunk size
+  wavBuffer.writeUInt16LE(1, 20); // PCM format
+  wavBuffer.writeUInt16LE(numChannels, 22);
+  wavBuffer.writeUInt32LE(sampleRate, 24);
+  wavBuffer.writeUInt32LE(sampleRate * numChannels * bitsPerSample / 8, 28); // byte rate
+  wavBuffer.writeUInt16LE(numChannels * bitsPerSample / 8, 32); // block align
+  wavBuffer.writeUInt16LE(bitsPerSample, 34);
+  wavBuffer.write('data', 36);
+  wavBuffer.writeUInt32LE(dataSize, 40);
+  
+  // Copy PCM data
+  pcmBuffer.copy(wavBuffer, headerSize);
+  
+  return wavBuffer;
+}
+
 async function processAudioForTranscription(meetingId, audioBuffer, userId) {
   const meeting = meetings.get(meetingId);
   if (!meeting) return;
   
   try {
-    // Create a temporary file-like object for OpenAI
-    const audioFile = new File([audioBuffer], 'audio.webm', { type: 'audio/webm' });
+    console.log(`🎤 Transcribing audio from ${userId} (${audioBuffer.length} bytes)`);
     
-    // Transcribe using Whisper
+    // Convert PCM to WAV format for Whisper
+    const wavBuffer = convertPCMtoWAV(audioBuffer);
+    
+    // Transcribe using Whisper with toFile
     const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
+      file: await toFile(wavBuffer, 'audio.wav'),
       model: 'whisper-1',
-      language: 'en',
-      response_format: 'json'
+      language: 'en'
     });
     
     const transcribedText = transcription.text;
+    
+    console.log(`📝 Transcription: "${transcribedText}"`);
     
     if (transcribedText.trim()) {
       // Store transcription
@@ -215,17 +274,33 @@ async function generateAIResponse(meetingId, userMessage, userId) {
       messages: [
         {
           role: 'system',
-          content: `You are an AI assistant helping an insurance agent during a client consultation. 
-          Provide brief, actionable suggestions to help the agent respond effectively to the client.
-          Keep responses concise (2-3 sentences max).
-          Focus on: product recommendations, addressing concerns, compliance reminders, and next steps.`
+          content: `You are an AI assistant for insurance agents during live calls. Generate SHORT, ACTIONABLE suggestions.
+
+FORMAT: Use bullet points (• or -)
+LENGTH: 1-2 bullets max, each under 15 words
+TONE: Direct and professional
+
+Focus on:
+• Product recommendations
+• Compliance reminders
+• Quick responses
+• Next steps
+
+GOOD example:
+• Recommend Term Life - matches 20-year need
+• Ask about existing policies
+
+BAD example (too wordy):
+"You could respond with: 'It's great to hear about...'"
+
+Be concise!`
         },
         {
           role: 'user',
           content: `Recent conversation:\n${conversationContext}\n\nClient just said: "${userMessage}"\n\nWhat should the agent say or do?`
         }
       ],
-      max_tokens: 150,
+      max_tokens: 100,
       temperature: 0.7
     });
     
