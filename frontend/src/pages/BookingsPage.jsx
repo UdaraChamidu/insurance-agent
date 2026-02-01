@@ -100,12 +100,8 @@ export default function BookingsPage() {
   };
 
   const handleJoinMeeting = (appointment) => {
-    if (appointment.onlineMeetingUrl) {
-      window.open(appointment.onlineMeetingUrl, '_blank');
-    } else {
-      // Create a new meeting
-      navigate(`/admin/dashboard?meetingId=${appointment.id}`);
-    }
+    // Navigate to the Meeting Page (Unified UI) as Admin
+    navigate(`/meeting?meetingId=${appointment.id}&role=admin`);
   };
 
   const filteredAppointments = appointments.filter(apt => {
@@ -290,14 +286,12 @@ export default function BookingsPage() {
                       </>
                     )}
                   </button>
-                  {appointment.onlineMeetingUrl && (
-                    <button
-                      onClick={() => handleJoinMeeting(appointment)}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
-                    >
-                      Join
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleJoinMeeting(appointment)}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
+                  >
+                    Join
+                  </button>
                 </div>
               </div>
             ))}

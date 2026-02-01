@@ -49,11 +49,25 @@ export default function AdminPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const appointments = await response.json();
-      console.log(`✅ Loaded ${appointments.length} appointments`);
+      const data = await response.json();
+      console.log('📦 Raw API Response:', data);
+
+      // Handle different response structures (Array vs { value: [] } vs undefined)
+      let appointmentsList = [];
+      if (Array.isArray(data)) {
+        appointmentsList = data;
+      } else if (data && Array.isArray(data.value)) {
+        appointmentsList = data.value;
+      } else if (data && Array.isArray(data.appointments)) {
+         appointmentsList = data.appointments;
+      } else {
+        console.warn('⚠️ API returned unexpected format:', data);
+      }
+      
+      console.log(`✅ Loaded ${appointmentsList.length} appointments`);
       
       // Transform appointments to match our UI structure
-      const transformedMeetings = appointments.map(apt => ({
+      const transformedMeetings = appointmentsList.map(apt => ({
         id: apt.id,
         clientName: apt.customerName || 'Unknown',
         email: apt.customerEmailAddress || 'N/A',
@@ -100,7 +114,7 @@ export default function AdminPage() {
   };
 
   const joinMeeting = (meetingId) => {
-    navigate(`/admin/dashboard?meetingId=${meetingId}`);
+    navigate(`/meeting?meetingId=${meetingId}&role=admin`);
   };
 
   if (!isAuthenticated) {
@@ -186,12 +200,15 @@ export default function AdminPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats */}
+        {/* Stats */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Today's Meetings</p>
-                <p className="text-3xl font-bold text-gray-900">2</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {meetings.filter(m => m.date === new Date().toLocaleDateString()).length}
+                </p>
               </div>
               <Calendar className="h-12 w-12 text-blue-600 opacity-50" />
             </div>
@@ -200,8 +217,8 @@ export default function AdminPage() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Active Clients</p>
-                <p className="text-3xl font-bold text-gray-900">8</p>
+                <p className="text-sm text-gray-600">Scheduled</p>
+                <p className="text-3xl font-bold text-gray-900">{meetings.length}</p>
               </div>
               <Users className="h-12 w-12 text-green-600 opacity-50" />
             </div>
@@ -210,8 +227,10 @@ export default function AdminPage() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">This Week</p>
-                <p className="text-3xl font-bold text-gray-900">12</p>
+                <p className="text-sm text-gray-600">Consultations</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {meetings.filter(m => m.type.includes('Consultation')).length || meetings.length}
+                </p>
               </div>
               <Video className="h-12 w-12 text-purple-600 opacity-50" />
             </div>
