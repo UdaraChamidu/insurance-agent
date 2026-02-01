@@ -216,24 +216,24 @@ export default function MeetingPage() {
   }
 
   return (
-    <div className="h-screen bg-black flex">
-      {/* Main Video Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-gray-900 px-6 py-3">
+    <div className="h-screen bg-black flex flex-col md:flex-row">
+      {/* Main Video Area - Full height on mobile, flex-1 on desktop */}
+      <div className={`flex-1 flex flex-col relative ${role === 'admin' ? 'h-[50vh] md:h-full' : 'h-full'}`}>
+        {/* Header - Hidden on small mobile screens if needed, or compact */}
+        <header className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-lg font-semibold text-white">SecureLife Insurance - Consultation</h1>
-              {role === 'admin' && <span className="text-xs bg-blue-600 px-2 py-1 rounded text-white">Admin</span>}
+            <div className="flex items-center space-x-2">
+              <h1 className="text-sm md:text-lg font-semibold text-white truncate">Consultation</h1>
+              {role === 'admin' && <span className="text-[10px] bg-blue-600 px-2 py-0.5 rounded text-white">Admin</span>}
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-xs md:text-sm text-gray-300">
               {userName}
             </div>
           </div>
         </header>
 
         {/* Video Section */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative bg-gray-900 overflow-hidden">
           {/* Remote Video */}
           <video
             ref={remoteVideoRef}
@@ -243,16 +243,16 @@ export default function MeetingPage() {
           />
           
           {!isConnected && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-              <div className="text-center text-gray-400">
-                <Video className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                <p>Connecting to {role === 'admin' ? 'client' : 'agent'}...</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-0">
+              <div className="text-center text-gray-400 p-4">
+                <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-sm">Connecting...</p>
               </div>
             </div>
           )}
 
-          {/* Local Video */}
-          <div className="absolute bottom-24 right-6 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700">
+          {/* Local Video - PiP */}
+          <div className="absolute bottom-20 right-4 w-32 h-24 md:bottom-24 md:right-6 md:w-64 md:h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700 z-10">
             <video
               ref={localVideoRef}
               autoPlay
@@ -260,36 +260,35 @@ export default function MeetingPage() {
               muted
               className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 px-2 py-1 rounded text-xs text-white">
-              You
-            </div>
           </div>
 
-          {/* Controls */}
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center space-x-4">
-            <button
-              onClick={toggleMute}
-              className={`p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
-            </button>
-            
-            <button
-              onClick={toggleVideo}
-              className={`p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
-              title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
-            >
-              {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
-            </button>
-            
-            <button
-              onClick={endCall}
-              className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
-              title="Leave meeting"
-            >
-              <Phone className="h-6 w-6 text-white transform rotate-135" />
-            </button>
+          {/* Controls - Floating Bar */}
+          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-20 pointer-events-none">
+            <div className="flex items-center space-x-4 bg-black/50 backdrop-blur-sm px-6 py-2 rounded-full pointer-events-auto">
+              <button
+                onClick={toggleMute}
+                className={`p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
+              </button>
+              
+              <button
+                onClick={toggleVideo}
+                className={`p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+              >
+                {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
+              </button>
+              
+              <button
+                onClick={endCall}
+                className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
+                title="Leave meeting"
+              >
+                <Phone className="h-6 w-6 text-white transform rotate-135" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

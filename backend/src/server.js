@@ -159,6 +159,15 @@ async function handleAudioChunk(data, connectionId) {
     // Append to meeting's audio buffer
     meeting.audioBuffer = Buffer.concat([meeting.audioBuffer, audioBuffer]);
     
+    // Privacy/Cost Check: Only process audio if there are at least 2 participants (Agent + Client)
+    if (meeting.participants.length < 2) {
+      // Clear buffer to prevent memory leak, but DO NOT process
+      if (meeting.audioBuffer.length > 500000) { // Clear if gets too big
+         meeting.audioBuffer = Buffer.alloc(0);
+      }
+      return;
+    }
+    
     console.log(`🎤 Audio buffer: ${meeting.audioBuffer.length} bytes`);
     
     // Process every 8 seconds of audio (at 16kHz mono, 8 seconds ≈ 256KB)
