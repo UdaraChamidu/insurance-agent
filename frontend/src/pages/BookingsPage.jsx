@@ -58,7 +58,9 @@ export default function BookingsPage() {
       // 2. Generate Meeting Link (Frontend side)
       // Format: http://localhost:5173/meeting?meetingId=UUID&role=client
       const meetingId = appointment.id;
-      const meetingLink = `${window.location.origin}/meeting?meetingId=${meetingId}&role=client`;
+      // Encode the ID to handle special characters (like Microsoft Graph IDs) safely
+      const encodedId = encodeURIComponent(meetingId);
+      const meetingLink = `${window.location.origin}/meeting?meetingId=${encodedId}&role=client`;
 
       // 3. Send Email using EmailJS
       // Matching variables from your template screenshot:
