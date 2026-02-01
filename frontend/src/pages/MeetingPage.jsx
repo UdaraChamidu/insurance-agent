@@ -12,6 +12,13 @@ export default function MeetingPage() {
   const role = searchParams.get('role') || 'client';
   
   const [error, setError] = useState(null); // Add error state
+  const [logs, setLogs] = useState([]); // Visual logs
+
+  // Helper to add logs
+  const addLog = (msg) => {
+    console.log(msg);
+    setLogs(prev => [...prev.slice(-10), `${new Date().toLocaleTimeString()} - ${msg}`]);
+  };
 
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -46,11 +53,13 @@ export default function MeetingPage() {
 
     try {
       // Connect to WebSocket
+      addLog(`Connecting to WS: ${WS_URL}`);
       await meetingService.connect(WS_URL);
+      addLog('WS Connected');
       
       // Set up callback for remote stream
       meetingService.onRemoteStream = (stream) => {
-        console.log('📹 Setting remote stream');
+        addLog('📹 Remote stream received');
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = stream;
         }
@@ -59,7 +68,7 @@ export default function MeetingPage() {
       // Set up callbacks for transcriptions and AI suggestions (admin only)
       if (role === 'admin') {
         meetingService.onTranscription = (data) => {
-          console.log('📝 Transcription received:', data);
+          addLog('📝 Transcription received');
           const entry = {
             text: data.text,
             timestamp: new Date().toLocaleTimeString()
@@ -73,7 +82,7 @@ export default function MeetingPage() {
         };
         
         meetingService.onAISuggestion = (data) => {
-          console.log('💡 AI Suggestion received:', data);
+          addLog('💡 AI Suggestion received');
           const entry = {
             suggestion: data.suggestion,
             timestamp: new Date().toLocaleTimeString()
@@ -88,11 +97,13 @@ export default function MeetingPage() {
       }
       
       // Join meeting (peer connections handled automatically)
+      addLog(`Joining meeting: ${meetingId}`);
       const stream = await meetingService.joinMeeting(
         meetingId,
         `${role}-${userName.replace(/\s+/g, '-')}-${Date.now()}`,
         role
       );
+      addLog('✅ Local stream acquired');
       
       // Set local video
       if (localVideoRef.current) {
@@ -102,7 +113,8 @@ export default function MeetingPage() {
       setIsConnected(true);
       setIsJoined(true);
     } catch (error) {
-      console.error('Error joining meeting:', error);
+      addLog(`❌ Error: ${error.message}`);
+      setError(error.message);
       alert('Failed to join meeting. Please check your camera and microphone permissions.');
     }
   };

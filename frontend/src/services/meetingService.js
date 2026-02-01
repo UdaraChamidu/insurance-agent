@@ -139,9 +139,9 @@ class MeetingService {
         video: true,
         audio: {
           echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
+          noiseSuppression: true
+          // Removed sampleRate: 16000 to fix OverconstrainedError on mobiles
+          // browser will handle resampling in AudioContext
         }
       });
       
