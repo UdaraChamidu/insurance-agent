@@ -1,88 +1,105 @@
-import { authService } from './microsoft-auth.js';
+import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+
+// Helper to log to file
+const logToFile = (message) => {
+  const logPath = path.join(process.cwd(), 'email-error.log');
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  try {
+    fs.appendFileSync(logPath, logMessage);
+  } catch (err) {
+    console.error('Failed to write to log file:', err);
+  }
+};
 
 /**
- * Email Service using Microsoft Graph Mail API
+ * Email Service using Nodemailer (SMTP)
  * Sends meeting invitations to customers
  */
 class EmailService {
+  constructor() {
+    this.transporter = null;
+    this.initializeTransporter();
+  }
+
+  initializeTransporter() {
+    // Check if SMTP credentials are provided
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('⚠️ SMTP credentials not found in .env. Email sending will be simulated.');
+      return;
+    }
+
+    this.transporter = nodemailer.createTransport({
+      service: process.env.SMTP_SERVICE || 'gmail', // Default to Gmail
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+
   /**
    * Send meeting invitation email
    */
   async sendMeetingInvitation(recipientEmail, recipientName, meetingDetails) {
     try {
-      console.log(`📧 ==== EMAIL SERVICE START ====`);
-      console.log(`Recipient: ${recipientEmail}`);
-      console.log(`Name: ${recipientName}`);
-      console.log(`Meeting Details:`, meetingDetails);
-      
-      console.log(`🔐 Getting Graph client...`);
-      const client = await authService.getGraphClient();
-      console.log(`✅ Graph client obtained`);
+      const startMsg = `📧 ==== EMAIL SERVICE START (Nodemailer) ==== \nTo: ${recipientEmail}`;
+      console.log(startMsg);
+      logToFile(startMsg);
+
+      if (!this.transporter) {
+        // Try initializing again
+        this.initializeTransporter();
+        if (!this.transporter) {
+          const msg = '❌ SMTP credentials missing. Please set SMTP_USER and SMTP_PASS in .env';
+          console.error(msg);
+          logToFile(msg);
+          throw new Error('SMTP credentials missing. Please configure .env file.');
+        }
+      }
       
       const meetingUrl = meetingDetails.meetingUrl;
       const dateStr = new Date(meetingDetails.startDateTime).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
       const timeStr = new Date(meetingDetails.startDateTime).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
+        hour: 'numeric', minute: '2-digit', hour12: true
       });
       
-      console.log(`📝 Generating email template...`);
       const emailBody = this.generateEmailTemplate(recipientName, {
         date: dateStr,
         time: timeStr,
         agentName: meetingDetails.staffMemberDisplayName || 'Your Agent',
         meetingUrl: meetingUrl
       });
-      console.log(`✅ Email template generated (${emailBody.length} chars)`);
       
-      const mailMessage = {
-        message: {
-          subject: `Your Insurance Consultation - ${dateStr}`,
-          body: {
-            contentType: 'HTML',
-            content: emailBody
-          },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: recipientEmail,
-                name: recipientName
-              }
-            }
-          ]
-        },
-        saveToSentItems: true
+      const mailOptions = {
+        from: `"SecureLife Insurance" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: `Your Insurance Consultation - ${dateStr}`,
+        html: emailBody
       };
       
-      console.log(`📤 Calling Graph API /me/sendMail...`);
-      console.log(`Subject: ${mailMessage.message.subject}`);
-      console.log(`To: ${recipientEmail}`);
+      console.log(`📤 Sending via ${process.env.SMTP_SERVICE || 'gmail'}...`);
+      const info = await this.transporter.sendMail(mailOptions);
       
-      await client.api('/me/sendMail').post(mailMessage);
-      
-      console.log(`✅ ==== EMAIL SENT SUCCESSFULLY ====`);
+      const successMsg = `✅ Email sent successfully! Message ID: ${info.messageId}`;
+      console.log(successMsg);
+      logToFile(successMsg);
       
       return {
         success: true,
         sentTo: recipientEmail,
-        sentAt: new Date().toISOString()
+        sentAt: new Date().toISOString(),
+        messageId: info.messageId
       };
       
     } catch (error) {
-      console.error('❌ ========== EMAIL ERROR =========');
-      console.error('Error Name:', error.name);
-      console.error('Error Message:', error.message);
-      console.error('Error Code:', error.code);
-      console.error('Status Code:', error.statusCode);
-      console.error('Error Body:', error.body);
-      console.error('Full Error:', JSON.stringify(error, null, 2));
-      console.error('==================================');
+      const errorMsg = `❌ ========== EMAIL ERROR =========\nError Name: ${error.name}\nError Message: ${error.message}\nFull Error: ${JSON.stringify(error, null, 2)}\n==================================\n`;
+      console.error(errorMsg);
+      logToFile(errorMsg);
       throw new Error(`Failed to send email: ${error.message}`);
     }
   }

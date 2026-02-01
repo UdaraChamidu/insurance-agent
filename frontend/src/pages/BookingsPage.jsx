@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
+import emailjs from '@emailjs/browser';
 
 export default function BookingsPage() {
   const navigate = useNavigate();
@@ -37,15 +38,62 @@ export default function BookingsPage() {
   };
 
   const handleSendInvitation = async (appointmentId) => {
+    // Get EmailJS credentials from environment variables
+    const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+    const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+    if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
+      alert('EmailJS credentials missing in .env file!');
+      console.error('Missing credentials:', { SERVICE_ID, TEMPLATE_ID, PUBLIC_KEY });
+      return;
+    }
+
     setSendingInvitation(prev => ({ ...prev, [appointmentId]: true }));
     try {
-      const result = await bookingsService.sendInvitation(appointmentId);
-      alert(`✅ ${result.message}\n\nMeeting URL: ${result.meetingUrl}`);
-      // Refresh appointments
-      await loadAppointments();
+      // 1. Get appointment details
+      const appointment = appointments.find(a => a.id === appointmentId);
+      if (!appointment) throw new Error('Appointment not found');
+
+      // 2. Generate Meeting Link (Frontend side)
+      // Format: http://localhost:5173/meeting?meetingId=UUID&role=client
+      const meetingId = appointment.id;
+      const meetingLink = `${window.location.origin}/meeting?meetingId=${meetingId}&role=client`;
+
+      // 3. Send Email using EmailJS
+      // Matching variables from your template screenshot:
+      // {{to_email}}, {{customer_name}}, {{meeting_time}}, {{meeting_id}}, {{passcode}}, {{join_link}}, {{description}}, {{email}}
+      
+      const dateStr = bookingsService.formatDate(appointment.startDateTime);
+      const timeStr = bookingsService.formatTime(appointment.startDateTime);
+      
+      const emailParams = {
+        // Recipient Mapping
+        to_email: appointment.customerEmailAddress,
+        email: 'agent@securelife.com', // For "Reply To" field (or put agent's email here)
+        
+        // Content Mapping
+        customer_name: appointment.customerName,
+        meeting_time: `${dateStr} at ${timeStr}`,
+        meeting_id: meetingId,
+        passcode: 'No Passcode Required', // Or 'Direct Link'
+        join_link: meetingLink,
+        description: appointment.serviceName || 'Insurance Consultation',
+        
+        // Keep old ones just in case
+        date: dateStr,
+        time: timeStr,
+        service_name: appointment.serviceName
+      };
+
+      console.log('Sending email with params:', emailParams);
+      await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
+
+      alert(`✅ Invitation sent to ${appointment.customerEmailAddress}\n\nLink: ${meetingLink}`);
+      
     } catch (error) {
       console.error('Error sending invitation:', error);
-      alert('Failed to send invitation. Please try again.');
+      alert(`Failed to send invitation: ${error.text || error.message}`);
     } finally {
       setSendingInvitation(prev => ({ ...prev, [appointmentId]: false }));
     }

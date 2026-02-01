@@ -210,8 +210,9 @@ class RealBookingsService {
       const { emailService } = await import('./email-service.js');
       console.log(`✅ Email service imported`);
       
-      // Send email with meeting link
       console.log(`📤 [4/5] Sending email to ${appointment.customerEmailAddress}...`);
+      logToFile(`Attempting to send email to ${appointment.customerEmailAddress}`);
+      
       const result = await emailService.sendMeetingInvitation(
         appointment.customerEmailAddress,
         appointment.customerName,
@@ -222,7 +223,9 @@ class RealBookingsService {
         }
       );
       
-      console.log(`✅ [5/5] Invitation sent successfully!`);
+      const successMsg = `✅ [5/5] Invitation sent successfully!`;
+      console.log(successMsg);
+      logToFile(successMsg);
       
       return {
         success: true,
@@ -232,15 +235,14 @@ class RealBookingsService {
         meetingUrl: meetingUrl
       };
     } catch (error) {
-      console.error('❌ ========== EMAIL SEND ERROR ==========');
-      console.error('Error type:', error.constructor.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      const errorMsg = `❌ ========== EMAIL SEND ERROR (Bookings Service) =========\nError type: ${error.constructor.name}\nError message: ${error.message}\nError stack: ${error.stack}\n`;
+      console.error(errorMsg);
+      logToFile(errorMsg);
       if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
+         logToFile(`Response data: ${JSON.stringify(error.response.data)}\n`);
       }
-      console.error('==========================================');
+      logToFile('==========================================\n');
+      
       throw new Error(`Failed to send invitation: ${error.message}`);
     }
   }
