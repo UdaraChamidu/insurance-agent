@@ -118,9 +118,17 @@ class SharePointService {
   }
   
   /**
-   * List PDF files in a specific folder
+   * List PDF files in a specific folder (legacy - use listDocumentsInFolder)
    */
   async listPDFsInFolder(folderName, libraryName = 'KB-DEV') {
+    return this.listDocumentsInFolder(folderName, libraryName);
+  }
+  
+  /**
+   * List all supported document files in a specific folder
+   * Supports: PDF, DOCX, XLSX, XLS, TXT, MD, CSV
+   */
+  async listDocumentsInFolder(folderName, libraryName = 'KB-DEV') {
     try {
       const client = await this.getGraphClient();
       const library = await this.getDocumentLibrary(libraryName);
@@ -132,25 +140,30 @@ class SharePointService {
         .expand('listItem($expand=fields)')
         .get();
       
-      // Filter PDFs
-      const pdfs = items.value.filter(item => 
-        item.file && item.name.toLowerCase().endsWith('.pdf')
-      );
+      // Supported extensions
+      const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.txt', '.md', '.csv'];
+      
+      // Filter supported documents
+      const documents = items.value.filter(item => {
+        if (!item.file) return false;
+        const fileName = item.name.toLowerCase();
+        return supportedExts.some(ext => fileName.endsWith(ext));
+      });
       
       // Map to our format with metadata
-      const pdfDetails = pdfs.map(pdf => ({
-        id: pdf.id,
-        name: pdf.name,
-        size: pdf.size,
-        lastModified: pdf.lastModifiedDateTime,
-        downloadUrl: pdf['@microsoft.graph.downloadUrl'],
-        metadata: this.extractMetadata(pdf, folderName)
+      const docDetails = documents.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        size: doc.size,
+        lastModified: doc.lastModifiedDateTime,
+        downloadUrl: doc['@microsoft.graph.downloadUrl'],
+        metadata: this.extractMetadata(doc, folderName)
       }));
       
-      console.log(`✅ Found ${pdfDetails.length} PDFs in ${folderName}`);
-      return pdfDetails;
+      console.log(`✅ Found ${docDetails.length} document(s) in ${folderName}`);
+      return docDetails;
     } catch (error) {
-      console.error(`❌ Error listing PDFs in ${folderName}:`, error.message);
+      console.error(`❌ Error listing documents in ${folderName}:`, error.message);
       throw error;
     }
   }
@@ -176,9 +189,9 @@ class SharePointService {
   }
   
   /**
-   * Download PDF file content
+   * Download document file content (PDF, DOCX, XLSX, TXT, etc.)
    */
-  async downloadPDF(downloadUrl) {
+  async downloadDocument(downloadUrl) {
     try {
       const response = await fetch(downloadUrl);
       
@@ -195,40 +208,48 @@ class SharePointService {
   }
   
   /**
-   * Sync all PDFs from all folders
+   * Sync all documents from all folders
+   * Supports: PDF, DOCX, XLSX, TXT, MD, CSV
    */
   async syncAllFolders(libraryName = 'KB-DEV') {
     try {
-      console.log('🔄 Starting SharePoint sync...');
+      console.log('🔄 Starting SharePoint sync (all document types)...');
       
-      const allPDFs = [];
+      const allDocuments = [];
       
       for (const folder of this.folders) {
         console.log(`\n📁 Syncing folder: ${folder.name}...`);
         
         try {
-          const pdfs = await this.listPDFsInFolder(folder.name, libraryName);
+          const documents = await this.listDocumentsInFolder(folder.name, libraryName);
           
-          // Add universe namespace to each PDF
-          pdfs.forEach(pdf => {
-            pdf.namespace = folder.universe;
+          // Add universe namespace to each document
+          documents.forEach(doc => {
+            doc.namespace = folder.universe;
           });
           
-          allPDFs.push(...pdfs);
+          allDocuments.push(...documents);
           
-          console.log(`   ✅ ${pdfs.length} PDFs found`);
+          console.log(`   ✅ ${documents.length} document(s) found`);
         } catch (error) {
           console.error(`   ⚠️  Error syncing ${folder.name}:`, error.message);
           // Continue with other folders
         }
       }
       
-      console.log(`\n✅ Sync complete: ${allPDFs.length} total PDFs found`);
-      return allPDFs;
+      console.log(`\n✅ Sync complete: ${allDocuments.length} total documents found`);
+      return allDocuments;
     } catch (error) {
       console.error('❌ Sync error:', error);
       throw error;
     }
+  }
+  
+  /**
+   * Legacy alias - use syncAllFolders instead
+   */
+  async downloadPDF(downloadUrl) {
+    return this.downloadDocument(downloadUrl);
   }
   
   /**

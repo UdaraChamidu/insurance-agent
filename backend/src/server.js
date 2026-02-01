@@ -17,6 +17,7 @@ const openai = new OpenAI({
 });
 
 import { smartBookingsService as bookingsService } from './services/bookings-service.js';
+import { autoIngestionService } from './services/auto-ingestion-service.js';
 
 app.use(cors());
 app.use(express.json());
@@ -399,6 +400,14 @@ app.get('/health', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Start auto-ingestion service
+  try {
+    await autoIngestionService.start();
+  } catch (error) {
+    console.error('❌ Failed to start auto-ingestion:', error.message);
+    console.log('⚠️  Auto-ingestion disabled. Server will continue without it.');
+  }
 });

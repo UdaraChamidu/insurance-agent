@@ -1,5 +1,5 @@
 import { sharePointService } from './sharepoint-service.js';
-import { pdfProcessor } from './pdf-processor.js';
+import { documentProcessor } from './document-processor.js';
 import { chunkingService } from './chunking-service.js';
 import { embeddingService } from './embedding-service.js';
 import { pineconeService } from './pinecone-service.js';
@@ -35,47 +35,48 @@ class IngestionOrchestrator {
       await pineconeService.initialize();
       
       // Step 2: Sync SharePoint files
-      console.log('\n📍 Step 2: Sync SharePoint Documents');
-      const pdfs = await sharePointService.syncAllFolders();
+      console.log('\n📍 Step 2: Sync SharePoint Documents (All Types)');
+      const documents = await sharePointService.syncAllFolders();
       
-      if (pdfs.length === 0) {
-        console.log('⚠️  No PDFs found in SharePoint. Exiting.');
+      if (documents.length === 0) {
+        console.log('⚠️  No documents found in SharePoint. Exiting.');
         return this.getStats();
       }
       
-      // Step 3: Process each PDF
-      console.log('\n📍 Step 3: Process PDFs');
-      const processedPDFs = [];
+      // Step 3: Process each document
+      console.log('\n📍 Step 3: Process Documents');
+      const processedDocs = [];
       
-      for (const pdf of pdfs) {
+      for (const doc of documents) {
         try {
-          console.log(`\n📄 Processing: ${pdf.name} (${(pdf.size / 1024).toFixed(1)} KB)`);
+          const fileType = doc.name.split('.').pop().toUpperCase();
+          console.log(`\n📄 Processing: ${doc.name} [${fileType}] (${(doc.size / 1024).toFixed(1)} KB)`);
           
-          // Download PDF
-          const pdfBuffer = await sharePointService.downloadPDF(pdf.downloadUrl);
+          // Download document
+          const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl);
           
-          // Extract text
-          const processed = await pdfProcessor.processPDF(pdfBuffer, pdf.name);
+          // Extract text (works for PDF, DOCX, XLSX, TXT, etc.)
+          const processed = await documentProcessor.processDocument(docBuffer, doc.name);
           
-          processedPDFs.push({
+          processedDocs.push({
             processed,
-            metadata: pdf.metadata,
-            namespace: pdf.namespace,
-            fileName: pdf.name
+            metadata: doc.metadata,
+            namespace: doc.namespace,
+            fileName: doc.name
           });
           
           this.stats.pdfsProcessed++;
         } catch (error) {
-          console.error(`❌ Error processing ${pdf.name}:`, error.message);
-          this.stats.errors.push({ file: pdf.name, error: error.message });
+          console.error(`❌ Error processing ${doc.name}:`, error.message);
+          this.stats.errors.push({ file: doc.name, error: error.message });
         }
       }
       
       // Step 4: Create chunks
-      console.log(`\n📍 Step 4: Create Chunks from ${processedPDFs.length} PDFs`);
+      console.log(`\n📍 Step 4: Create Chunks from ${processedDocs.length} Documents`);
       const allChunks = [];
       
-      for (const item of processedPDFs) {
+      for (const item of processedDocs) {
         try {
           const chunks = await chunkingService.createChunks(
             item.processed,

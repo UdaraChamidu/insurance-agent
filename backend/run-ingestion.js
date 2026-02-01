@@ -1,0 +1,172 @@
+import dotenv from 'dotenv';
+import { ingestionOrchestrator } from './src/services/ingestion-orchestrator.js';
+import { pineconeService } from './src/services/pinecone-service.js';
+import { sharePointService } from './src/services/sharepoint-service.js';
+
+dotenv.config();
+
+/**
+ * RAG Ingestion Script
+ * Processes all PDFs from SharePoint and uploads to Pinecone
+ */
+
+async function runIngestion() {
+  console.log('\n🚀 Starting RAG Ingestion Pipeline\n');
+  console.log('='.repeat(60));
+  
+  try {
+    // Step 1: Verify configuration
+    console.log('\n📋 Step 1: Verifying Configuration...\n');
+    
+    if (!pineconeService.isConfigured) {
+      console.error('❌ Pinecone not configured. Please set PINECONE_API_KEY in .env');
+      process.exit(1);
+    }
+    console.log('✅ Pinecone API key configured');
+    
+    if (!sharePointService.isReady()) {
+      console.error('❌ SharePoint not configured. Please set SHAREPOINT_SITE_URL in .env');
+      process.exit(1);
+    }
+    console.log('✅ SharePoint URL configured');
+    
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ OpenAI not configured. Please set OPENAI_API_KEY in .env');
+      process.exit(1);
+    }
+    console.log('✅ OpenAI API key configured');
+    
+    // Step 2: Initialize Pinecone
+    console.log('\n📋 Step 2: Initializing Pinecone...\n');
+    
+    await pineconeService.initialize();
+    console.log('✅ Connected to Pinecone');
+    
+    const created = await pineconeService.createIndexIfNeeded();
+    if (created) {
+      console.log('✅ Pinecone index created');
+      console.log('⏳ Waiting 60 seconds for index to initialize...');
+      await new Promise(resolve => setTimeout(resolve, 60000));
+    } else {
+      console.log('✅ Pinecone index already exists');
+    }
+    
+    // Get index stats
+    try {
+      const stats = await pineconeService.getStats();
+      console.log('\n📊 Current Index Stats:');
+      console.log(`   Total vectors: ${stats.totalVectorCount || 0}`);
+      console.log(`   Dimension: ${stats.dimension || 1536}`);
+      
+      if (stats.namespaces && Object.keys(stats.namespaces).length > 0) {
+        console.log('   Namespaces with data:');
+        Object.entries(stats.namespaces).forEach(([ns, data]) => {
+          console.log(`      - ${ns}: ${data.vectorCount} vectors`);
+        });
+      }
+    } catch (error) {
+      console.log('⚠️  Could not fetch index stats (this is okay for new indexes)');
+    }
+    
+    // Step 3: Check SharePoint for PDFs
+    console.log('\n📋 Step 3: Checking SharePoint for PDFs...\n');
+    
+    const site = await sharePointService.getSiteInfo();
+    console.log(`✅ Connected to SharePoint: ${site.displayName}`);
+    
+    const folders = await sharePointService.listFolders('KBDEV');
+    console.log(`✅ Found ${folders.length} folders in KBDEV`);
+    
+    let totalPDFs = 0;
+    const folderSummary = [];
+    
+    for (const folder of folders) {
+      try {
+        const pdfs = await sharePointService.listPDFsInFolder(folder.name);
+        totalPDFs += pdfs.length;
+        folderSummary.push({ folder: folder.name, count: pdfs.length });
+        
+        if (pdfs.length > 0) {
+          console.log(`   📁 ${folder.name}: ${pdfs.length} PDF(s)`);
+        }
+      } catch (error) {
+        console.error(`   ❌ Error checking ${folder.name}:`, error.message);
+      }
+    }
+    
+    if (totalPDFs === 0) {
+      console.log('\n⚠️  No PDFs found in SharePoint!');
+      console.log('\n📝 Next Steps:');
+      console.log('   1. Go to: https://helmygenesis.sharepoint.com/sites/EliteDealBroker');
+      console.log('   2. Open: KBDEV library');
+      console.log('   3. Upload regulatory PDFs to the appropriate folders');
+      console.log('   4. Run this script again');
+      process.exit(0);
+    }
+    
+    console.log(`\n✅ Total: ${totalPDFs} PDF(s) ready to process`);
+    
+    // Step 4: Confirm before processing
+    console.log('\n📋 Step 4: Ready to Process...\n');
+    console.log('This will:');
+    console.log(`   • Process ${totalPDFs} PDF files`);
+    console.log('   • Extract text and create chunks');
+    console.log('   • Generate OpenAI embeddings');
+    console.log('   • Upload vectors to Pinecone');
+    
+    // Estimate costs
+    const estimatedChunks = totalPDFs * 20; // Rough estimate: 20 chunks per PDF
+    const embeddingCost = (estimatedChunks / 1000) * 0.0001; // $0.0001 per 1K tokens
+    
+    console.log(`\n💰 Estimated Cost:`);
+    console.log(`   • ~${estimatedChunks} chunks`);
+    console.log(`   • ~$${embeddingCost.toFixed(4)} for embeddings`);
+    console.log(`   • Processing time: ${Math.ceil(totalPDFs / 2)} minutes`);
+    
+// Auto-proceed (you can add confirmation prompt here if needed)
+    console.log('\n▶️  Starting ingestion in 5 seconds...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Step 5: Run full ingestion
+    console.log('\n📋 Step 5: Running Full Ingestion Pipeline...\n');
+    console.log('='.repeat(60));
+    
+    const result = await ingestionOrchestrator.runFullIngestion();
+    
+    // Step 6: Summary
+    console.log('\n' + '='.repeat(60));
+    console.log('✅ INGESTION COMPLETE!\n');
+    console.log('📊 Summary:');
+    console.log(`   PDFs Processed: ${result.stats.processed}/${result.stats.total}`);
+    console.log(`   Total Chunks: ${result.stats.totalChunks}`);
+    console.log(`   Total Vectors: ${result.stats.totalVectors}`);
+    console.log(`   Failed: ${result.stats.failed || 0}`);
+    
+    if (result.stats.byNamespace) {
+      console.log('\n📁 By Namespace:');
+      Object.entries(result.stats.byNamespace).forEach(([ns, count]) => {
+        console.log(`   ${ns}: ${count} vectors`);
+      });
+    }
+    
+    console.log('\n✅ Your knowledge base is ready!');
+    console.log('\n🎯 Next Steps:');
+    console.log('   1. Verify data in Pinecone dashboard');
+    console.log('   2. Build the query & answer system');
+    console.log('   3. Create the frontend chat UI');
+    console.log('='.repeat(60) + '\n');
+    
+  } catch (error) {
+    console.error('\n❌ Ingestion failed:', error.message);
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+// Run ingestion
+runIngestion()
+  .then(() => process.exit(0))
+  .catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
