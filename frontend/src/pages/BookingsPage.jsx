@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter, Bell } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 import emailjs from '@emailjs/browser';
 
@@ -19,11 +19,7 @@ export default function BookingsPage() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  useEffect(() => {
-    loadAppointments();
-  }, [filter]);
-
-  const loadAppointments = async () => {
+  const fetchAppointments = async () => {
     setLoading(true);
     try {
       const filters = {};
@@ -43,6 +39,11 @@ export default function BookingsPage() {
       setLoading(false);
     }
   };
+  const [successModal, setSuccessModal] = useState({ show: false, email: '', phone: null, link: '' });
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [filter]);
 
   const handleSendInvitation = async (appointmentId) => {
     // Get EmailJS credentials from environment variables
@@ -98,13 +99,7 @@ export default function BookingsPage() {
       console.log('Sending email with params:', emailParams);
       await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
 
-      alert(`✅ Invitation sent to ${appointment.customerEmailAddress}\n\nLink: ${meetingLink}`);
-      
-      setInvitationStatus(prev => {
-        const newState = { ...prev, [appointmentId]: true };
-        localStorage.setItem('invitationStatus', JSON.stringify(newState));
-        return newState;
-      });
+      let smsSent = false;
 
       // 4. Send SMS (if phone number exists)
       if (appointment.customerPhone) {
@@ -119,11 +114,27 @@ export default function BookingsPage() {
             })
           });
           console.log('📱 SMS sent successfully');
+          smsSent = true;
         } catch (smsError) {
           console.error('Failed to send SMS:', smsError);
           // Don't alert user about SMS failure if email succeeded, checking console is enough
         }
       }
+
+      // 5. Update UI
+      setInvitationStatus(prev => {
+        const newState = { ...prev, [appointmentId]: true };
+        localStorage.setItem('invitationStatus', JSON.stringify(newState));
+        return newState;
+      });
+      
+      // Show Success Modal instead of alert
+      setSuccessModal({
+        show: true,
+        email: appointment.customerEmailAddress,
+        phone: smsSent ? appointment.customerPhone : null,
+        link: meetingLink
+      });
 
     } catch (error) {
       console.error('Error sending invitation:', error);
@@ -186,27 +197,54 @@ export default function BookingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-slate-900 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-10">
+      <header className="bg-white dark:bg-black/30 backdrop-blur-md border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center space-x-4 w-full md:w-auto">
               <button
-                onClick={() => navigate('/admin')}
-                className="text-white hover:text-blue-300 transition"
+                onClick={() => navigate('/')}
+                className="text-gray-600 dark:text-white hover:text-blue-600 dark:hover:text-blue-300 transition"
               >
                 <ArrowLeft className="h-6 w-6" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Scheduled Meetings</h1>
-                <p className="text-sm text-gray-400">Manage your appointments and consultations</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Scheduled Meetings</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Manage your appointments and consultations</p>
               </div>
             </div>
             <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
-              <div className="px-4 py-2 bg-blue-600/20 rounded-lg border border-blue-500/30">
-                <div className="text-xs text-blue-300">Total Appointments</div>
-                <div className="text-2xl font-bold text-white">{filteredAppointments.length}</div>
+              <button
+                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-white transition-colors relative"
+                title="Notifications"
+              >
+                <Bell className="h-6 w-6" />
+                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              </button>
+              
+              <button
+                onClick={() => navigate('/admin/profile')}
+                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-white transition-colors"
+                title="Admin Profile"
+              >
+                <User className="h-6 w-6" />
+              </button>
+
+              <div className="h-8 w-px bg-gray-300 dark:bg-white/10 mx-2"></div>
+
+              <button
+                onClick={fetchAppointments}
+                className="p-2 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-lg text-gray-700 dark:text-white transition-all flex items-center gap-2"
+                title="Refresh Appointments"
+              >
+                <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">Refresh</span>
+              </button>
+              
+              <div className="hidden md:block px-4 py-2 bg-blue-100 dark:bg-blue-600/20 rounded-lg border border-blue-200 dark:border-blue-500/30">
+                <div className="text-xs text-blue-600 dark:text-blue-300">Total Appointments</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{filteredAppointments.length}</div>
               </div>
             </div>
           </div>
@@ -350,6 +388,68 @@ export default function BookingsPage() {
           </div>
         )}
       </div>
+
+      {/* Success Modal */}
+      {successModal.show && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 border border-green-500/30 p-8 rounded-2xl shadow-2xl max-w-lg w-full relative animate-fadeIn">
+            <button 
+              onClick={() => setSuccessModal({ ...successModal, show: false })}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <XCircle className="h-6 w-6" />
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle className="h-10 w-10 text-green-400" />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-white mb-2">Invitation Sent!</h2>
+              <p className="text-gray-300 mb-6">
+                The meeting details have been successfully delivered.
+              </p>
+              
+              <div className="bg-white/5 rounded-xl p-4 w-full space-y-3 mb-6">
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="h-5 w-5 text-blue-400" />
+                  <span className="text-gray-300">Email sent to:</span>
+                  <span className="text-white font-medium ml-auto truncate max-w-[200px]">{successModal.email}</span>
+                </div>
+                
+                {successModal.phone && (
+                  <div className="flex items-center gap-3 text-sm border-t border-white/10 pt-3">
+                    <Phone className="h-5 w-5 text-green-400" />
+                    <span className="text-gray-300">SMS sent to:</span>
+                    <span className="text-white font-medium ml-auto">{successModal.phone}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="w-full">
+                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 text-left">Meeting Link</label>
+                <div className="bg-black/50 p-3 rounded-lg border border-white/10 flex items-center justify-between group">
+                  <code className="text-blue-300 text-sm truncate mr-4">{successModal.link}</code>
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(successModal.link)}
+                    className="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Copy Link"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSuccessModal({ ...successModal, show: false })}
+                className="mt-8 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all w-full"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
