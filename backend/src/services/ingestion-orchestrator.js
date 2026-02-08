@@ -127,7 +127,7 @@ class IngestionOrchestrator {
           console.log(`\n📄 Processing: ${doc.name} [${fileType}] (${(doc.size / 1024).toFixed(1)} KB)`);
           
           // Download document
-          const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl);
+          const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl, doc.driveId, doc.id);
           
           // Extract text (works for PDF, DOCX, XLSX, TXT, etc.)
           const processed = await documentProcessor.processDocument(docBuffer, doc.name);

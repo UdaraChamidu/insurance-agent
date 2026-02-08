@@ -74,8 +74,9 @@ async function runIngestion() {
     const site = await sharePointService.getSiteInfo();
     console.log(`✅ Connected to SharePoint: ${site.displayName}`);
     
-    const folders = await sharePointService.listFolders('KBDEV');
-    console.log(`✅ Found ${folders.length} folders in KBDEV`);
+    const libraryName = process.env.SHAREPOINT_KB_DEV_ID || 'KB-DEV';
+    const folders = await sharePointService.listFolders(libraryName);
+    console.log(`✅ Found ${folders.length} folders in ${libraryName}`);
     
     let totalPDFs = 0;
     const folderSummary = [];
@@ -146,17 +147,15 @@ async function runIngestion() {
     console.log('\n' + '='.repeat(60));
     console.log('✅ INGESTION COMPLETE!\n');
     console.log('📊 Summary:');
-    console.log(`   PDFs Processed: ${result.stats.processed || result.stats.pdfsProcessed}/${result.stats.total || totalPDFs}`);
-    console.log(`   Skipped: ${result.stats.skipped}`);
-    console.log(`   Total Chunks: ${result.stats.totalChunks || result.stats.chunksCreated}`);
-    console.log(`   Total Vectors: ${result.stats.totalVectors}`);
-    console.log(`   Failed: ${result.stats.failed || 0}`);
+    console.log(`   PDFs Processed: ${result.pdfsProcessed || 0}/${totalPDFs}`);
+    console.log(`   Skipped: ${result.skipped || 0}`);
+    console.log(`   Total Chunks: ${result.chunksCreated || 0}`);
+    console.log(`   Total Vectors: ${result.vectorsUploaded || 0}`);
+    console.log(`   Errors: ${result.errors ? result.errors.length : 0}`);
     
-    if (result.stats.byNamespace) {
-      console.log('\n📁 By Namespace:');
-      Object.entries(result.stats.byNamespace).forEach(([ns, count]) => {
-        console.log(`   ${ns}: ${count} vectors`);
-      });
+    if (result.errors && result.errors.length > 0) {
+      console.log('\n⚠️  Errors encountered:');
+      result.errors.forEach(e => console.log(`   - ${e.file || e.stage}: ${e.error}`));
     }
     
     console.log('\n✅ Your knowledge base is ready!');

@@ -132,7 +132,7 @@ class AutoIngestionService {
       console.log(`\n⚙️  Processing: ${doc.name} [${fileType}]...`);
       
       // Download document
-      const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl);
+      const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl, doc.driveId, doc.id);
       
       // Extract text
       const processed = await documentProcessor.processDocument(docBuffer, doc.name);

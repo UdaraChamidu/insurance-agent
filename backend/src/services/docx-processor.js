@@ -12,12 +12,25 @@ class DocxProcessor {
     try {
       console.log('📄 Extracting text from DOCX...');
       
-      const result = await mammoth.extractRawText({ buffer: docxBuffer });
+      // Ensure buffer is in the correct format for mammoth
+      let buffer = docxBuffer;
+      if (docxBuffer instanceof ArrayBuffer) {
+        buffer = Buffer.from(docxBuffer);
+      }
+      
+      const result = await mammoth.extractRawText({ buffer: buffer });
+      
+      // Handle case where result.text might be undefined or null
+      const text = result.value || result.text || '';
+      
+      if (!text || text.trim().length === 0) {
+        console.warn('⚠️  DOCX appears to be empty or could not extract text');
+      }
       
       const extracted = {
-        text: result.text,
-        wordCount: result.text.split(/\s+/).filter(w => w.length > 0).length,
-        charCount: result.text.length,
+        text: text,
+        wordCount: text ? text.split(/\s+/).filter(w => w.length > 0).length : 0,
+        charCount: text ? text.length : 0,
         messages: result.messages || []
       };
       
@@ -52,11 +65,17 @@ class DocxProcessor {
       return {
         text: cleanedText,
         rawText: extracted.text,
-        fileName: fileName,
-        fileType: 'docx',
+        // Match the PDF processor format for compatibility with chunking service
+        headings: sections,
+        metadata: {
+          fileName: fileName,
+          title: fileName.replace(/\.[^/.]+$/, ''),
+          fileType: 'docx',
+          numPages: Math.ceil(extracted.wordCount / 500), // Approximate pages
+          author: null
+        },
         wordCount: extracted.wordCount,
         charCount: extracted.charCount,
-        sections: sections,
         conversionMessages: extracted.messages
       };
     } catch (error) {

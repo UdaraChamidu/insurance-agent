@@ -153,6 +153,7 @@ class SharePointService {
       // Map to our format with metadata
       const docDetails = documents.map(doc => ({
         id: doc.id,
+        driveId: library.id,
         name: doc.name,
         size: doc.size,
         lastModified: doc.lastModifiedDateTime,
@@ -190,19 +191,57 @@ class SharePointService {
   
   /**
    * Download document file content (PDF, DOCX, XLSX, TXT, etc.)
+   * @param {string|undefined} downloadUrl - The direct download URL (may be undefined)
+   * @param {string} driveId - The drive ID (for fallback)
+   * @param {string} itemId - The item ID (for fallback)
    */
-  async downloadDocument(downloadUrl) {
+  async downloadDocument(downloadUrl, driveId, itemId) {
     try {
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // If we have a direct download URL, use it
+      if (downloadUrl) {
+        const response = await fetch(downloadUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const buffer = await response.arrayBuffer();
+        return Buffer.from(buffer);
       }
       
-      const buffer = await response.arrayBuffer();
-      return Buffer.from(buffer);
+      // Fallback: Use Graph API to get the content
+      if (driveId && itemId) {
+        console.log('   📥 Using Graph API fallback for download...');
+        const client = await this.getGraphClient();
+        const content = await client
+          .api(`/drives/${driveId}/items/${itemId}/content`)
+          .responseType('arraybuffer')
+          .get();
+        
+        // Handle different response types
+        if (content instanceof ArrayBuffer) {
+          return Buffer.from(content);
+        } else if (Buffer.isBuffer(content)) {
+          return content;
+        } else if (content && typeof content.pipe === 'function') {
+          // It's a stream - collect chunks
+          const chunks = [];
+          for await (const chunk of content) {
+            chunks.push(chunk);
+          }
+          return Buffer.concat(chunks);
+        } else if (content && content.arrayBuffer) {
+          // It's a Blob or Response
+          const arrayBuffer = await content.arrayBuffer();
+          return Buffer.from(arrayBuffer);
+        } else {
+          throw new Error(`Unexpected response type: ${typeof content}`);
+        }
+      }
+      
+      throw new Error('No download URL and no drive/item ID provided');
     } catch (error) {
-      console.error('❌ Error downloading PDF:', error.message);
+      console.error('❌ Error downloading document:', error.message);
       throw error;
     }
   }
