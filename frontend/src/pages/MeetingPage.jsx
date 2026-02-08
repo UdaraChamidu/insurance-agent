@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare } from 'lucide-react';
+import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare, MonitorUp } from 'lucide-react';
 import meetingService from '../services/meetingService';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
@@ -29,6 +29,7 @@ export default function MeetingPage() {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [isAIMonitoring, setIsAIMonitoring] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const isMonitoringRef = useRef(false);
   
   const localVideoRef = useRef(null);
@@ -303,6 +304,36 @@ export default function MeetingPage() {
               >
                 {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
               </button>
+
+              {role === 'admin' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      if (!isScreenSharing) {
+                        const stream = await meetingService.startScreenShare();
+                        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+                        setIsScreenSharing(true);
+                        
+                        // Detect when the stream ends (e.g. Stop sharing in browser)
+                        stream.getVideoTracks()[0].onended = () => {
+                          setIsScreenSharing(false);
+                          if (localVideoRef.current) localVideoRef.current.srcObject = meetingService.localStream;
+                        };
+                      } else {
+                        await meetingService.stopScreenShare();
+                        if (localVideoRef.current) localVideoRef.current.srcObject = meetingService.localStream;
+                        setIsScreenSharing(false);
+                      }
+                    } catch (err) {
+                      console.error('Screen share error:', err);
+                    }
+                  }}
+                  className={`p-4 rounded-full ${isScreenSharing ? 'bg-blue-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                  title={isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
+                >
+                  <MonitorUp className="h-6 w-6 text-white" />
+                </button>
+              )}
               
               <button
                 onClick={endCall}

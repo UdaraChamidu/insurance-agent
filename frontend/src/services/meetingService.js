@@ -405,6 +405,57 @@ class MeetingService {
     this.cleanup();
   }
 
+  async startScreenShare() {
+    try {
+      console.log('🖥️ Starting screen share...');
+      // Get screen stream
+      this.screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenTrack = this.screenStream.getVideoTracks()[0];
+      
+      // Replace video track in peer connection
+      if (this.peerConnection) {
+        const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          console.log('🔄 Replacing camera track with screen track');
+          await sender.replaceTrack(screenTrack);
+        }
+      }
+      
+      // Handle browser's "Stop Sharing" button
+      screenTrack.onended = () => {
+        console.log('🛑 Screen sharing ended via browser UI');
+        this.stopScreenShare();
+      };
+      
+      return this.screenStream;
+    } catch (error) {
+      console.error('❌ Error getting screen media:', error);
+      throw error;
+    }
+  }
+
+  async stopScreenShare() {
+    console.log('🛑 Stopping screen share...');
+    
+    // Stop screen tracks
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(track => track.stop());
+      this.screenStream = null;
+    }
+    
+    // Switch back to camera track
+    if (this.localStream && this.peerConnection) {
+      const cameraTrack = this.localStream.getVideoTracks()[0];
+      const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender && cameraTrack) {
+        console.log('🔄 Reverting to camera track');
+        await sender.replaceTrack(cameraTrack);
+      }
+    }
+    
+    return this.localStream;
+  }
+
   cleanup() {
     this.isRecording = false;
     
