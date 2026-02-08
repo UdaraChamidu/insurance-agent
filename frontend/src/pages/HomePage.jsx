@@ -68,9 +68,14 @@ export default function HomePage() {
                   <ArrowRight className="h-5 w-5 bg-white/20 rounded-full p-1 transition-transform group-hover:translate-x-1" />
                 </div>
               </a>
-              <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl font-semibold text-lg transition-all backdrop-blur-sm hover:border-white/20 w-full sm:w-auto">
+              <a
+                href="https://www.elitedealbroker.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl font-semibold text-lg transition-all backdrop-blur-sm hover:border-white/20 w-full sm:w-auto flex items-center justify-center"
+              >
                 Explore Services
-              </button>
+              </a>
             </div>
           </div>
         </div>
@@ -133,7 +138,7 @@ export default function HomePage() {
             className="inline-flex items-center px-8 py-4 bg-white text-blue-900 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all shadow-xl shadow-white/10"
           >
             <CheckCircle className="mr-2 h-5 w-5 text-blue-600" />
-            Book Your Free Session
+            Book Your Session
           </a>
         </div>
       </section>

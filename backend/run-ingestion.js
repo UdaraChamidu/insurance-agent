@@ -118,27 +118,37 @@ async function runIngestion() {
     const estimatedChunks = totalPDFs * 20; // Rough estimate: 20 chunks per PDF
     const embeddingCost = (estimatedChunks / 1000) * 0.0001; // $0.0001 per 1K tokens
     
-    console.log(`\n💰 Estimated Cost:`);
+    console.log(`\n💰 Estimated Cost (if full processing):`);
     console.log(`   • ~${estimatedChunks} chunks`);
     console.log(`   • ~$${embeddingCost.toFixed(4)} for embeddings`);
-    console.log(`   • Processing time: ${Math.ceil(totalPDFs / 2)} minutes`);
+    
+    // Check for force flag
+    const forceRefresh = process.argv.includes('--force') || process.argv.includes('-f');
+    
+    if (forceRefresh) {
+        console.log('\n⚠️  FORCE REFRESH detected - will re-process EVERYTHING.');
+    } else {
+        console.log('\nℹ️  INCREMENTAL MODE - will skip unchanged files.');
+        console.log('    Use --force to re-process everything.');
+    }
     
 // Auto-proceed (you can add confirmation prompt here if needed)
-    console.log('\n▶️  Starting ingestion in 5 seconds...');
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.log('\n▶️  Starting ingestion in 2 seconds...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Step 5: Run full ingestion
-    console.log('\n📋 Step 5: Running Full Ingestion Pipeline...\n');
+    console.log('\n📋 Step 5: Running Ingestion Pipeline...\n');
     console.log('='.repeat(60));
     
-    const result = await ingestionOrchestrator.runFullIngestion();
+    const result = await ingestionOrchestrator.runFullIngestion(forceRefresh);
     
     // Step 6: Summary
     console.log('\n' + '='.repeat(60));
     console.log('✅ INGESTION COMPLETE!\n');
     console.log('📊 Summary:');
-    console.log(`   PDFs Processed: ${result.stats.processed}/${result.stats.total}`);
-    console.log(`   Total Chunks: ${result.stats.totalChunks}`);
+    console.log(`   PDFs Processed: ${result.stats.processed || result.stats.pdfsProcessed}/${result.stats.total || totalPDFs}`);
+    console.log(`   Skipped: ${result.stats.skipped}`);
+    console.log(`   Total Chunks: ${result.stats.totalChunks || result.stats.chunksCreated}`);
     console.log(`   Total Vectors: ${result.stats.totalVectors}`);
     console.log(`   Failed: ${result.stats.failed || 0}`);
     

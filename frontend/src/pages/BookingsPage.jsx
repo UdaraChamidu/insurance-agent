@@ -300,7 +300,7 @@ export default function BookingsPage() {
             {filteredAppointments.map((appointment) => (
               <div
                 key={appointment.id}
-                className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 hover:bg-white/15 transition-all hover:shadow-xl hover:shadow-blue-500/20"
+                className="bg-white dark:bg-white/10 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/20 p-6 hover:shadow-xl dark:hover:bg-white/15 transition-all shadow-sm"
               >
                 {/* Status badge */}
                 <div className="flex items-center justify-between mb-4">
@@ -308,22 +308,22 @@ export default function BookingsPage() {
                     {getStatusIcon(appointment.status)}
                     <span>{appointment.status.toUpperCase()}</span>
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     {bookingsService.getRelativeTime(appointment.startDateTime)}
                   </div>
                 </div>
 
                 {/* Service name */}
-                <h3 className="text-lg font-bold text-white mb-3">{appointment.serviceName}</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{appointment.serviceName}</h3>
 
                 {/* Date and time */}
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center space-x-2 text-sm text-gray-300">
-                    <Calendar className="h-4 w-4 text-blue-400" />
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                    <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                     <span>{bookingsService.formatDate(appointment.startDateTime)}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-300">
-                    <Clock className="h-4 w-4 text-blue-400" />
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                    <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                     <span>
                       {bookingsService.formatTime(appointment.startDateTime)} - {bookingsService.formatTime(appointment.endDateTime)}
                       {' '}({bookingsService.calculateDuration(appointment.startDateTime, appointment.endDateTime)} min)
@@ -332,16 +332,16 @@ export default function BookingsPage() {
                 </div>
 
                 {/* Customer info */}
-                <div className="border-t border-white/10 pt-4 mb-4 space-y-2">
-                  <div className="flex items-center space-x-2 text-sm text-gray-300">
-                    <User className="h-4 w-4 text-green-400" />
+                <div className="border-t border-gray-200 dark:border-white/10 pt-4 mb-4 space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                    <User className="h-4 w-4 text-green-500 dark:text-green-400" />
                     <span className="font-medium">{appointment.customerName}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
                     <Mail className="h-3 w-3" />
                     <span className="truncate">{appointment.customerEmailAddress}</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
                     <Phone className="h-3 w-3" />
                     <span>{appointment.customerPhone}</span>
                   </div>
@@ -349,10 +349,10 @@ export default function BookingsPage() {
 
                 {/* Notes */}
                 {appointment.customerNotes && (
-                  <div className="bg-black/20 rounded-lg p-3 mb-4">
+                  <div className="bg-gray-50 dark:bg-black/20 rounded-lg p-3 mb-4 border border-gray-100 dark:border-white/5">
                     <div className="flex items-start space-x-2">
-                      <FileText className="h-4 w-4 text-purple-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-300">{appointment.customerNotes}</p>
+                      <FileText className="h-4 w-4 text-purple-500 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-gray-600 dark:text-gray-300">{appointment.customerNotes}</p>
                     </div>
                   </div>
                 )}
@@ -362,7 +362,7 @@ export default function BookingsPage() {
                   <button
                     onClick={() => handleSendInvitation(appointment.id)}
                     disabled={sendingInvitation[appointment.id]}
-                    className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all"
+                    className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg shadow-blue-500/20"
                   >
                     {sendingInvitation[appointment.id] ? (
                       <>
@@ -378,7 +378,7 @@ export default function BookingsPage() {
                   </button>
                   <button
                     onClick={() => handleJoinMeeting(appointment)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all"
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg shadow-green-500/20"
                   >
                     Join
                   </button>
