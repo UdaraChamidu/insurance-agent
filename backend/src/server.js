@@ -34,12 +34,12 @@ app.post('/api/send-sms', async (req, res) => {
       return res.status(400).json({ error: 'Missing "to" (phone number) or "message"' });
     }
     
-    // Basic phone number cleaning - remove spaces, dashes, ensure + prefix if missing
-    // Ideally use a library like google-libphonenumber, but for now simple checks
-    let cleanTo = to.replace(/\s+/g, '').replace(/-/g, '');
+    // Basic phone number cleaning - remove spaces, dashes, parentheses
+    let cleanTo = to.replace(/[\s\-\(\)]/g, '');
+    
+    // Add + prefix if missing (assumes customer entered full country code like 94761720686)
     if (!cleanTo.startsWith('+')) {
-      // Assuming US/Canada if no code provided, or require client to send E.164
-      cleanTo = '+1' + cleanTo; 
+      cleanTo = '+' + cleanTo;
     }
 
     const result = await sendSMS(cleanTo, message);

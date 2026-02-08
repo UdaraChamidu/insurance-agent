@@ -4,6 +4,8 @@ import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircl
 import bookingsService from '../services/bookingsService';
 import emailjs from '@emailjs/browser';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 export default function BookingsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
