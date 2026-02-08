@@ -243,11 +243,25 @@ export default function AdminDashboard() {
 
         {/* Right Sidebar - Transcription & AI */}
         <div className="w-96 bg-gray-800 flex flex-col">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-700">
+          <div className="flex border-b border-gray-700 items-center pr-2">
             <button className="flex-1 px-4 py-3 text-white bg-gray-700 font-medium flex items-center justify-center space-x-2">
               <MessageSquare className="h-4 w-4" />
               <span>Live Transcription</span>
+            </button>
+            <button 
+              onClick={() => {
+                const lastClientTranscription = [...transcriptions].reverse().find(t => !t.userId.startsWith('admin'));
+                if (lastClientTranscription) {
+                  meetingService.requestAISuggestion(meetingId, lastClientTranscription.text, lastClientTranscription.userId);
+                } else {
+                  alert('No client transcription available to analyze.');
+                }
+              }}
+              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md flex items-center space-x-1 transition-colors"
+              title="Ask AI about the last thing the client said"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>Ask AI</span>
             </button>
           </div>
 

@@ -381,6 +381,15 @@ class MeetingService {
     return btoa(binary);
   }
 
+  requestAISuggestion(meetingId, text, userId) {
+    this.send({
+      type: 'request-ai-suggestion',
+      meetingId,
+      text,
+      userId
+    });
+  }
+
   send(data) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));

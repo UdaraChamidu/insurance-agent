@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Mic, MicOff, VideoOff, Phone, Download } from 'lucide-react';
+import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare } from 'lucide-react';
 import meetingService from '../services/meetingService';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
@@ -28,6 +28,8 @@ export default function MeetingPage() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [isAIMonitoring, setIsAIMonitoring] = useState(false);
+  const isMonitoringRef = useRef(false);
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -68,6 +70,8 @@ export default function MeetingPage() {
       // Set up callbacks for transcriptions and AI suggestions (admin only)
       if (role === 'admin') {
         meetingService.onTranscription = (data) => {
+          if (!isMonitoringRef.current) return; // Use ref to get latest state
+          
           addLog('📝 Transcription received');
           const entry = {
             text: data.text,
@@ -82,6 +86,8 @@ export default function MeetingPage() {
         };
         
         meetingService.onAISuggestion = (data) => {
+          if (!isMonitoringRef.current) return; // Use ref to get latest state
+          
           addLog('💡 AI Suggestion received');
           const entry = {
             suggestion: data.suggestion,
@@ -112,6 +118,9 @@ export default function MeetingPage() {
       
       setIsConnected(true);
       setIsJoined(true);
+      // Monitoring off by default
+      setIsAIMonitoring(false);
+      isMonitoringRef.current = false;
     } catch (error) {
       addLog(`❌ Error: ${error.message}`);
       setError(error.message);
@@ -310,20 +319,61 @@ export default function MeetingPage() {
       {/* Admin Panel - 3 Columns (50% width for more space) */}
       {role === 'admin' && (
         <div className="w-1/2 bg-gray-900 flex flex-col">
-          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700">
+          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
             <h2 className="text-sm font-semibold text-white">Admin Panel</h2>
+            <div className="flex items-center space-x-3">
+              <span className={`text-[10px] uppercase font-bold ${isAIMonitoring ? 'text-green-400' : 'text-gray-500'}`}>
+                AI Feed: {isAIMonitoring ? 'Active' : 'Disabled'}
+              </span>
+              <button
+                onClick={() => {
+                  const newState = !isAIMonitoring;
+                  setIsAIMonitoring(newState);
+                  isMonitoringRef.current = newState;
+                  // State is now preserved, no clearing here
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isAIMonitoring ? 'bg-green-600' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isAIMonitoring ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-[10px] text-white font-medium min-w-[60px]">
+                {isAIMonitoring ? 'AI ACTIVE' : 'AI OFF'}
+              </span>
+            </div>
           </div>
           
           <div className="flex-1 flex overflow-hidden">
             {/* Column 1: Live Transcription */}
             <div className="flex-1 border-r border-gray-700 flex flex-col">
-              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <h3 className="text-xs font-semibold text-white">Live Transcription</h3>
+              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
+                <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
+                  <span>Live Transcription</span>
+                  {!isAIMonitoring && <span className="text-[10px] text-gray-500 bg-gray-700 px-1 rounded animate-pulse">PAUSED</span>}
+                </h3>
+                <button 
+                  onClick={() => {
+                    if (transcriptions.length > 0) {
+                      const lastEntry = transcriptions[transcriptions.length - 1];
+                      meetingService.requestAISuggestion(meetingId, lastEntry.text, 'customer');
+                    } else {
+                      alert('No transcription available to analyze.');
+                    }
+                  }}
+                  className="px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white text-[10px] rounded flex items-center space-x-1 transition-colors"
+                >
+                  <span>Ask AI</span>
+                </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {transcriptions.length === 0 ? (
                   <div className="text-center text-gray-500 text-xs mt-4">
-                    <p>Waiting for customer...</p>
+                    <p>{!isAIMonitoring ? 'Feed Paused' : 'Waiting for customer...'}</p>
                   </div>
                 ) : (
                   transcriptions.map((item, index) => (
@@ -339,15 +389,18 @@ export default function MeetingPage() {
             {/* Column 2: AI Suggestions */}
             <div className="flex-1 border-r border-gray-700 flex flex-col">
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <h3 className="text-xs font-semibold text-white flex items-center">
-                  <span className="mr-1">💡</span>
-                  AI Suggestions
+                <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
+                  <div className="flex items-center">
+                    <span className="mr-1">💡</span>
+                    AI Suggestions
+                  </div>
+                  {!isAIMonitoring && <span className="text-[10px] text-gray-500 bg-gray-700 px-1 rounded animate-pulse">PAUSED</span>}
                 </h3>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {aiSuggestions.length === 0 ? (
                   <div className="text-center text-gray-500 text-xs mt-4">
-                    <p>AI suggestions...</p>
+                    <p>{!isAIMonitoring ? 'Assistance Paused' : 'AI suggestions...'}</p>
                   </div>
                 ) : (
                   aiSuggestions.map((item, index) => (
@@ -372,10 +425,10 @@ export default function MeetingPage() {
                   <Download className="h-3 w-3" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {conversationHistory.length === 0 ? (
                   <div className="text-center text-gray-500 text-xs mt-4">
-                    <p>Chat will appear...</p>
+                    <p>{!isAIMonitoring ? 'History Hidden' : 'Chat will appear...'}</p>
                   </div>
                 ) : (
                   conversationHistory.map((item, index) => (

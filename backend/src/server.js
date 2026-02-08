@@ -55,6 +55,10 @@ wss.on('connection', (ws) => {
         case 'leave-meeting':
           handleLeaveMeeting(data, connectionId);
           break;
+        
+        case 'request-ai-suggestion':
+          await handleManualAISuggestion(data, connectionId);
+          break;
       }
     } catch (error) {
       console.error('Error handling message:', error);
@@ -256,8 +260,7 @@ async function processAudioForTranscription(meetingId, audioBuffer, userId) {
         ...transcriptionEntry
       });
       
-      // Generate AI response for admin
-      await generateAIResponse(meetingId, transcribedText, userId);
+      // Auto-AI removed: suggestions are now manual
     }
   } catch (error) {
     console.error('Error transcribing audio:', error);
@@ -325,6 +328,12 @@ Be concise!`
   } catch (error) {
     console.error('Error generating AI response:', error);
   }
+}
+
+async function handleManualAISuggestion(data, connectionId) {
+  const { meetingId, text, userId } = data;
+  console.log(`🤖 Manual AI suggestion requested for ${userId}: "${text}"`);
+  await generateAIResponse(meetingId, text, userId);
 }
 
 function broadcastToMeeting(meetingId, message) {
