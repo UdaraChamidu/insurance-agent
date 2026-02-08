@@ -320,9 +320,9 @@ class MeetingService {
     let audioChunks = [];
     let chunkCount = 0;
     const CHUNKS_PER_SECOND = Math.floor(this.audioContext.sampleRate / 4096);
-    const SEND_INTERVAL = CHUNKS_PER_SECOND * 8; // Send every 8 seconds for better quality
+    const SEND_INTERVAL = CHUNKS_PER_SECOND * 4; // Send every 4 seconds for lower latency
     
-    console.log(`🎤 Audio processing started at ${this.audioContext.sampleRate}Hz, sending every ${SEND_INTERVAL} chunks (${8}s)`);
+    console.log(`🎤 Audio processing started at ${this.audioContext.sampleRate}Hz, sending every ${SEND_INTERVAL} chunks (${4}s)`);
     
     this.audioProcessor.onaudioprocess = (e) => {
       if (!this.isRecording) return;

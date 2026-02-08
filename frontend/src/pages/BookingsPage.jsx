@@ -8,9 +8,14 @@ export default function BookingsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('upcoming'); // upcoming, all, completed, pending
+  const [filter, setFilter] = useState('upcoming'); // upcoming, past, all, invitation_sent
   const [searchTerm, setSearchTerm] = useState('');
   const [sendingInvitation, setSendingInvitation] = useState({});
+  const [invitationStatus, setInvitationStatus] = useState(() => {
+    // Load sent invitations from local storage
+    const saved = localStorage.getItem('invitationStatus');
+    return saved ? JSON.parse(saved) : {};
+  });
 
   useEffect(() => {
     loadAppointments();
@@ -22,9 +27,9 @@ export default function BookingsPage() {
       const filters = {};
       
       if (filter === 'upcoming') {
-        filters.startDate = new Date().toISOString();
-      } else if (filter === 'completed' || filter === 'pending') {
-        filters.status = filter;
+        // filter handled in frontend to support all backends
+      } else if (filter === 'past') {
+        // filter handled in frontend
       }
 
       const data = await bookingsService.getAppointments(filters);
@@ -93,6 +98,31 @@ export default function BookingsPage() {
 
       alert(`✅ Invitation sent to ${appointment.customerEmailAddress}\n\nLink: ${meetingLink}`);
       
+      setInvitationStatus(prev => {
+        const newState = { ...prev, [appointmentId]: true };
+        localStorage.setItem('invitationStatus', JSON.stringify(newState));
+        return newState;
+      });
+
+      // 4. Send SMS (if phone number exists)
+      if (appointment.customerPhone) {
+        try {
+          const smsMessage = `Hello ${appointment.customerName}, your meeting is scheduled for ${dateStr} at ${timeStr}. Join here: ${meetingLink}`;
+          await fetch(`${API_URL}/api/send-sms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: appointment.customerPhone,
+              message: smsMessage
+            })
+          });
+          console.log('📱 SMS sent successfully');
+        } catch (smsError) {
+          console.error('Failed to send SMS:', smsError);
+          // Don't alert user about SMS failure if email succeeded, checking console is enough
+        }
+      }
+
     } catch (error) {
       console.error('Error sending invitation:', error);
       alert(`Failed to send invitation: ${error.text || error.message}`);
@@ -108,11 +138,29 @@ export default function BookingsPage() {
 
   const filteredAppointments = appointments.filter(apt => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const apptDate = new Date(apt.startDateTime);
+    const now = new Date();
+    
+    // 1. Category Filter
+    let matchesCategory = true;
+    if (filter === 'upcoming') {
+      matchesCategory = apptDate >= now;
+    } else if (filter === 'past') {
+      matchesCategory = apptDate < now;
+    } else if (filter === 'invitation_sent') {
+      matchesCategory = invitationStatus[apt.id];
+    }
+    // 'all' matches everything
+    
+    // 2. Search Filter
+    const matchesSearch = (
       apt.customerName.toLowerCase().includes(searchLower) ||
       apt.customerEmailAddress.toLowerCase().includes(searchLower) ||
-      apt.serviceName.toLowerCase().includes(searchLower)
+      apt.serviceName.toLowerCase().includes(searchLower) ||
+      (apt.customerPhone && apt.customerPhone.includes(searchLower))
     );
+    
+    return matchesCategory && matchesSearch;
   });
 
   const getStatusColor = (status) => {
@@ -140,8 +188,8 @@ export default function BookingsPage() {
       {/* Header */}
       <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center space-x-4 w-full md:w-auto">
               <button
                 onClick={() => navigate('/admin')}
                 className="text-white hover:text-blue-300 transition"
@@ -153,7 +201,7 @@ export default function BookingsPage() {
                 <p className="text-sm text-gray-400">Manage your appointments and consultations</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
               <div className="px-4 py-2 bg-blue-600/20 rounded-lg border border-blue-500/30">
                 <div className="text-xs text-blue-300">Total Appointments</div>
                 <div className="text-2xl font-bold text-white">{filteredAppointments.length}</div>
@@ -165,10 +213,10 @@ export default function BookingsPage() {
 
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="flex flex-wrap gap-4 items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between mb-6">
           {/* Filter buttons */}
-          <div className="flex gap-2">
-            {['upcoming', 'all', 'confirmed', 'pending', 'completed'].map((f) => (
+          <div className="flex flex-wrap gap-2">
+            {['upcoming', 'past', 'all', 'invitation_sent'].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -178,13 +226,13 @@ export default function BookingsPage() {
                     : 'bg-white/10 text-gray-300 hover:bg-white/20'
                 }`}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'invitation_sent' ? 'Invitation Sent' : f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
 
           {/* Search */}
-          <div className="flex-1 max-w-md">
+          <div className="w-full md:flex-1 md:max-w-md">
             <input
               type="text"
               placeholder="Search by name, email, or service..."

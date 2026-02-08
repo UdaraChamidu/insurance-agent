@@ -18,9 +18,37 @@ const openai = new OpenAI({
 
 import { smartBookingsService as bookingsService } from './services/bookings-service.js';
 import { autoIngestionService } from './services/auto-ingestion-service.js';
+import { sendSMS } from './services/sms-service.js';
+import { pineconeService } from './services/pinecone-service.js';
+import { embeddingService } from './services/embedding-service.js';
 
 app.use(cors());
 app.use(express.json());
+
+// SMS Endpoint
+app.post('/api/send-sms', async (req, res) => {
+  try {
+    const { to, message } = req.body;
+    
+    if (!to || !message) {
+      return res.status(400).json({ error: 'Missing "to" (phone number) or "message"' });
+    }
+    
+    // Basic phone number cleaning - remove spaces, dashes, ensure + prefix if missing
+    // Ideally use a library like google-libphonenumber, but for now simple checks
+    let cleanTo = to.replace(/\s+/g, '').replace(/-/g, '');
+    if (!cleanTo.startsWith('+')) {
+      // Assuming US/Canada if no code provided, or require client to send E.164
+      cleanTo = '+1' + cleanTo; 
+    }
+
+    const result = await sendSMS(cleanTo, message);
+    res.json({ success: true, sid: result.sid });
+  } catch (error) {
+    console.error('API Error sending SMS:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Store active meetings
 const meetings = new Map();
@@ -280,40 +308,109 @@ async function generateAIResponse(meetingId, userMessage, userId) {
       .map(t => `${t.userId}: ${t.text}`)
       .join('\n');
     
-    // Generate AI suggestion
+    // === RAG RETRIEVAL ===
+    let retrievedContext = '';
+    let sourceCitations = [];
+    
+    try {
+      // Generate embedding for the user's query
+      const queryEmbedding = await embeddingService.generateEmbedding(userMessage);
+      
+      // Query all relevant namespaces (we can refine this based on detected keywords later)
+      const namespaces = [
+        'training-reference',
+        'fl-state-authority',
+        'cms-medicare',
+        'federal-aca',
+        'erisa-irs-selffunded',
+        'fl-medicaid-agency',
+        'carrier-fmo-policies'
+      ];
+      
+      let allMatches = [];
+      
+      for (const namespace of namespaces) {
+        try {
+          const matches = await pineconeService.query({
+            vector: queryEmbedding,
+            namespace: namespace,
+            topK: 3
+          });
+          allMatches = allMatches.concat(matches.map(m => ({ ...m, namespace })));
+        } catch (nsError) {
+          // Namespace might not exist yet, skip silently
+          console.log(`ℹ️ Namespace ${namespace} not available: ${nsError.message}`);
+        }
+      }
+      
+      // Sort by score and take top 5
+      allMatches.sort((a, b) => (b.score || 0) - (a.score || 0));
+      const topMatches = allMatches.slice(0, 5);
+      
+      if (topMatches.length > 0) {
+        retrievedContext = topMatches.map((match, i) => {
+          const meta = match.metadata || {};
+          const citation = meta.citation || meta.fileName || 'Unknown Source';
+          sourceCitations.push(citation);
+          return `[Source ${i + 1}: ${citation}]\n${meta.text || 'No text available'}`;
+        }).join('\n\n---\n\n');
+        
+        console.log(`📚 RAG: Retrieved ${topMatches.length} relevant documents`);
+      } else {
+        retrievedContext = '⚠️ No relevant documents found in knowledge base.';
+        console.log('📚 RAG: No matches found');
+      }
+    } catch (ragError) {
+      console.error('⚠️ RAG retrieval failed:', ragError.message);
+      retrievedContext = '⚠️ Unable to retrieve sources — knowledge base unavailable.';
+    }
+    
+    // === COMPLIANCE-FIRST SYSTEM PROMPT ===
+    const systemPrompt = `You are a compliance-first AI assistant supporting a licensed Florida health insurance agent during live calls.
+
+YOUR ROLE:
+- Surface SHORT, CITABLE suggestions from authoritative regulatory sources
+- The licensed agent makes ALL decisions — you are decision-support only
+- NEVER interpret law, guess, or generate sales language
+
+RETRIEVED CONTEXT FROM KNOWLEDGE BASE:
+${retrievedContext}
+
+RESPONSE RULES:
+1. Use ONLY information from the retrieved context above
+2. Include citations: [Source: DocumentName] or [Source: §Section]
+3. If information is missing, unclear, or no sources retrieved → respond with: "⚠️ Needs verification — escalate to compliance"
+4. Keep suggestions to 1-2 bullet points, under 20 words each
+5. Be direct and actionable
+
+FORMAT:
+• [Actionable suggestion] — [Source: Citation]
+• ⚠️ Escalate: [reason] (if needed)
+
+FORBIDDEN:
+- Do NOT guess or hallucinate facts
+- Do NOT interpret or paraphrase regulations
+- Do NOT write verbatim scripts for the agent
+- Do NOT answer compliance questions without a source citation
+
+If the retrieved context does not contain relevant information, respond ONLY with:
+"⚠️ No relevant sources found. Needs verification — escalate to compliance."`;
+
+    // Generate AI suggestion with compliance-first prompt
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are an AI assistant for insurance agents during live calls. Generate SHORT, ACTIONABLE suggestions.
-
-FORMAT: Use bullet points (• or -)
-LENGTH: 1-2 bullets max, each under 15 words
-TONE: Direct and professional
-
-Focus on:
-• Product recommendations
-• Compliance reminders
-• Quick responses
-• Next steps
-
-GOOD example:
-• Recommend Term Life - matches 20-year need
-• Ask about existing policies
-
-BAD example (too wordy):
-"You could respond with: 'It's great to hear about...'"
-
-Be concise!`
+          content: systemPrompt
         },
         {
           role: 'user',
-          content: `Recent conversation:\n${conversationContext}\n\nClient just said: "${userMessage}"\n\nWhat should the agent say or do?`
+          content: `Recent conversation:\n${conversationContext}\n\nClient just said: "${userMessage}"\n\nWhat should the agent say or do? Remember to cite sources.`
         }
       ],
-      max_tokens: 100,
-      temperature: 0.7
+      max_tokens: 200,
+      temperature: 0.3 // Lower temperature for more factual responses
     });
     
     const aiSuggestion = completion.choices[0].message.content;
@@ -323,6 +420,7 @@ Be concise!`
       type: 'ai-suggestion',
       suggestion: aiSuggestion,
       relatedTo: userMessage,
+      sources: sourceCitations,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

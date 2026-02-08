@@ -167,19 +167,19 @@ export default function AdminPage() {
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             <h1 className="text-2xl font-bold text-gray-900">Admin Console</h1>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
               <button
                 onClick={() => navigate('/admin/bookings')}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
               >
                 <Calendar className="h-4 w-4" />
                 <span>View Scheduled Meetings</span>
               </button>
               <button
                 onClick={() => setShowCreateMeeting(true)}
-                className="btn-primary"
+                className="w-full md:w-auto btn-primary"
               >
                 Create Meeting Link
               </button>
@@ -188,7 +188,7 @@ export default function AdminPage() {
                   sessionStorage.removeItem('adminAuth');
                   setIsAuthenticated(false);
                 }}
-                className="btn-secondary"
+                className="w-full md:w-auto btn-secondary"
               >
                 Logout
               </button>
@@ -201,7 +201,7 @@ export default function AdminPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats */}
         {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -250,30 +250,30 @@ export default function AdminPage() {
             <div className="space-y-4">
               {meetings.map((meeting) => (
                 <div key={meeting.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex-1 w-full">
+                      <div className="flex items-start md:items-center space-x-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <Users className="h-6 w-6 text-blue-600" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">{meeting.clientName}</h3>
-                          <p className="text-sm text-gray-600">{meeting.email}</p>
-                          <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                          <p className="text-sm text-gray-600 break-all">{meeting.email}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-500">
                             <span>{meeting.date} at {meeting.time}</span>
-                            <span>•</span>
+                            <span className="hidden md:inline">•</span>
                             <span>{meeting.type}</span>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
                       <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
                         {meeting.status}
                       </span>
                       <button
                         onClick={() => joinMeeting(meeting.id)}
-                        className="btn-primary flex items-center space-x-2"
+                        className="btn-primary flex items-center space-x-2 flex-1 md:flex-none justify-center"
                       >
                         <Video className="h-4 w-4" />
                         <span>Join Meeting</span>
