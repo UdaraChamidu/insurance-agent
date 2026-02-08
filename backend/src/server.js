@@ -327,21 +327,29 @@ async function generateAIResponse(meetingId, userMessage, userId) {
         'carrier-fmo-policies'
       ];
       
-      let allMatches = [];
       
-      for (const namespace of namespaces) {
+      // Execute queries in parallel for all namespaces
+      const queryPromises = namespaces.map(async (namespace) => {
         try {
           const matches = await pineconeService.query({
             vector: queryEmbedding,
             namespace: namespace,
             topK: 3
           });
-          allMatches = allMatches.concat(matches.map(m => ({ ...m, namespace })));
+          // Attach namespace to matches
+          return matches.map(m => ({ ...m, namespace }));
         } catch (nsError) {
-          // Namespace might not exist yet, skip silently
-          console.log(`ℹ️ Namespace ${namespace} not available: ${nsError.message}`);
+          // Namespace might not exist yet, skip silently but log
+          console.log(`ℹ️ Namespace ${namespace} query failed: ${nsError.message}`);
+          return [];
         }
-      }
+      });
+      
+      // Wait for all queries to complete
+      const results = await Promise.all(queryPromises);
+      
+      // Flatten results into a single array
+      let allMatches = results.flat();
       
       // Sort by score and take top 5
       allMatches.sort((a, b) => (b.score || 0) - (a.score || 0));
