@@ -1,7 +1,7 @@
 # Insurance AI Consultation Platform
 
 A real-time video consultation platform with AI-powered transcription and agent assistance for insurance consultations.
- 
+  
 ## 🎯 Features
 
 - **Public Website**: Insurance company landing page with meeting scheduling
