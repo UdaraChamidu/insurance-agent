@@ -83,7 +83,7 @@ class PineconeService {
       
       await this.client.createIndex({
         name: this.indexName,
-        dimension: 1536, // OpenAI ada-002 embedding size
+        dimension: 768, // Gemini text-embedding-004 size
         metric: 'cosine',
         spec: {
           serverless: {
@@ -175,6 +175,54 @@ class PineconeService {
       return true;
     } catch (error) {
       console.error(`❌ Error deleting from ${namespace}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Delete all vectors for a specific file by ID prefix
+   * Chunk IDs follow the pattern: {sanitized_filename}_chunk_{index}
+   */
+  async deleteByFilePrefix(filePrefix, namespace) {
+    if (!this.index) {
+      await this.initialize();
+    }
+    
+    try {
+      const ns = this.index.namespace(namespace);
+      const idsToDelete = [];
+      
+      // Use listPaginated to find all vector IDs with this prefix
+      let paginationToken = undefined;
+      do {
+        const listResult = await ns.listPaginated({
+          prefix: filePrefix,
+          ...(paginationToken && { paginationToken })
+        });
+        
+        if (listResult.vectors) {
+          idsToDelete.push(...listResult.vectors.map(v => v.id));
+        }
+        
+        paginationToken = listResult.pagination?.next;
+      } while (paginationToken);
+      
+      if (idsToDelete.length === 0) {
+        console.log(`ℹ️  No existing vectors found with prefix "${filePrefix}" in ${namespace}`);
+        return 0;
+      }
+      
+      // Delete in batches of 100 (Pinecone limit)
+      const batchSize = 100;
+      for (let i = 0; i < idsToDelete.length; i += batchSize) {
+        const batch = idsToDelete.slice(i, i + batchSize);
+        await ns.deleteMany(batch);
+      }
+      
+      console.log(`🗑️  Deleted ${idsToDelete.length} old vectors with prefix "${filePrefix}" from ${namespace}`);
+      return idsToDelete.length;
+    } catch (error) {
+      console.error(`❌ Error deleting by prefix from ${namespace}:`, error);
       throw error;
     }
   }

@@ -71,8 +71,6 @@ export default function MeetingPage() {
       // Set up callbacks for transcriptions and AI suggestions (admin only)
       if (role === 'admin') {
         meetingService.onTranscription = (data) => {
-          if (!isMonitoringRef.current) return; // Use ref to get latest state
-          
           addLog('📝 Transcription received');
           const entry = {
             text: data.text,
@@ -84,17 +82,15 @@ export default function MeetingPage() {
             text: data.text,
             timestamp: entry.timestamp
           }]);
-          
-          // Auto-trigger AI suggestion when monitoring is ON
-          if (data.text && data.text.trim().length > 5) {
+
+          // Auto-trigger AI suggestion ONLY when monitoring toggle is ON
+          if (isMonitoringRef.current && data.text && data.text.trim().length > 5) {
             addLog('🤖 Auto-requesting AI suggestion...');
             meetingService.requestAISuggestion(meetingId, data.text, 'customer');
           }
         };
         
         meetingService.onAISuggestion = (data) => {
-          if (!isMonitoringRef.current) return; // Use ref to get latest state
-          
           addLog('💡 AI Suggestion received');
           const entry = {
             suggestion: data.suggestion,

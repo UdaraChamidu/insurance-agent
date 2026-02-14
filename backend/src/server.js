@@ -3,7 +3,7 @@ import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-import OpenAI, { toFile } from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
@@ -12,9 +12,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 import { smartBookingsService as bookingsService } from './services/bookings-service.js';
 import { autoIngestionService } from './services/auto-ingestion-service.js';
@@ -258,17 +256,23 @@ async function processAudioForTranscription(meetingId, audioBuffer, userId) {
   try {
     console.log(`🎤 Transcribing audio from ${userId} (${audioBuffer.length} bytes)`);
     
-    // Convert PCM to WAV format for Whisper
+    // Convert PCM to WAV format for Gemini
     const wavBuffer = convertPCMtoWAV(audioBuffer);
-    
-    // Transcribe using Whisper with toFile
-    const transcription = await openai.audio.transcriptions.create({
-      file: await toFile(wavBuffer, 'audio.wav'),
-      model: 'whisper-1',
-      language: 'en'
-    });
-    
-    const transcribedText = transcription.text;
+
+    // Transcribe using Gemini multimodal audio
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const audioBase64 = wavBuffer.toString('base64');
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'audio/wav',
+          data: audioBase64
+        }
+      },
+      { text: 'Transcribe this audio exactly. Return ONLY the spoken words, nothing else. If there is silence or no speech, return an empty string.' }
+    ]);
+
+    const transcribedText = result.response.text();
     
     console.log(`📝 Transcription: "${transcribedText}"`);
     
@@ -405,24 +409,21 @@ FORBIDDEN:
 If the retrieved context does not contain relevant information, respond ONLY with:
 "⚠️ No relevant sources found. Needs verification — escalate to compliance."`;
 
-    // Generate AI suggestion with compliance-first prompt
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Recent conversation:\n${conversationContext}\n\nClient just said: "${userMessage}"\n\nWhat should the agent say or do? Remember to cite sources.`
-        }
-      ],
-      max_tokens: 200,
-      temperature: 0.3 // Lower temperature for more factual responses
+    // Generate AI suggestion with Gemini
+    const chatModel = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        maxOutputTokens: 200,
+        temperature: 0.3 // Lower temperature for more factual responses
+      }
     });
-    
-    const aiSuggestion = completion.choices[0].message.content;
+
+    const chatResult = await chatModel.generateContent(
+      `Recent conversation:\n${conversationContext}\n\nClient just said: "${userMessage}"\n\nWhat should the agent say or do? Remember to cite sources.`
+    );
+
+    const aiSuggestion = chatResult.response.text();
     
     // Send AI suggestion to admins only
     broadcastToAdmins(meetingId, {
@@ -600,6 +601,84 @@ app.patch('/api/bookings/appointments/:id/status', async (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// ========== Document Management Dashboard APIs ==========
+
+/**
+ * GET /api/documents/stats - Ingestion service statistics
+ */
+app.get('/api/documents/stats', async (req, res) => {
+  try {
+    const ingestionStats = autoIngestionService.getStats();
+    
+    // Get live Pinecone vector count
+    let pineconeStats = { totalRecordCount: 0, namespaces: {} };
+    try {
+      pineconeStats = await pineconeService.getStats();
+    } catch (e) {
+      // Non-critical
+    }
+    
+    res.json({
+      ingestion: ingestionStats,
+      pinecone: {
+        totalVectors: pineconeStats.totalRecordCount || 0,
+        namespaces: pineconeStats.namespaces || {}
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching document stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats', message: error.message });
+  }
+});
+
+/**
+ * GET /api/documents/files - List of all processed files
+ */
+app.get('/api/documents/files', (req, res) => {
+  try {
+    const files = autoIngestionService.getProcessedFiles();
+    res.json({ files });
+  } catch (error) {
+    console.error('Error fetching document files:', error);
+    res.status(500).json({ error: 'Failed to fetch files', message: error.message });
+  }
+});
+
+/**
+ * POST /api/documents/reprocess - Remove tracking for a file so it re-processes
+ */
+app.post('/api/documents/reprocess', (req, res) => {
+  try {
+    const { fileKey } = req.body;
+    
+    if (!fileKey) {
+      return res.status(400).json({ error: 'fileKey is required' });
+    }
+    
+    const files = autoIngestionService.getProcessedFiles();
+    const file = files.find(f => f.key === fileKey);
+    
+    if (!file) {
+      return res.status(404).json({ error: 'File not found in tracking' });
+    }
+    
+    // Remove from tracking (will be re-processed on next poll)
+    autoIngestionService.processedFiles.delete(fileKey);
+    autoIngestionService.saveProcessedFiles();
+    
+    console.log(`🔄 File "${file.fileName}" marked for re-processing`);
+    
+    res.json({ 
+      success: true, 
+      message: `File "${file.fileName}" will be re-processed on next poll cycle`,
+      fileName: file.fileName
+    });
+  } catch (error) {
+    console.error('Error scheduling reprocess:', error);
+    res.status(500).json({ error: 'Failed to schedule reprocess', message: error.message });
+  }
 });
 
 const PORT = process.env.PORT || 3001;

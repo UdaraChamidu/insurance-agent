@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Video, Lock, Users } from 'lucide-react';
+import { Calendar, Video, Lock, Users, Database } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -177,7 +177,14 @@ export default function AdminPage() {
                 className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 bg-purple-600/80 hover:bg-purple-500 text-white rounded-lg transition-all border border-purple-500/30"
               >
                 <Calendar className="h-4 w-4" />
-                <span>View Scheduled Meetings</span>
+                <span>Scheduled Meetings</span>
+              </button>
+              <button
+                onClick={() => navigate('/admin/documents')}
+                className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600/80 hover:bg-blue-500 text-white rounded-lg transition-all border border-blue-500/30"
+              >
+                <Database className="h-4 w-4" />
+                <span>Knowledge Base</span>
               </button>
               <button
                 onClick={() => setShowCreateMeeting(true)}

@@ -3,11 +3,18 @@ import { documentProcessor } from './document-processor.js';
 import { chunkingService } from './chunking-service.js';
 import { embeddingService } from './embedding-service.js';
 import { pineconeService } from './pinecone-service.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Auto-Ingestion Service
  * Automatically processes new files uploaded to SharePoint
  * Uses polling to check for new/modified files
+ * Persists processed file tracking to disk to avoid re-processing on restart
  */
 class AutoIngestionService {
   constructor() {
@@ -15,12 +22,47 @@ class AutoIngestionService {
     this.isRunning = false;
     this.intervalId = null;
     this.processedFiles = new Map(); // Track processed files by ID + lastModified
+    this.trackingFilePath = path.join(__dirname, '..', '..', 'data', 'processed-files.json');
     this.stats = {
       totalChecks: 0,
       filesProcessed: 0,
       lastCheck: null,
       errors: []
     };
+    
+    // Load previously processed files from disk
+    this.loadProcessedFiles();
+  }
+  
+  /**
+   * Load processed files tracking from disk
+   */
+  loadProcessedFiles() {
+    try {
+      if (fs.existsSync(this.trackingFilePath)) {
+        const data = JSON.parse(fs.readFileSync(this.trackingFilePath, 'utf-8'));
+        this.processedFiles = new Map(Object.entries(data));
+        console.log(`📂 Loaded ${this.processedFiles.size} previously processed file(s) from tracking`);
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not load processed files tracking:', error.message);
+    }
+  }
+  
+  /**
+   * Save processed files tracking to disk
+   */
+  saveProcessedFiles() {
+    try {
+      const dir = path.dirname(this.trackingFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const data = Object.fromEntries(this.processedFiles);
+      fs.writeFileSync(this.trackingFilePath, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.warn('⚠️  Could not save processed files tracking:', error.message);
+    }
   }
   
   /**
@@ -92,8 +134,15 @@ class AutoIngestionService {
       for (const doc of documents) {
         const fileKey = `${doc.id}|${doc.lastModified}`;
         
-        // Check if we've already processed this version
+        // Check if we've already processed this exact version
         if (!this.processedFiles.has(fileKey)) {
+          // Check if this is a modification (same doc ID, different lastModified)
+          const previousVersion = this.findPreviousVersion(doc.id);
+          if (previousVersion) {
+            doc._isModified = true;
+            doc._previousKey = previousVersion.key;
+            doc._previousData = previousVersion.data;
+          }
           newOrModified.push(doc);
         }
       }
@@ -106,8 +155,20 @@ class AutoIngestionService {
       console.log(`📥 Found ${newOrModified.length} new/modified file(s):`);
       newOrModified.forEach(doc => {
         const fileType = doc.name.split('.').pop().toUpperCase();
-        console.log(`   - ${doc.name} [${fileType}]`);
+        const label = doc._isModified ? '🔄 MODIFIED' : '🆕 NEW';
+        console.log(`   - ${doc.name} [${fileType}] ${label}`);
       });
+      
+      // Check if data already exists in Pinecone for these files
+      try {
+        const stats = await pineconeService.getStats();
+        const totalVectors = stats.totalRecordCount || 0;
+        if (totalVectors > 0) {
+          console.log(`📊 Pinecone already has ${totalVectors} vectors.`);
+        }
+      } catch (e) {
+        // Non-critical, continue
+      }
       
       // Process each new file
       for (const doc of newOrModified) {
@@ -124,12 +185,57 @@ class AutoIngestionService {
   }
   
   /**
+   * Find a previous version of a file by doc ID (different lastModified)
+   */
+  findPreviousVersion(docId) {
+    for (const [key, data] of this.processedFiles.entries()) {
+      // Keys are formatted as "{docId}|{lastModified}"
+      if (key.startsWith(docId + '|')) {
+        return { key, data };
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Sanitize filename to match chunk ID prefix pattern
+   * Must match ChunkingService.sanitizeFileName for correct ID matching
+   */
+  sanitizeFileName(fileName) {
+    return fileName
+      .replace('.pdf', '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .toLowerCase();
+  }
+  
+  /**
    * Process a single file
    */
   async processFile(doc) {
     try {
       const fileType = doc.name.split('.').pop().toUpperCase();
       console.log(`\n⚙️  Processing: ${doc.name} [${fileType}]...`);
+      
+      // If this is a modified file, clean up old vectors first
+      if (doc._isModified && doc._previousData) {
+        const previousNamespace = doc._previousData.namespace || doc.namespace;
+        const filePrefix = this.sanitizeFileName(doc.name);
+        
+        console.log(`🔄 File modification detected! Cleaning up old vectors...`);
+        console.log(`   Previous version processed at: ${doc._previousData.processedAt}`);
+        console.log(`   Previous vectors: ${doc._previousData.vectors || 'unknown'}`);
+        
+        try {
+          const deletedCount = await pineconeService.deleteByFilePrefix(filePrefix, previousNamespace);
+          console.log(`   ✅ Cleaned up ${deletedCount} old vectors from namespace: ${previousNamespace}`);
+          
+          // Remove old tracking entry
+          this.processedFiles.delete(doc._previousKey);
+          this.saveProcessedFiles();
+        } catch (cleanupError) {
+          console.error(`   ⚠️  Cleanup failed: ${cleanupError.message}. Proceeding with re-ingestion anyway.`);
+        }
+      }
       
       // Download document
       const docBuffer = await sharePointService.downloadDocument(doc.downloadUrl, doc.driveId, doc.id);
@@ -149,6 +255,22 @@ class AutoIngestionService {
       // Generate embeddings
       const vectors = await embeddingService.createVectorsForPinecone(chunks);
       
+      if (vectors.length === 0) {
+        console.warn(`⚠️  No vectors generated for ${doc.name} - skipping upload`);
+        // Still mark as processed to avoid re-trying immediately
+        const fileKey = `${doc.id}|${doc.lastModified}`;
+        this.processedFiles.set(fileKey, {
+          fileName: doc.name,
+          namespace: doc.namespace,
+          processedAt: new Date().toISOString(),
+          chunks: chunks.length,
+          vectors: 0,
+          status: 'no_vectors'
+        });
+        this.saveProcessedFiles();
+        return;
+      }
+      
       console.log(`   🔢 Generated ${vectors.length} vectors`);
       
       // Upload to Pinecone
@@ -161,10 +283,14 @@ class AutoIngestionService {
       this.processedFiles.set(fileKey, {
         fileName: doc.name,
         namespace: doc.namespace,
-        processedAt: new Date(),
+        processedAt: new Date().toISOString(),
         chunks: chunks.length,
-        vectors: vectors.length
+        vectors: vectors.length,
+        status: 'success'
       });
+      
+      // Save tracking to disk
+      this.saveProcessedFiles();
       
       this.stats.filesProcessed++;
       
@@ -207,6 +333,14 @@ class AutoIngestionService {
    */
   clearHistory() {
     this.processedFiles.clear();
+    // Also delete the tracking file
+    try {
+      if (fs.existsSync(this.trackingFilePath)) {
+        fs.unlinkSync(this.trackingFilePath);
+      }
+    } catch (e) {
+      // ignore
+    }
     console.log('🗑️  Cleared processed files history');
   }
   

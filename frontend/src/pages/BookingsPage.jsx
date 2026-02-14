@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter, Bell } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter, Bell, Database, Activity, HardDrive, ChevronRight, X } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 import emailjs from '@emailjs/browser';
 
@@ -18,6 +18,23 @@ export default function BookingsPage() {
     const saved = localStorage.getItem('invitationStatus');
     return saved ? JSON.parse(saved) : {};
   });
+
+  // Knowledge Base status bar state
+  const [docStats, setDocStats] = useState(null);
+  const [showKBBar, setShowKBBar] = useState(true);
+
+  const fetchDocStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/documents/stats`);
+      if (res.ok) setDocStats(await res.json());
+    } catch (e) { /* non-critical */ }
+  }, []);
+
+  useEffect(() => {
+    fetchDocStats();
+    const interval = setInterval(fetchDocStats, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDocStats]);
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -146,7 +163,7 @@ export default function BookingsPage() {
 
   const handleJoinMeeting = (appointment) => {
     // Navigate to the Meeting Page (Unified UI) as Admin
-    navigate(`/meeting?meetingId=${appointment.id}&role=admin`);
+    navigate(`/meeting?meetingId=${encodeURIComponent(appointment.id)}&role=admin`);
   };
 
   const filteredAppointments = appointments.filter(apt => {
@@ -250,6 +267,70 @@ export default function BookingsPage() {
           </div>
         </div>
       </header>
+
+      {/* Knowledge Base Status Bar */}
+      {showKBBar && docStats && (
+        <div className="bg-gradient-to-r from-blue-900/40 via-purple-900/30 to-blue-900/40 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 py-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-5 overflow-x-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Database className="h-4 w-4 text-blue-400" />
+                  <span className="text-xs font-semibold text-blue-300 uppercase tracking-wider">Knowledge Base</span>
+                </div>
+
+                <div className="h-4 w-px bg-white/10 flex-shrink-0" />
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className={`h-2 w-2 rounded-full ${docStats.ingestion?.isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                  <span className={`text-xs font-medium ${docStats.ingestion?.isRunning ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {docStats.ingestion?.isRunning ? 'Syncing' : 'Stopped'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <FileText className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="text-xs text-gray-300">
+                    <span className="font-bold text-white">{docStats.ingestion?.processedFileCount || 0}</span> files
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <HardDrive className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="text-xs text-gray-300">
+                    <span className="font-bold text-white">{(docStats.pinecone?.totalVectors || 0).toLocaleString()}</span> vectors
+                  </span>
+                </div>
+
+                {(docStats.ingestion?.errors?.length || 0) > 0 && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <XCircle className="h-3.5 w-3.5 text-red-400" />
+                    <span className="text-xs text-red-300 font-medium">
+                      {docStats.ingestion.errors.length} error(s)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => navigate('/admin/documents')}
+                  className="flex items-center gap-1 text-xs text-blue-300 hover:text-blue-200 transition-colors font-medium"
+                >
+                  View All <ChevronRight className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => setShowKBBar(false)}
+                  className="text-gray-500 hover:text-gray-300 transition-colors ml-1"
+                  title="Dismiss"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-6 py-6">
