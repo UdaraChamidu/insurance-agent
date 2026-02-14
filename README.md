@@ -1,11 +1,11 @@
 # Insurance AI Consultation Platform
 
 A real-time video consultation platform with AI-powered transcription and agent assistance for insurance consultations.
- 
+  
 ## 🎯 Features
 
 - **Public Website**: Insurance company landing page with meeting scheduling
-- **Microsoft Booking Integration**: Seamless appointment scheduling
+- **Microsoft Booking Integration**: Seamless appointment scheduling 
 - **Custom WebRTC Video**: High-quality, low-latency video conferencing
 - **Real-time Transcription**: Using OpenAI Whisper API
 - **AI Agent Assistance**: GPT-4 provides real-time suggestions and compliance checks
