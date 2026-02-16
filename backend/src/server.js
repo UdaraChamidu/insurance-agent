@@ -622,7 +622,7 @@ app.post('/api/leads/intake', async (req, res) => {
     } = req.body;
 
     // 1. Create Lead Session
-    const leadId = leadSessionStore.createSession({
+    const leadId = await leadSessionStore.createSession({
       productType,
       state: state || 'FL',
       triggers: triggers || [],
@@ -648,7 +648,7 @@ app.post('/api/leads/intake', async (req, res) => {
         });
         
         // Update session with GHL ID
-        leadSessionStore.updateSession(leadId, { ghlContactId: contact.id });
+        await leadSessionStore.updateSession(leadId, { ghlContactId: contact.id });
         console.log(`✅ Synced lead ${leadId} to GHL: ${contact.id}`);
       } catch (ghlError) {
         console.error('⚠️ Failed to sync to GHL:', ghlError.message);
@@ -667,8 +667,8 @@ app.post('/api/leads/intake', async (req, res) => {
  * GET /api/leads/:leadId
  * Retrieve lead context for the frontend
  */
-app.get('/api/leads/:leadId', (req, res) => {
-  const session = leadSessionStore.getSession(req.params.leadId);
+app.get('/api/leads/:leadId', async (req, res) => {
+  const session = await leadSessionStore.getSession(req.params.leadId);
   if (!session) {
     return res.status(404).json({ error: 'Lead session not found' });
   }
@@ -684,13 +684,13 @@ app.post('/api/leads/:leadId/wrapup', async (req, res) => {
     const { leadId } = req.params;
     const { disposition, notes, planName, premium } = req.body;
     
-    const session = leadSessionStore.getSession(leadId);
+    const session = await leadSessionStore.getSession(leadId);
     if (!session) {
       return res.status(404).json({ error: 'Lead session not found' });
     }
 
     // 1. Update Session
-    const updatedSession = leadSessionStore.updateSession(leadId, {
+    const updatedSession = await leadSessionStore.updateSession(leadId, {
       disposition,
       notes,
       planName,

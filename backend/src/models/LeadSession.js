@@ -1,65 +1,115 @@
-/**
- * Simple in-memory store for Lead Sessions
- * In a production app, this would be a Redis or Database table
- */
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 class LeadSessionStore {
-    constructor() {
-      this.sessions = new Map();
-      // Cleanup old sessions every hour
-      setInterval(() => this.cleanup(), 3600000);
-    }
-  
-    /**
-     * Create a new lead session
-     * @param {Object} data 
-     * @returns {string} sessionId
-     */
-    createSession(data) {
-      const sessionId = 'lead_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      this.sessions.set(sessionId, {
-        id: sessionId,
-        createdAt: new Date(),
-        ...data
-      });
-      return sessionId;
-    }
-  
-    /**
-     * Get session by ID
-     * @param {string} sessionId 
-     */
-    getSession(sessionId) {
-      return this.sessions.get(sessionId);
-    }
-  
-    /**
-     * Update session data
-     * @param {string} sessionId 
-     * @param {Object} updates 
-     */
-    updateSession(sessionId, updates) {
-      const session = this.sessions.get(sessionId);
-      if (!session) return null;
-      
-      const updatedSession = { ...session, ...updates };
-      this.sessions.set(sessionId, updatedSession);
-      return updatedSession;
-    }
-  
-    /**
-     * Remove sessions older than 24 hours
-     */
-    cleanup() {
-      const now = new Date();
-      for (const [id, session] of this.sessions.entries()) {
-        const sessionAge = now - session.createdAt;
-        if (sessionAge > 86400000) { // 24 hours
-          this.sessions.delete(id);
+  // No constructor or cleanup needed - DB persists data
+
+  /**
+   * Create a new lead session
+   * @param {Object} data 
+   * @returns {Promise<string>} leadId
+   */
+  async createSession(data) {
+    const { productType, state, triggers, utm, contactInfo } = data;
+
+    try {
+      // 1. Create Lead
+      const lead = await prisma.lead.create({
+        data: {
+          productType,
+          state,
+          triggers: triggers || {},
+          firstName: contactInfo?.firstName,
+          lastName: contactInfo?.lastName,
+          email: contactInfo?.email,
+          phone: contactInfo?.phone,
+          utmSource: utm?.utm_source,
+          utmMedium: utm?.utm_medium,
+          utmCampaign: utm?.utm_campaign,
         }
-      }
+      });
+
+      // 2. Create Session linked to Lead
+      await prisma.session.create({
+        data: {
+          leadId: lead.id,
+          status: 'new'
+        }
+      });
+
+      return lead.id;
+    } catch (error) {
+      console.error('Error creating lead session:', error);
+      throw error;
     }
   }
-  
-  export default new LeadSessionStore();
+
+  /**
+   * Get session by ID (using leadId)
+   * @param {string} leadId 
+   */
+  async getSession(leadId) {
+    try {
+      const session = await prisma.session.findUnique({
+        where: { leadId },
+        include: { lead: true }
+      });
+
+      if (!session) return null;
+
+      // Flatten for compatibility with existing frontend/backend logic
+      return {
+        id: session.leadId,
+        startTime: session.startTime,
+        status: session.status,
+        ghlContactId: session.ghlContactId,
+        ...session.lead, 
+        // Lead fields override session fields if same name, but they are distinct in schema
+        // frontend expects 'productType', 'state' at top level
+      };
+    } catch (error) {
+      console.error('Error retrieving session:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update session data
+   * @param {string} leadId 
+   * @param {Object} updates 
+   */
+  async updateSession(leadId, updates) {
+    try {
+      const { disposition, notes, planName, premium, ghlContactId, callEndedAt } = updates;
+      
+      const updateData = {};
+      if (disposition !== undefined) updateData.disposition = disposition;
+      if (notes !== undefined) updateData.notes = notes;
+      if (planName !== undefined) updateData.planName = planName;
+      if (premium !== undefined) updateData.premium = premium;
+      if (ghlContactId !== undefined) updateData.ghlContactId = ghlContactId;
+      if (callEndedAt !== undefined) updateData.endTime = new Date(callEndedAt);
+      
+      // Also update status if disposition is set
+      if (disposition) updateData.status = 'completed';
+
+      const session = await prisma.session.update({
+        where: { leadId },
+        data: updateData,
+        include: { lead: true }
+      });
+      
+      return {
+        id: session.leadId,
+        ...session.lead,
+        ...session
+      };
+    } catch (error) {
+      console.error('Error updating session:', error);
+      return null;
+    }
+  }
+}
+
+export default new LeadSessionStore();
   

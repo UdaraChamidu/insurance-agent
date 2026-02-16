@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",
@@ -12,7 +13,8 @@
     "@google/generative-ai": "^0.24.1",
     "@langchain/pinecone": "^1.0.1",
     "@microsoft/microsoft-graph-client": "^3.0.7",
-    "@pinecone-database/pinecone": "^7.0.0",
+    "@pinecone-database/pinecone": "^2.0.0",
+    "@prisma/client": "5.22.0",
     "axios": "^1.6.2",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
@@ -27,5 +29,8 @@
     "uuid": "^9.0.1",
     "ws": "^8.14.2",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }
