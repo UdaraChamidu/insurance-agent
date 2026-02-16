@@ -8,6 +8,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
+const ghlService = require('./services/ghl-service');
+const leadSessionStore = require('./models/LeadSession');
+
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
@@ -598,6 +601,81 @@ app.patch('/api/bookings/appointments/:id/status', async (req, res) => {
     res.status(500).json({ error: 'Failed to update appointment', message: error.message });
   }
 });
+
+// === CRM & LEAD INTAKE ROUTES ===
+
+/**
+ * POST /api/leads/intake
+ * Receives intake data (product, state, triggers, UTMs)
+ * Returns a leadId (session ID)
+ */
+app.post('/api/leads/intake', async (req, res) => {
+  try {
+    const { 
+      productType, 
+      state, 
+      triggers, 
+      utm_source, 
+      utm_medium, 
+      utm_campaign,
+      contactInfo // Optional: { email, phone, firstName, lastName }
+    } = req.body;
+
+    // 1. Create Lead Session
+    const leadId = leadSessionStore.createSession({
+      productType,
+      state: state || 'FL',
+      triggers: triggers || [],
+      utm: { utm_source, utm_medium, utm_campaign },
+      contactInfo: contactInfo || {}
+    });
+
+    console.log(`📥 New Lead Intake: ${leadId} (${productType} in ${state})`);
+
+    // 2. If contact info exists, sync to GHL immediately
+    if (contactInfo && contactInfo.email) {
+      try {
+        const contact = await ghlService.createContact({
+          email: contactInfo.email,
+          phone: contactInfo.phone,
+          firstName: contactInfo.firstName,
+          lastName: contactInfo.lastName,
+          tags: [`Lead Source: ${utm_source || 'Direct'}`, `Product: ${productType}`],
+          customFields: {
+            state: state,
+            triggers: JSON.stringify(triggers)
+          }
+        });
+        
+        // Update session with GHL ID
+        leadSessionStore.updateSession(leadId, { ghlContactId: contact.id });
+        console.log(`✅ Synced lead ${leadId} to GHL: ${contact.id}`);
+      } catch (ghlError) {
+        console.error('⚠️ Failed to sync to GHL:', ghlError.message);
+        // Continue, don't fail the request
+      }
+    }
+
+    res.json({ success: true, leadId });
+  } catch (error) {
+    console.error('Error in lead intake:', error);
+    res.status(500).json({ error: 'Failed to process intake' });
+  }
+});
+
+/**
+ * GET /api/leads/:leadId
+ * Retrieve lead context for the frontend
+ */
+app.get('/api/leads/:leadId', (req, res) => {
+  const session = leadSessionStore.getSession(req.params.leadId);
+  if (!session) {
+    return res.status(404).json({ error: 'Lead session not found' });
+  }
+  res.json(session);
+});
+
+// ==========================================
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

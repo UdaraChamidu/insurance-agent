@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import MeetingPage from './pages/MeetingPage';
 import ProfilePage from './pages/ProfilePage';
 import DocumentsPage from './pages/DocumentsPage';
+import IntakePage from './pages/IntakePage';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -24,7 +25,9 @@ function App() {
           <Route path="/admin/documents" element={<DocumentsPage />} />
           <Route path="/admin/bookings" element={<BookingsPage />} />
           <Route path="/admin/profile" element={<ProfilePage />} />
+          <Route path="/admin/profile" element={<ProfilePage />} />
           <Route path="/meeting" element={<MeetingPage />} />
+          <Route path="/intake" element={<IntakePage />} />
         </Routes>
       </Router>
     </ThemeProvider>
