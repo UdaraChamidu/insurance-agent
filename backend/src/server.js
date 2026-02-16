@@ -675,6 +675,63 @@ app.get('/api/leads/:leadId', (req, res) => {
   res.json(session);
 });
 
+/**
+ * POST /api/leads/:leadId/wrapup
+ * Submit post-call disposition and notes
+ */
+app.post('/api/leads/:leadId/wrapup', async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { disposition, notes, planName, premium } = req.body;
+    
+    const session = leadSessionStore.getSession(leadId);
+    if (!session) {
+      return res.status(404).json({ error: 'Lead session not found' });
+    }
+
+    // 1. Update Session
+    const updatedSession = leadSessionStore.updateSession(leadId, {
+      disposition,
+      notes,
+      planName,
+      premium,
+      callEndedAt: new Date()
+    });
+
+    console.log(`📝 Wrap-up for lead ${leadId}: ${disposition}`);
+
+    // 2. Sync to GHL if we have a contact ID
+    if (session.ghlContactId) {
+      try {
+        // Update fields
+        await ghlService.updateContact(session.ghlContactId, {
+          customFields: {
+            disposition: disposition,
+            last_call_notes: notes,
+            plan_sold: planName,
+            premium_amount: premium
+          },
+          tags: [`Disposition: ${disposition}`]
+        });
+
+        // Add a note to the timeline
+        // Note: The GHL API for notes might differ, usually /contacts/:id/notes
+        // For now, we'll just log it or if ghlService supported it.
+        // Let's assume ghlService.updateContact adds notes in a specific field or we skip explicit note endpoint for now.
+        
+        console.log(`✅ Synced wrap-up to GHL: ${session.ghlContactId}`);
+      } catch (ghlError) {
+        console.error('⚠️ Failed to sync wrap-up to GHL:', ghlError.message);
+      }
+    }
+
+    res.json({ success: true, session: updatedSession });
+  } catch (error) {
+     console.error('Error in wrap-up:', error);
+     res.status(500).json({ error: 'Failed to submit wrap-up' });
+  }
+});
+
 // ==========================================
 
 app.get('/health', (req, res) => {

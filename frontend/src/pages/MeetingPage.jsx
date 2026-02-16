@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare, MonitorUp } from 'lucide-react';
+import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare, MonitorUp, FileText, CheckSquare, X } from 'lucide-react';
 import meetingService from '../services/meetingService';
+import ScriptPanel from '../components/ScriptPanel';
+import WrapUpModal from '../components/WrapUpModal';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
 
@@ -34,6 +38,34 @@ export default function MeetingPage() {
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+
+  // Phase 2: Agent Dashboard State
+  const [activeTab, setActiveTab] = useState('ai'); // 'ai' or 'scripts'
+  const [showWrapUp, setShowWrapUp] = useState(false);
+  const [leadContext, setLeadContext] = useState(null);
+
+  // Fetch Lead Context (Phase 2)
+  useEffect(() => {
+    const fetchLead = async () => {
+      const storedLeadId = localStorage.getItem('currentLeadId');
+      if (storedLeadId) {
+        try {
+          const res = await fetch(`${API_URL}/api/leads/${storedLeadId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setLeadContext(data);
+            if (data.contactInfo?.firstName) {
+               // Update username if generic
+               if (!userName) setUserName(`${data.contactInfo.firstName} (Host)`);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching lead context:', err);
+        }
+      }
+    };
+    if (role === 'admin') fetchLead();
+  }, [role]);
 
   useEffect(() => {
     if (!meetingId) {
@@ -353,37 +385,63 @@ export default function MeetingPage() {
       {role === 'admin' && (
         <div className="w-1/2 bg-gray-900 flex flex-col">
           <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
-            <h2 className="text-sm font-semibold text-white">Admin Panel</h2>
+            
+            {/* Tabs */}
+            <div className="flex space-x-4">
+              <button 
+                onClick={() => setActiveTab('ai')}
+                className={`text-sm font-semibold pb-1 border-b-2 transition-colors ${activeTab === 'ai' ? 'text-white border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-200'}`}
+              >
+                AI Assist
+              </button>
+              <button 
+                onClick={() => setActiveTab('scripts')}
+                className={`text-sm font-semibold pb-1 border-b-2 transition-colors ${activeTab === 'scripts' ? 'text-white border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-200'}`}
+              >
+                Scripts & Tools
+              </button>
+            </div>
+
             <div className="flex items-center space-x-3">
+              {/* Wrap Up Button */}
+              <button
+                onClick={() => setShowWrapUp(true)}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow-sm transition-colors flex items-center gap-1"
+              >
+                <CheckSquare className="w-3 h-3" /> Wrap Up
+              </button>
+
+              <div className="h-4 w-px bg-gray-600 mx-2"></div>
+
               <span className={`text-[10px] uppercase font-bold ${isAIMonitoring ? 'text-green-400' : 'text-gray-500'}`}>
-                AI Feed: {isAIMonitoring ? 'Active' : 'Disabled'}
+                {isAIMonitoring ? 'AI Active' : 'AI Off'}
               </span>
               <button
                 onClick={() => {
                   const newState = !isAIMonitoring;
                   setIsAIMonitoring(newState);
                   isMonitoringRef.current = newState;
-                  // State is now preserved, no clearing here
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
                   isAIMonitoring ? 'bg-green-600' : 'bg-gray-600'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isAIMonitoring ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                    isAIMonitoring ? 'translate-x-5' : 'translate-x-1'
                   }`}
                 />
               </button>
-              <span className="text-[10px] text-white font-medium min-w-[60px]">
-                {isAIMonitoring ? 'AI ACTIVE' : 'AI OFF'}
-              </span>
             </div>
           </div>
           
-          <div className="flex-1 flex overflow-hidden">
-            {/* Column 1: Live Transcription */}
-            <div className="flex-1 border-r border-gray-700 flex flex-col">
+          <div className="flex-1 flex overflow-hidden relative bg-gray-900">
+            
+            {/* Tab Content: AI Assist */}
+            {activeTab === 'ai' && (
+              <>
+                {/* Column 1: Live Transcription */}
+                <div className="flex-1 border-r border-gray-700 flex flex-col">
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <span>Live Transcription</span>
@@ -487,7 +545,27 @@ export default function MeetingPage() {
                 )}
               </div>
             </div>
+            </>
+            )}
+
+            {/* Tab Content: Scripts & Tools */}
+            {activeTab === 'scripts' && (
+              <div className="w-full h-full p-4 bg-gray-900">
+                 <ScriptPanel productType={leadContext?.productType || 'default'} />
+              </div>
+            )}
+
           </div>
+
+          {/* Wrap Up Modal */}
+          <WrapUpModal 
+            isOpen={showWrapUp} 
+            onClose={() => setShowWrapUp(false)}
+            leadId={leadContext?.id || localStorage.getItem('currentLeadId')}
+            onSave={(data) => {
+              addLog(`✅ Wrap-up saved: ${data.disposition}`);
+            }}
+          />
         </div>
       )}
     </div>
