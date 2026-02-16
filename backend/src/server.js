@@ -8,8 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
-const ghlService = require('./services/ghl-service');
-const leadSessionStore = require('./models/LeadSession');
+import ghlService from './services/ghl-service.js';
+import leadSessionStore from './models/LeadSession.js';
 
 const app = express();
 const server = createServer(app);

@@ -1,4 +1,4 @@
-const axios = require('axios');
+import axios from 'axios';
 
 class GHLService {
   constructor() {
@@ -136,4 +136,4 @@ class GHLService {
   }
 }
 
-module.exports = new GHLService();
+export default new GHLService();

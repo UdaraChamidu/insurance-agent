@@ -61,5 +61,5 @@ class LeadSessionStore {
     }
   }
   
-  module.exports = new LeadSessionStore();
+  export default new LeadSessionStore();
   
