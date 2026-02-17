@@ -26,7 +26,7 @@ class BookingsService {
       }
 
       const data = await response.json();
-      return data.appointments;
+      return Array.isArray(data) ? data : (data.appointments || []);
     } catch (error) {
       console.error('Error fetching appointments:', error);
       throw error;

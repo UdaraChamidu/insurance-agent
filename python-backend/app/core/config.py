@@ -22,8 +22,17 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     # Supabase
+    MAX_WIDTH: int = 120
     SUPABASE_URL: str
     SUPABASE_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str
+    DATABASE_URL: str
+    
+    # Microsoft Graph / SharePoint
+    MICROSOFT_CLIENT_ID: str
+    MICROSOFT_TENANT_ID: str
+    MICROSOFT_CLIENT_SECRET: str
+    SHAREPOINT_SITE_URL: str
     
     # Gemini
     GEMINI_API_KEY: str

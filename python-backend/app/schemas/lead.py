@@ -7,7 +7,7 @@ from app.schemas.common import Status, Disposition, TimestampSchema
 class LeadBase(BaseModel):
     product_type: Optional[str] = Field(None, alias="productType")
     state: Optional[str] = None
-    triggers: Optional[Dict[str, Any]] = None
+    triggers: Optional[List[str]] = None
     first_name: Optional[str] = Field(None, alias="firstName")
     last_name: Optional[str] = Field(None, alias="lastName")
     email: Optional[EmailStr] = None
