@@ -1,129 +1,101 @@
-# Insurance AI Consultant Platform
+# 🏥 Insurance AI Consultant Platform
 
-A specialized video consultation platform for insurance agents, featuring real-time AI assistance, compliance gating, and CRM integration.
+**A "Smart" Video Consultation & Intake System for Insurance Agents.**
 
-## 🌟 Key Features
-
-### 🔹 For Clients
-- **Smart Intake Flow**: Personalized questionnaire to capture product interest (Medicare, ACA, Life) and critical triggers (Turning 65, Moved, etc.).
-- **Dynamic Scheduling**: Automatically routes clients to the correct specialist calendar based on their intake needs.
-- **Seamless Video**: No-download WebRTC video calls directly in the browser.
-
-### 🔹 For Agents
-- **AI Copilot**: Real-time transcription and compliance suggestions during calls (requires OpenAI key).
-- **Compliance Scripts**: Automatically loads the correct legal disclaimers and scripts based on the client's product type.
-- **Wrap-Up & CRM Sync**: Integrated "Wrap Up" form to log call outcome (Booked, Quoted, NI) and sync structured data to GoHighLevel (GHL).
-- **RAG Knowledge Base**: Instant access to carrier policies and regulations via the "Ask AI" panel.
+This platform streamlines the entire lifecycle of selling insurance—from the moment a lead clicks an ad, to the final policy binding—ensuring compliance and efficiency at every step.
 
 ---
 
-## 🛠️ Tech Stack
+## 🔄 How It Works (The User Journey)
 
-- **Frontend**: React (Vite), Tailwind CSS, Lucide Icons
-- **Backend**: Node.js (Express), Socket.io (WebSocket)
-- **Database**: Pinecone (Vector DB), In-Memory Session Store (for active leads)
-- **Integrations**: OpenAI (GPT-4/Whisper), Microsoft Graph (Bookings/SharePoint), GoHighLevel (CRM), Twilio (SMS).
+### 1. The "Smart" Intake (`/intake`)
+Instead of a generic contact form, clients go through a **dynamic questionnaire**:
+- **Product Filtering**: Accurately buckets leads into *Medicare*, *ACA (Obamacare)*, or *Life Insurance*.
+- **State Validity**: Checks if the agent is licensed in the client's state (default: FL).
+- **Trigger Capture**: Identifies high-intent signals (e.g., "Turning 65 soon", "Just moved").
+- **Result**: Creates a **Lead Session** in Supabase and syncs a "New Lead" contact to **GoHighLevel (CRM)**.
+
+### 2. Intelligent Scheduling
+Once a lead is qualified, they don't just see a generic calendar. The system routes them to the **specific Microsoft Booking calendar** for their product type (e.g., a "Medicare Specialist" calendar vs. a "Family Plan" calendar).
+
+### 3. The Consultation Room (`/meeting`)
+The agent and client meet in a custom video room (WebRTC) that gives the agent **Superpowers**:
+- **Script Panel**: Automatically loads the *exact* compliance script required for the client's product (e.g., CMS Disclaimer for Medicare).
+- **Compliance Checklist**: Interactive checklist to ensure no required disclosures are missed.
+- **Agent Tools**: Quick access to carrier-specific lookups and cheat sheets.
+- *(Future)* **AI Copilot**: Live transcription and RAG-based answer suggestions.
+
+### 4. The Wrap-Up & Sync
+When the call ends, the agent fills out a **Wrap-Up Form** directly in the dashboard:
+- **Disposition**: What happened? (Sold, Quoted, Not Interested).
+- **Notes**: Key details from the call.
+- **Sync**: One click saves everything to:
+    1.  **Supabase** (Permanent Database).
+    2.  **GoHighLevel** (Updates the contact tags, notes, and pipeline stage).
 
 ---
 
-## 🚀 Getting Started
+## 🧠 System Architecture
+
+### 📂 The "Brain" (Knowledge Base)
+- **SharePoint Integration**: The system watches specific SharePoint folders (e.g., `02_CMS_Medicare_Authority`).
+- **Auto-Ingestion**: When a new PDF/Doc is uploaded to SharePoint, the backend automatically downloads, chunks, and embeds it into **Pinecone**.
+- **Result**: The agent (and future AI) has instant access to the latest carrier policies and state regulations.
+
+### 🗄️ The Database (Supabase + Prisma)
+We moved away from temporary memory to a robust PostgreSQL setup:
+- **Leads**: Stores intake data and UTM parameters.
+- **Sessions**: Tracks call start/end times and status.
+- **Transcripts**: (Prepared) Stores conversation history for AI analysis.
+
+---
+
+## 🚀 Developer Setup
 
 ### Prerequisites
 - Node.js v18+
-- API Keys for OpenAI, Pinecone, Microsoft Graph (Optional for full features), GoHighLevel (Optional for CRM sync).
+- Supabase Project (PostgreSQL)
+- *(Optional)*: OpenAI API Key, GoHighLevel API Key, Microsoft Graph Credentials
 
 ### 1. Installation
-
-**Backend:**
 ```bash
+# Backend
 cd backend
 npm install
-```
+npx prisma generate  # Generate DB client
 
-**Frontend:**
-```bash
+# Frontend
 cd frontend
 npm install
 ```
 
-### 2. Environment Variables
-
-Create reference `.env` files in both directories.
-
-**Backend (`backend/.env`):**
+### 2. Environment Variables (`.env`)
+You need a `.env` file in `backend/` with at least:
 ```env
 PORT=3001
-# AI (Optional)
-OPENAI_API_KEY=sk-...
-PINECONE_API_KEY=...
-PINECONE_INDEX=insurance-agent
-
-# CRM (GoHighLevel)
-GHL_API_KEY=...
-GHL_LOCATION_ID=...
-
-# Microsoft (Bookings/SharePoint)
-MICROSOFT_CLIENT_ID=...
-MICROSOFT_TENANT_ID=...
-MICROSOFT_CLIENT_SECRET=...
-SHAREPOINT_SITE_URL=...
-
-# Twilio (Optional)
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-TWILIO_PHONE_NUMBER=...
-```
-
-**Frontend (`frontend/.env`):**
-```env
-VITE_API_URL=http://localhost:3001
-VITE_WS_URL=ws://localhost:3001
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres"
+# Add OpenAI/GHL keys for full features
 ```
 
 ### 3. Running Locally
-
-**Start Backend:**
 ```bash
+# Terminal 1 (Backend)
 cd backend
 npm start
-```
-*Server runs on port 3001.*
 
-**Start Frontend:**
-```bash
+# Terminal 2 (Frontend)
 cd frontend
 npm run dev
 ```
-*App runs on http://localhost:5173*.
+Visit `http://localhost:5173` to start.
 
 ---
 
-## 🚢 Deployment Guide
+## 🗺️ Roadmap
 
-### Frontend (Vercel)
-The frontend is a static React app and is best deployed on **Vercel**.
-1.  Connect your GitHub repo to Vercel.
-2.  Set `Build Command`: `npm run build`
-3.  Set `Output Directory`: `dist`
-4.  **Environment Variables**:
-    - `VITE_API_URL`: Your production backend URL (e.g., `https://my-backend.railway.app`)
-    - `VITE_WS_URL`: Your production backend websocket (e.g., `wss://my-backend.railway.app`)
-
-### Backend (Railway)
-The backend is a Node.js service. We verify it works best with Docker on **Railway**.
-1.  Connect your GitHub repo to Railway.
-2.  Railway matches the `Dockerfile` automatically (Node 20 Alpine).
-3.  **Environment Variables**: Add all variables from your `backend/.env` to the Railway service settings.
-4.  **Networking**: Railway will provide a public domain. Use this for the Frontend's `VITE_API_URL`.
-
----
-
-## 🧪 Testing the Flow
-
-1.  **Intake**: Go to `/intake`. Fill out the form.
-    - *Simulates ad click and lead capture.*
-2.  **Scheduling**: (Redirects to `/schedule`).
-    - *Note: Microsoft Booking iframe may block on localhost/non-production domains.*
-3.  **Consultation**: Agent joins via `/meeting?meetingId=test&role=admin`.
-    - Verify "Scripts & Tools" tab loads the correct script for the lead's product.
-    - Click "Wrap Up" to save call outcome.
+- [x] **Phase 1**: Core Intake & CRM Sync
+- [x] **Phase 2**: Agent Dashboard & Scripts
+- [x] **Phase 3**: RAG / Document Ingestion
+- [x] **Phase 4**: Database Persistence (Supabase)
+- [ ] **Phase 5**: AI Intelligence (Live Transcription & Suggestions)
+- [ ] **Phase 6**: Twilio Voice Integration (Phone Calls)

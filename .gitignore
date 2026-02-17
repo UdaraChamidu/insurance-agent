@@ -45,4 +45,6 @@ temp/
 .vercel
 .railway
 
-
+# python backend
+python-backend/venv
+python-backend/.env
