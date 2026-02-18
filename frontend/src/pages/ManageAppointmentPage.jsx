@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Calendar, Clock, AlertTriangle, CheckCircle, XCircle,
-  Loader, ChevronLeft, ChevronRight
+  Loader, ChevronLeft, ChevronRight, Shield, Globe, RefreshCw, AlertCircle, ArrowLeft
 } from 'lucide-react';
 import { sendCancellationEmail, sendRescheduleEmail } from '../services/frontendEmailService';
 
@@ -29,6 +29,7 @@ const formatTime12 = (time24) => {
 export default function ManageAppointmentPage() {
   const { token } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +52,18 @@ export default function ManageAppointmentPage() {
   useEffect(() => {
     fetchAppointment();
   }, [token]);
+
+  // Handle query params for auto-open
+  useEffect(() => {
+    if (!appointment) return;
+    const action = searchParams.get('action');
+    if (action === 'reschedule' && !showReschedule && appointment.status !== 'cancelled') {
+      setShowReschedule(true);
+    }
+    if (action === 'cancel' && !showCancelConfirm && appointment.status !== 'cancelled') {
+      setShowCancelConfirm(true);
+    }
+  }, [searchParams, appointment]);
 
   const fetchAppointment = async () => {
     try {
@@ -167,7 +180,12 @@ export default function ManageAppointmentPage() {
       });
       const data = await res.json();
       if (data.success) {
+        setAppointment(data.appointment);
+        setSuccessMsg('Appointment rescheduled successfully!');
+        setShowReschedule(false);
         setActionResult({ type: 'rescheduled', data: data.appointment });
+        // Send reschedule email
+        sendRescheduleEmail(data.appointment).catch(err => console.error('Email failed:', err));
       } else {
         setError(data.detail || 'Failed to reschedule appointment.');
       }

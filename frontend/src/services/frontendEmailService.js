@@ -20,11 +20,9 @@ export const sendBookingConfirmation = async (appointment, lead) => {
   const lastName = lead.contactInfo?.lastName || lead.lastName || '';
   const email = lead.contactInfo?.email || lead.email || '';
   const fullName = `${firstName} ${lastName}`.trim();
-  const link = `${window.location.origin}${appointment.meetingLink}`;
-  const manageLink = `${window.location.origin}/appointment/manage/${appointment.manageToken}`;
 
   const templateParams = {
-    // Recipient
+    // Standard fields
     to_name: fullName,
     user_name: fullName, // Alias
     name: fullName,      // Alias
@@ -45,14 +43,14 @@ export const sendBookingConfirmation = async (appointment, lead) => {
     // Service Description
     service_name: appointment.serviceName,
     description: appointment.serviceName, // Alias
-    message: `Appointment for ${appointment.serviceName}`, // Alias
+    message: appointment.notes || 'No additional notes', // Alias
     notes: appointment.notes || 'No additional notes',
 
     // Meeting Details (Mapping for Zoom-like templates)
-    meeting_link: link,
-    join_link: link, // Alias
-    link: link,      // Alias
-    zoom_link: link, // Alias
+    meeting_link: `${window.location.origin}${appointment.meetingLink}`,
+    join_link: `${window.location.origin}${appointment.meetingLink}`, // Alias
+    link: `${window.location.origin}${appointment.meetingLink}`,      // Alias
+    zoom_link: `${window.location.origin}${appointment.meetingLink}`, // Alias
     
     meeting_id: appointment.meetingId || 'N/A',
     meeting_password: 'No Password Required',
@@ -60,9 +58,9 @@ export const sendBookingConfirmation = async (appointment, lead) => {
     password: 'No Password Required', // Alias
     
     // Management
-    manage_link: manageLink,
-    cancel_link: manageLink,      // Alias for template convenience
-    reschedule_link: manageLink,  // Alias for template convenience
+    manage_link: `${window.location.origin}/appointment/manage/${appointment.manageToken}`,
+    cancel_link: `${window.location.origin}/appointment/manage/${appointment.manageToken}?action=cancel`,
+    reschedule_link: `${window.location.origin}/appointment/manage/${appointment.manageToken}?action=reschedule`,
     
     // System
     booking_ref: appointment.bookingRef || 'Pending'
@@ -73,6 +71,9 @@ export const sendBookingConfirmation = async (appointment, lead) => {
 };
 
 export const sendCancellationEmail = async (appointment) => {
+  // Try to find a specific cancellation template, otherwise fallback
+  const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_CANCEL;
+  
   // Appointment object from manage API has customer details flattened
   const customerName = appointment.customerName || 'Customer';
   const customerEmail = appointment.customerEmail || '';
@@ -103,10 +104,13 @@ export const sendCancellationEmail = async (appointment) => {
     reschedule_link: window.location.origin,
   };
   
-  return sendEmail(templateParams);
+  return sendEmail(templateParams, templateId);
 };
 
 export const sendRescheduleEmail = async (appointment) => {
+  // Try to find a specific reschedule template, otherwise fallback
+  const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_RESCHEDULE;
+
   const customerName = appointment.customerName || 'Customer';
   const customerEmail = appointment.customerEmail || '';
   const link = `${window.location.origin}${appointment.meetingLink}`;
@@ -143,5 +147,5 @@ export const sendRescheduleEmail = async (appointment) => {
     reschedule_link: manageLink,
   };
   
-  return sendEmail(templateParams);
+  return sendEmail(templateParams, templateId);
 };
