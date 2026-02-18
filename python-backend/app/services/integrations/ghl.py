@@ -25,6 +25,40 @@ class GHLService:
                 print(f"GHL create_contact error: {e}")
                 return None
 
-    # Add other methods as needed (update_contact, add_tag, etc.)
+    async def update_contact(self, contact_id: str, update_data: dict):
+        if not self.api_key:
+            print(f"[MOCK GHL] Updating contact {contact_id}: {update_data}")
+            return {"id": contact_id, "mock": True}
+            
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.put(
+                    f"{self.base_url}/contacts/{contact_id}",
+                    json=update_data,
+                    headers={"Authorization": f"Bearer {self.api_key}"}
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                print(f"GHL update_contact error: {e}")
+                return None
+
+    async def add_note(self, contact_id: str, note_body: str):
+        if not self.api_key:
+            print(f"[MOCK GHL] Adding note to {contact_id}: {note_body}")
+            return True
+            
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/contacts/{contact_id}/notes",
+                    json={"body": note_body},
+                    headers={"Authorization": f"Bearer {self.api_key}"}
+                )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                print(f"GHL add_note error: {e}")
+                return None
 
 ghl_service = GHLService()

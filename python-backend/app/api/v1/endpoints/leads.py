@@ -3,11 +3,82 @@ from datetime import datetime
 from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models import Lead, Session as DbSession
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
+from app.services.integrations.ghl import ghl_service
 
 router = APIRouter()
+
+# Background Task Functions
+async def sync_lead_to_ghl(lead_id: str):
+    db = SessionLocal()
+    try:
+        # Fetch Lead and Session
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        if not session or not session.lead:
+            print(f"Sync Error: Lead/Session {lead_id} not found")
+            return
+            
+        lead = session.lead
+        
+        # Prepare GHL Contact Data
+        contact_data = {
+            "email": lead.email,
+            "phone": lead.phone,
+            "firstName": lead.firstName,
+            "lastName": lead.lastName,
+            "tags": [f"Lead Source: {lead.utmSource or 'Direct'}", f"Product: {lead.productType}"],
+            "customFields": {
+                "state": lead.state,
+                "triggers": str(lead.triggers) # GHL custom fields are usually strings
+            }
+        }
+        
+        # Sync to GHL
+        ghl_contact = await ghl_service.create_contact(contact_data)
+        
+        if ghl_contact and ghl_contact.get("contact", {}).get("id"):
+            contact_id = ghl_contact["contact"]["id"]
+            session.ghlContactId = contact_id
+            db.commit()
+            print(f"✅ Synced lead {lead_id} to GHL: {contact_id}")
+            
+    except Exception as e:
+        print(f"Error syncing lead to GHL: {e}")
+    finally:
+        db.close()
+
+async def sync_wrapup_to_ghl(lead_id: str):
+    db = SessionLocal()
+    try:
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        if not session or not session.ghlContactId:
+            print(f"Sync Skip: No GHL ID for session {lead_id}")
+            return
+            
+        # Update Contact Fields
+        update_data = {
+            "tags": [f"Disposition: {session.disposition}"],
+            "customFields": {
+                "plan_sold": session.planName,
+                "premium_amount": session.premium
+            }
+        }
+        
+        await ghl_service.update_contact(session.ghlContactId, update_data)
+        
+        # Add Note
+        if session.notes:
+            await ghl_service.add_note(session.ghlContactId, f"Call Notes: {session.notes}")
+            
+        print(f"✅ Synced wrap-up for {lead_id} to GHL")
+        
+    except Exception as e:
+        print(f"Error syncing wrapup to GHL: {e}")
+    finally:
+        db.close()
+
 
 @router.post("/intake", response_model=Dict[str, Any])
 async def create_lead_intake(
@@ -42,7 +113,6 @@ async def create_lead_intake(
             utmContent=lead_in.utm_content
         )
         db.add(db_lead)
-        # Flush to check for errors before committing (optional, but good for catching dupes)
         db.flush() 
         
         # 2. Create Session
@@ -58,14 +128,57 @@ async def create_lead_intake(
         db.commit()
         db.refresh(db_lead)
         
-        # 3. Trigger Background Tasks (e.g. Sync to GHL)
-        # background_tasks.add_task(sync_to_ghl, lead_id)
+        # 3. Trigger Background Tasks (Sync to GHL)
+        if lead_in.email or lead_in.phone:
+            background_tasks.add_task(sync_lead_to_ghl, lead_id)
 
         return {"success": True, "leadId": lead_id}
 
     except Exception as e:
         db.rollback()
         print(f"Error in lead intake: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/", response_model=List[Dict[str, Any]])
+async def get_leads(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve all leads (with latest session status)
+    """
+    try:
+        # data = db.query(Lead).offset(skip).limit(limit).all()
+        # Better: Join with Session to get status
+        results = (
+            db.query(Lead, DbSession)
+            .outerjoin(DbSession, Lead.id == DbSession.leadId)
+            .order_by(DbSession.createdAt.desc()) # Newest first
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+        
+        leads_list = []
+        for lead, session in results:
+            leads_list.append({
+                "id": lead.id,
+                "firstName": lead.firstName,
+                "lastName": lead.lastName,
+                "email": lead.email,
+                "phone": lead.phone,
+                "productType": lead.productType,
+                "state": lead.state,
+                "createdAt": session.createdAt if session else None,
+                "status": session.status if session else "new",
+                "disposition": session.disposition if session else None
+            })
+            
+        return leads_list
+
+    except Exception as e:
+        print(f"Error fetching leads: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{lead_id}", response_model=Dict[str, Any])
@@ -78,7 +191,6 @@ async def get_lead_session(
     """
     try:
         # Fetch Session with Lead relation
-        # We need to query by leadId which is on the Session model
         session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
         
         if not session:
@@ -113,6 +225,7 @@ async def get_lead_session(
 async def lead_wrapup(
     lead_id: str,
     update_in: SessionUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
@@ -131,11 +244,18 @@ async def lead_wrapup(
             
         if update_in.notes:
             session.notes = update_in.notes
-            
-        # If schema has more fields, map them here
+        
+        # Map other fields if present in schema
+        if hasattr(update_in, "plan_name") and update_in.plan_name:
+             session.planName = update_in.plan_name
+        if hasattr(update_in, "premium") and update_in.premium:
+             session.premium = update_in.premium
             
         db.commit()
         db.refresh(session)
+        
+        # Trigger GHL Sync
+        background_tasks.add_task(sync_wrapup_to_ghl, lead_id)
         
         return {"success": True, "session": {"id": session.id, "status": session.status}}
 

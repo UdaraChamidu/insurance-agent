@@ -9,7 +9,7 @@ class ConnectionManager:
         # connection_id -> {ws, user_id, meeting_id}
         self.connections: Dict[str, Dict[str, Any]] = {}
 
-    async def connect(self, websocket: WebSocket, meeting_id: str, connection_id: str, user_id: Optional[str] = None):
+    async def connect(self, websocket: WebSocket, meeting_id: str, connection_id: str, user_id: Optional[str] = None, role: str = "customer"):
         await websocket.accept()
         
         if meeting_id not in self.active_meetings:
@@ -20,10 +20,11 @@ class ConnectionManager:
         self.connections[connection_id] = {
             "ws": websocket,
             "meeting_id": meeting_id,
-            "user_id": user_id
+            "user_id": user_id,
+            "role": role
         }
         
-        print(f"User {user_id or 'anon'} connected to meeting {meeting_id}")
+        print(f"User {user_id or 'anon'} ({role}) connected to meeting {meeting_id}")
 
     def disconnect(self, connection_id: str):
         if connection_id in self.connections:
@@ -55,5 +56,18 @@ class ConnectionManager:
             await websocket.send_json(message)
         except Exception as e:
             print(f"Error sending personal message: {e}")
+
+    async def broadcast_to_admin(self, meeting_id: str, message: dict):
+        """Broadcast message only to participants with role='admin'"""
+        target_conns = [
+            info for info in self.connections.values()
+            if info["meeting_id"] == meeting_id and info.get("role") == "admin"
+        ]
+        
+        for info in target_conns:
+            try:
+                await info["ws"].send_json(message)
+            except Exception as e:
+                print(f"Error broadcasting to admin: {e}")
 
 manager = ConnectionManager()

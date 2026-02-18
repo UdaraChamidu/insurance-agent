@@ -19,15 +19,28 @@ class BookingsService {
         queryParams.append('status', filters.status);
       }
 
-      const response = await fetch(`${API_URL}/api/bookings/appointments?${queryParams}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch appointments');
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-      const data = await response.json();
-      return Array.isArray(data) ? data : (data.appointments || []);
+      try {
+        const response = await fetch(`${API_URL}/api/bookings/appointments?${queryParams}`, {
+          signal: controller.signal
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch appointments');
+        }
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.appointments || []);
+      } finally {
+        clearTimeout(timeoutId);
+      }
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('Fetch request timed out');
+        throw new Error('Request timed out');
+      }
       console.error('Error fetching appointments:', error);
       throw error;
     }

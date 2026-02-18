@@ -214,261 +214,165 @@ export default function BookingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-slate-900 transition-colors duration-300">
-      {/* Header */}
-      <header className="bg-white dark:bg-black/30 backdrop-blur-md border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center space-x-4 w-full md:w-auto">
-              <button
-                onClick={() => navigate('/')}
-                className="text-gray-600 dark:text-white hover:text-blue-600 dark:hover:text-blue-300 transition"
-              >
-                <ArrowLeft className="h-6 w-6" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Scheduled Meetings</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Manage your appointments and consultations</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
-              <button
-                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-white transition-colors relative"
-                title="Notifications"
-              >
-                <Bell className="h-6 w-6" />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-              </button>
-              
-              <button
-                onClick={() => navigate('/admin/profile')}
-                className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-white transition-colors"
-                title="Admin Profile"
-              >
-                <User className="h-6 w-6" />
-              </button>
-
-              <div className="h-8 w-px bg-gray-300 dark:bg-white/10 mx-2"></div>
-
-              <button
-                onClick={fetchAppointments}
-                className="p-2 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-lg text-gray-700 dark:text-white transition-all flex items-center gap-2"
-                title="Refresh Appointments"
-              >
-                <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden md:inline">Refresh</span>
-              </button>
-              
-              <div className="hidden md:block px-4 py-2 bg-blue-100 dark:bg-blue-600/20 rounded-lg border border-blue-200 dark:border-blue-500/30">
-                <div className="text-xs text-blue-600 dark:text-blue-300">Total Appointments</div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">{filteredAppointments.length}</div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Scheduled Meetings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your appointments and consultations</p>
         </div>
-      </header>
-
-      {/* Knowledge Base Status Bar */}
-      {showKBBar && docStats && (
-        <div className="bg-gradient-to-r from-blue-900/40 via-purple-900/30 to-blue-900/40 border-b border-white/5">
-          <div className="max-w-7xl mx-auto px-6 py-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-5 overflow-x-auto">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Database className="h-4 w-4 text-blue-400" />
-                  <span className="text-xs font-semibold text-blue-300 uppercase tracking-wider">Knowledge Base</span>
-                </div>
-
-                <div className="h-4 w-px bg-white/10 flex-shrink-0" />
-
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className={`h-2 w-2 rounded-full ${docStats.ingestion?.isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                  <span className={`text-xs font-medium ${docStats.ingestion?.isRunning ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {docStats.ingestion?.isRunning ? 'Syncing' : 'Stopped'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <FileText className="h-3.5 w-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-300">
-                    <span className="font-bold text-white">{docStats.ingestion?.processedFileCount || 0}</span> files
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <HardDrive className="h-3.5 w-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-300">
-                    <span className="font-bold text-white">{(docStats.pinecone?.totalVectors || 0).toLocaleString()}</span> vectors
-                  </span>
-                </div>
-
-                {(docStats.ingestion?.errors?.length || 0) > 0 && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <XCircle className="h-3.5 w-3.5 text-red-400" />
-                    <span className="text-xs text-red-300 font-medium">
-                      {docStats.ingestion.errors.length} error(s)
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => navigate('/admin/documents')}
-                  className="flex items-center gap-1 text-xs text-blue-300 hover:text-blue-200 transition-colors font-medium"
-                >
-                  View All <ChevronRight className="h-3 w-3" />
-                </button>
-                <button
-                  onClick={() => setShowKBBar(false)}
-                  className="text-gray-500 hover:text-gray-300 transition-colors ml-1"
-                  title="Dismiss"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:block px-4 py-2 bg-blue-100 dark:bg-blue-600/20 rounded-lg border border-blue-200 dark:border-blue-500/30">
+            <div className="text-xs text-blue-600 dark:text-blue-300">Total</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-white">{filteredAppointments.length}</div>
           </div>
+          <button
+            onClick={fetchAppointments}
+            className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg text-gray-700 dark:text-white transition-all flex items-center gap-2"
+            title="Refresh Appointments"
+          >
+            <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden md:inline">Refresh</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Filters */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between mb-6">
-          {/* Filter buttons */}
-          <div className="flex flex-wrap gap-2">
-            {['upcoming', 'past', 'all', 'invitation_sent'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  filter === f
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                }`}
-              >
-                {f === 'invitation_sent' ? 'Invitation Sent' : f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="w-full md:flex-1 md:max-w-md">
-            <input
-              type="text"
-              placeholder="Search by name, email, or service..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+        {/* Filter buttons */}
+        <div className="flex flex-wrap gap-2">
+          {['upcoming', 'past', 'all', 'invitation_sent'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                filter === f
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
+                  : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'
+              }`}
+            >
+              {f === 'invitation_sent' ? 'Invitation Sent' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
         </div>
 
-        {/* Loading state */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader className="h-12 w-12 text-blue-400 animate-spin" />
-          </div>
-        ) : filteredAppointments.length === 0 ? (
-          <div className="text-center py-20">
-            <Calendar className="h-16 w-16 text-gray-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No appointments found</h3>
-            <p className="text-gray-400">Try adjusting your filters or search term</p>
-          </div>
-        ) : (
-          /* Appointments grid */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAppointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className="bg-white dark:bg-white/10 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/20 p-6 hover:shadow-xl dark:hover:bg-white/15 transition-all shadow-sm"
-              >
-                {/* Status badge */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(appointment.status)}`}>
-                    {getStatusIcon(appointment.status)}
-                    <span>{appointment.status.toUpperCase()}</span>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {bookingsService.getRelativeTime(appointment.startDateTime)}
-                  </div>
+        {/* Search */}
+        <div className="relative w-full md:max-w-xs">
+           {/* Search Icon was missing in imports or implementation, ensuring it exists or using simple input */}
+           <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader className="h-12 w-12 text-blue-400 animate-spin" />
+        </div>
+      ) : filteredAppointments.length === 0 ? (
+        <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/10">
+          <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No appointments found</h3>
+          <p className="text-gray-500 dark:text-gray-400">Try adjusting your filters or search term</p>
+        </div>
+      ) : (
+        /* Appointments grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredAppointments.map((appointment) => (
+            <div
+              key={appointment.id}
+              className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/10 p-6 hover:shadow-lg transition-all shadow-sm flex flex-col"
+            >
+              {/* Status badge */}
+              <div className="flex items-center justify-between mb-4">
+                <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(appointment.status)}`}>
+                  {getStatusIcon(appointment.status)}
+                  <span>{appointment.status.toUpperCase()}</span>
                 </div>
-
-                {/* Service name */}
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{appointment.serviceName}</h3>
-
-                {/* Date and time */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                    <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                    <span>{bookingsService.formatDate(appointment.startDateTime)}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                    <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                    <span>
-                      {bookingsService.formatTime(appointment.startDateTime)} - {bookingsService.formatTime(appointment.endDateTime)}
-                      {' '}({bookingsService.calculateDuration(appointment.startDateTime, appointment.endDateTime)} min)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Customer info */}
-                <div className="border-t border-gray-200 dark:border-white/10 pt-4 mb-4 space-y-2">
-                  <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-                    <User className="h-4 w-4 text-green-500 dark:text-green-400" />
-                    <span className="font-medium">{appointment.customerName}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{appointment.customerEmailAddress}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                    <Phone className="h-3 w-3" />
-                    <span>{appointment.customerPhone}</span>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {appointment.customerNotes && (
-                  <div className="bg-gray-50 dark:bg-black/20 rounded-lg p-3 mb-4 border border-gray-100 dark:border-white/5">
-                    <div className="flex items-start space-x-2">
-                      <FileText className="h-4 w-4 text-purple-500 dark:text-purple-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-600 dark:text-gray-300">{appointment.customerNotes}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleSendInvitation(appointment.id)}
-                    disabled={sendingInvitation[appointment.id]}
-                    className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg shadow-blue-500/20"
-                  >
-                    {sendingInvitation[appointment.id] ? (
-                      <>
-                        <Loader className="h-4 w-4 animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        <span>Send Invite</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleJoinMeeting(appointment)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg shadow-green-500/20"
-                  >
-                    Join
-                  </button>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {bookingsService.getRelativeTime(appointment.startDateTime)}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Service name */}
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{appointment.serviceName}</h3>
+
+              {/* Date and time */}
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                  <span>{bookingsService.formatDate(appointment.startDateTime)}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                  <span>
+                    {bookingsService.formatTime(appointment.startDateTime)} - {bookingsService.formatTime(appointment.endDateTime)}
+                    {' '}({bookingsService.calculateDuration(appointment.startDateTime, appointment.endDateTime)} min)
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer info */}
+              <div className="border-t border-gray-100 dark:border-white/5 pt-4 mb-4 space-y-2 flex-grow">
+                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                  <User className="h-4 w-4 text-green-500 dark:text-green-400" />
+                  <span className="font-medium">{appointment.customerName}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Mail className="h-3 w-3" />
+                  <span className="truncate">{appointment.customerEmailAddress}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Phone className="h-3 w-3" />
+                  <span>{appointment.customerPhone}</span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {appointment.customerNotes && (
+                <div className="bg-gray-50 dark:bg-black/20 rounded-lg p-3 mb-4 border border-gray-100 dark:border-white/5">
+                  <div className="flex items-start space-x-2">
+                    <FileText className="h-4 w-4 text-purple-500 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">{appointment.customerNotes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-white/5 mt-auto">
+                <button
+                  onClick={() => handleSendInvitation(appointment.id)}
+                  disabled={sendingInvitation[appointment.id]}
+                  className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all text-sm"
+                >
+                  {sendingInvitation[appointment.id] ? (
+                    <>
+                      <Loader className="h-3 w-3 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3 w-3" />
+                      <span>Invite</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleJoinMeeting(appointment)}
+                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all text-sm flex items-center gap-1"
+                >
+                  <span className="whitespace-nowrap">Join</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Success Modal */}
       {successModal.show && (

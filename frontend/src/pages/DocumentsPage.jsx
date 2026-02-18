@@ -24,10 +24,14 @@ export default function DocumentsPage() {
   // Fetch stats and files
   const fetchData = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       const [statsRes, filesRes] = await Promise.all([
-        fetch(`${API_URL}/api/documents/stats`),
-        fetch(`${API_URL}/api/documents/files`)
+        fetch(`${API_URL}/api/documents/stats`, { signal: controller.signal }),
+        fetch(`${API_URL}/api/documents/files`, { signal: controller.signal })
       ]);
 
       if (!statsRes.ok || !filesRes.ok) throw new Error('Failed to fetch data');
@@ -48,8 +52,13 @@ export default function DocumentsPage() {
       setFiles(filesData.files || []);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Backend might be down.');
+      } else {
+        setError(err.message);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
       setRefreshing(false);
     }
@@ -127,7 +136,7 @@ export default function DocumentsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="h-full flex items-center justify-center p-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400 mx-auto mb-4"></div>
           <p className="text-gray-400">Loading knowledge base...</p>
@@ -141,7 +150,7 @@ export default function DocumentsPage() {
   const errors = ingestion.errors || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 transition-colors duration-300">
+    <div className="space-y-6">
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-2xl border backdrop-blur-md animate-slide-in
@@ -156,43 +165,29 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {/* Header */}
-      <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/admin/bookings')}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500/20 p-2 rounded-lg">
-                  <Database className="h-6 w-6 text-blue-400" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white">Knowledge Base</h1>
-                  <p className="text-xs text-gray-400">Document ingestion & vector management</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-500">
-                Auto-refreshes every 30s
-              </span>
-              <button
-                onClick={() => fetchData(true)}
-                disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-lg transition-all text-sm"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-          </div>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Database className="h-6 w-6 text-blue-500" />
+            Knowledge Base
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage document ingestion & vector search status</p>
         </div>
-      </header>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+            Auto-refreshes every 30s
+          </span>
+          <button
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white rounded-lg transition-all text-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
 
       {/* Error Banner */}
       {error && (
@@ -204,7 +199,6 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {/* Ingestion Status */}
@@ -410,7 +404,6 @@ export default function DocumentsPage() {
           Polling interval: {ingestion.pollingIntervalMinutes || 5} min • 
           Next check in ~{Math.max(1, Math.round((ingestion.pollingIntervalMinutes || 5) - ((Date.now() - new Date(ingestion.lastCheck).getTime()) / 60000)))} min
         </div>
-      </main>
 
       {/* Custom animation */}
       <style>{`

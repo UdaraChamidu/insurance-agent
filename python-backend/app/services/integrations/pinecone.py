@@ -36,6 +36,15 @@ class PineconeService:
             print(f"Pinecone upsert error: {e}")
             return False
 
+    def get_stats(self):
+        if not self.index:
+            return {"totalRecordCount": 0}
+        try:
+            return self.index.describe_index_stats()
+        except Exception as e:
+            print(f"Pinecone stats error: {e}")
+            return {"totalRecordCount": 0}
+
     def query(self, vector, namespace, top_k=10, filter=None):
         if not self.index:
             return []

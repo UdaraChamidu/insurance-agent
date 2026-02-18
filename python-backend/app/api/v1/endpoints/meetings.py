@@ -4,6 +4,8 @@ from typing import Dict, Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from app.services.meeting.websocket_manager import manager
 
+from app.services.meeting.audio_service import audio_service
+
 router = APIRouter()
 
 @router.post("/", response_model=Dict[str, str])
@@ -62,7 +64,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 role = data.get("role", "customer")
                 
                 # Register with manager
-                await manager.connect(websocket, meeting_id, connection_id, user_id)
+                await manager.connect(websocket, meeting_id, connection_id, user_id, role)
                 
                 # Notify others
                 await manager.broadcast_to_meeting(meeting_id, {
@@ -108,9 +110,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 }, exclude=websocket)
             
             elif message_type == "audio-chunk":
-                # Real-time audio processing would happen here
-                # await audio_service.process_chunk(data.get("chunk"), meeting_id)
-                pass
+                # Real-time audio processing
+                audio_data = data.get("audioData")
+                if audio_data:
+                    await audio_service.process_audio_chunk(meeting_id, user_id, audio_data)
+
+            elif message_type == "request-ai-suggestion":
+                text = data.get("text")
+                if text:
+                    await audio_service.generate_ai_suggestion(meeting_id, user_id, text)
 
     except WebSocketDisconnect:
         manager.disconnect(connection_id)

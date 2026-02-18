@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     PINECONE_API_KEY: str
     PINECONE_INDEX_NAME: str = "insurance-agent"
     
+    # GoHighLevel
+    GHL_API_KEY: str = ""
+    GHL_LOCATION_ID: str = ""
+    
     # Application Params
     PORT: int = 8000
     ENVIRONMENT: str = "development"
