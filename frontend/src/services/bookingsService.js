@@ -1,46 +1,70 @@
-// Frontend service for Microsoft Bookings API
+// Frontend service for Custom Scheduling API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 class BookingsService {
+  /**
+   * Fetch available time slots for a date range
+   */
+  async getAvailability(from, to) {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/scheduling/availability?from=${from}&to=${to}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch availability');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new appointment
+   */
+  async createAppointment(data) {
+    try {
+      const response = await fetch(`${API_URL}/api/scheduling/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Failed to create appointment');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      throw error;
+    }
+  }
+
   /**
    * Fetch all appointments with optional filters
    */
   async getAppointments(filters = {}) {
     try {
       const queryParams = new URLSearchParams();
-      
-      if (filters.startDate) {
-        queryParams.append('startDate', filters.startDate);
-      }
-      if (filters.endDate) {
-        queryParams.append('endDate', filters.endDate);
-      }
-      if (filters.status) {
-        queryParams.append('status', filters.status);
-      }
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.from) queryParams.append('from', filters.from);
+      if (filters.to) queryParams.append('to', filters.to);
+      if (filters.limit) queryParams.append('limit', filters.limit);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       try {
-        const response = await fetch(`${API_URL}/api/bookings/appointments?${queryParams}`, {
-          signal: controller.signal
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch appointments');
-        }
-
-        const data = await response.json();
-        return Array.isArray(data) ? data : (data.appointments || []);
+        const response = await fetch(
+          `${API_URL}/api/scheduling/appointments?${queryParams}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch appointments');
+        return await response.json();
       } finally {
         clearTimeout(timeoutId);
       }
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.error('Fetch request timed out');
-        throw new Error('Request timed out');
-      }
+      if (error.name === 'AbortError') throw new Error('Request timed out');
       console.error('Error fetching appointments:', error);
       throw error;
     }
@@ -51,12 +75,8 @@ class BookingsService {
    */
   async getAppointmentById(id) {
     try {
-      const response = await fetch(`${API_URL}/api/bookings/appointments/${id}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch appointment');
-      }
-
+      const response = await fetch(`${API_URL}/api/scheduling/appointments/${id}`);
+      if (!response.ok) throw new Error('Failed to fetch appointment');
       return await response.json();
     } catch (error) {
       console.error('Error fetching appointment:', error);
@@ -65,128 +85,98 @@ class BookingsService {
   }
 
   /**
-   * Get booking business information
+   * Update appointment (status, notes, etc.)
    */
-  async getBookingBusiness() {
+  async updateAppointment(id, data) {
     try {
-      const response = await fetch(`${API_URL}/api/bookings/business`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch business info');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching business info:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Send invitation email for an appointment
-   */
-  async sendInvitation(appointmentId, meetingUrl = null) {
-    try {
-      const response = await fetch(`${API_URL}/api/bookings/appointments/${appointmentId}/send-invitation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ meetingUrl }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send invitation');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error sending invitation:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update appointment status
-   */
-  async updateAppointmentStatus(appointmentId, status) {
-    try {
-      const response = await fetch(`${API_URL}/api/bookings/appointments/${appointmentId}/status`, {
+      const response = await fetch(`${API_URL}/api/scheduling/appointments/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update appointment status');
-      }
-
+      if (!response.ok) throw new Error('Failed to update appointment');
       return await response.json();
     } catch (error) {
-      console.error('Error updating appointment status:', error);
+      console.error('Error updating appointment:', error);
       throw error;
     }
   }
 
   /**
-   * Format date for display
+   * Cancel an appointment
    */
+  async cancelAppointment(id) {
+    try {
+      const response = await fetch(`${API_URL}/api/scheduling/appointments/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to cancel appointment');
+      return await response.json();
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get availability settings
+   */
+  async getAvailabilitySettings() {
+    try {
+      const response = await fetch(`${API_URL}/api/scheduling/settings`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save availability settings
+   */
+  async saveAvailabilitySettings(slots) {
+    try {
+      const response = await fetch(`${API_URL}/api/scheduling/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slots }),
+      });
+      if (!response.ok) throw new Error('Failed to save settings');
+      return await response.json();
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      throw error;
+    }
+  }
+
+  // ===== Utility Methods =====
+
   formatDate(dateString) {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
     });
   }
 
-  /**
-   * Format time for display
-   */
-  formatTime(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  formatTime(time24) {
+    const [h, m] = time24.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
   }
 
-  /**
-   * Calculate duration in minutes
-   */
-  calculateDuration(startDateTime, endDateTime) {
-    const start = new Date(startDateTime);
-    const end = new Date(endDateTime);
-    return Math.round((end - start) / 60000); // Convert to minutes
-  }
-
-  /**
-   * Get relative time (e.g., "in 2 hours", "tomorrow")
-   */
   getRelativeTime(dateString) {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
     const now = new Date();
     const diffMs = date - now;
-    const diffHours = Math.round(diffMs / 3600000);
     const diffDays = Math.round(diffMs / 86400000);
 
-    if (diffHours < 0) {
-      return 'Past';
-    } else if (diffHours < 1) {
-      const diffMins = Math.round(diffMs / 60000);
-      return `in ${diffMins} minute${diffMins !== 1 ? 's' : ''}`;
-    } else if (diffHours < 24) {
-      return `in ${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
-    } else if (diffDays === 1) {
-      return 'Tomorrow';
-    } else if (diffDays < 7) {
-      return `in ${diffDays} days`;
-    } else {
-      return this.formatDate(dateString);
-    }
+    if (diffDays < 0) return 'Past';
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays < 7) return `in ${diffDays} days`;
+    return this.formatDate(dateString);
   }
 }
 

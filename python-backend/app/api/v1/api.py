@@ -5,7 +5,9 @@ from app.api.v1.endpoints import (
     documents,
     bookings,
     health,
-    notifications
+    notifications,
+    scheduling,
+    communications,
 )
 
 api_router = APIRouter()
@@ -16,3 +18,6 @@ api_router.include_router(meetings.router, prefix="/meetings", tags=["meetings"]
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(bookings.router, prefix="/bookings", tags=["bookings"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(scheduling.router, prefix="/scheduling", tags=["scheduling"])
+api_router.include_router(communications.router, prefix="/communications", tags=["communications"])
+

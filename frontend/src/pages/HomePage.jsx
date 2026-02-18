@@ -17,17 +17,22 @@ export default function HomePage() {
               </div>
               <h1 className="text-xl font-bold text-white tracking-wide">Elite Deal Broker</h1>
             </div>
-            <nav className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-6">
+            <nav className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-5">
+                <button
+                  onClick={() => navigate('/intake')}
+                  className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+                >
+                  Book Consultation
+                </button>
                 <a href="#services" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">Services</a>
-                <a href="#about" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">About</a>
                 <a href="#contact" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">Contact</a>
               </div>
               <button
                 onClick={() => navigate('/admin')}
                 className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-all shadow-lg shadow-blue-600/20 border border-blue-500/30"
               >
-                Admin Login
+                Admin Panel
               </button>
             </nav>
           </div>
@@ -56,10 +61,8 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <a
-                href="https://outlook.office.com/book/EliteDealBroker6@helmygenesis.com/?ismsaljsauthenabled"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => navigate('/intake')}
                 className="group relative px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-lg transition-all shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 hover:-translate-y-1 w-full sm:w-auto"
               >
                 <div className="flex items-center justify-center gap-2">
@@ -67,7 +70,7 @@ export default function HomePage() {
                   <span>Schedule Consultation</span>
                   <ArrowRight className="h-5 w-5 bg-white/20 rounded-full p-1 transition-transform group-hover:translate-x-1" />
                 </div>
-              </a>
+              </button>
               <a
                 href="https://www.elitedealbroker.com"
                 target="_blank"
@@ -131,15 +134,13 @@ export default function HomePage() {
           <p className="text-xl text-gray-300 mb-10">
             Book a free, no-obligation consultation with our top-rated agents today.
           </p>
-          <a
-            href="https://outlook.office.com/book/EliteDealBroker6@helmygenesis.com/?ismsaljsauthenabled"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => navigate('/intake')}
             className="inline-flex items-center px-8 py-4 bg-white text-blue-900 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all shadow-xl shadow-white/10"
           >
             <CheckCircle className="mr-2 h-5 w-5 text-blue-600" />
             Book Your Session
-          </a>
+          </button>
         </div>
       </section>
 

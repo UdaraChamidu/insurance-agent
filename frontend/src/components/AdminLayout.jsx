@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   Bell,
-  Search
+  Search,
+  Calendar
 } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 
@@ -19,8 +20,8 @@ export default function AdminLayout() {
   const location = useLocation();
 
   const menuItems = [
-    { path: '/admin/bookings', label: 'Schedule', icon: LayoutDashboard },
-    { path: '/admin/leads', label: 'Leads', icon: Users },
+    { path: '/admin/bookings', label: 'Appointments', icon: Calendar },
+    { path: '/admin/leads', label: 'Lead Pipeline', icon: Users },
     { path: '/admin/documents', label: 'Knowledge Base', icon: FileText },
     { path: '/admin/profile', label: 'Settings', icon: Settings },
   ];

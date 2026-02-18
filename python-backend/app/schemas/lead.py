@@ -5,6 +5,8 @@ from app.schemas.common import Status, Disposition, TimestampSchema
 # --- LEAD SCHEMAS ---
 
 class LeadBase(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     product_type: Optional[str] = Field(None, alias="productType")
     state: Optional[str] = None
     triggers: Optional[List[str]] = None

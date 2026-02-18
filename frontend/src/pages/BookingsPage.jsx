@@ -1,437 +1,330 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, FileText, Send, CheckCircle, XCircle, Loader, ArrowLeft, Filter, Bell, Database, Activity, HardDrive, ChevronRight, X } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
-import emailjs from '@emailjs/browser';
+import {
+  Calendar, Clock, User, Mail, Phone, MapPin,
+  Video, CheckCircle, XCircle, Loader, RefreshCw,
+  ChevronDown, Search, Filter, ArrowRight, AlertCircle
+} from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const STATUS_COLORS = {
+  confirmed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: 'Confirmed' },
+  pending:   { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: 'Pending' },
+  cancelled: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', label: 'Cancelled' },
+  completed: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', label: 'Completed' },
+  no_show:   { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20', label: 'No Show' },
+};
 
 export default function BookingsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('upcoming'); // upcoming, past, all, invitation_sent
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sendingInvitation, setSendingInvitation] = useState({});
-  const [invitationStatus, setInvitationStatus] = useState(() => {
-    // Load sent invitations from local storage
-    const saved = localStorage.getItem('invitationStatus');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
 
-  // Knowledge Base status bar state
-  const [docStats, setDocStats] = useState(null);
-  const [showKBBar, setShowKBBar] = useState(true);
-
-  const fetchDocStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/documents/stats`);
-      if (res.ok) setDocStats(await res.json());
-    } catch (e) { /* non-critical */ }
-  }, []);
-
-  useEffect(() => {
-    fetchDocStats();
-    const interval = setInterval(fetchDocStats, 30000);
-    return () => clearInterval(interval);
-  }, [fetchDocStats]);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const filters = {};
-      
-      if (filter === 'upcoming') {
-        // filter handled in frontend to support all backends
-      } else if (filter === 'past') {
-        // filter handled in frontend
-      }
-
+      if (statusFilter) filters.status = statusFilter;
       const data = await bookingsService.getAppointments(filters);
       setAppointments(data);
-    } catch (error) {
-      console.error('Error loading appointments:', error);
-      alert('Failed to load appointments. Please try again.');
+    } catch (err) {
+      setError('Failed to load appointments. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-  const [successModal, setSuccessModal] = useState({ show: false, email: '', phone: null, link: '' });
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchAppointments();
-  }, [filter]);
+  }, [fetchAppointments]);
 
-  const handleSendInvitation = async (appointmentId) => {
-    // Get EmailJS credentials from environment variables
-    const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-    const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-    const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-
-    if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
-      alert('EmailJS credentials missing in .env file!');
-      console.error('Missing credentials:', { SERVICE_ID, TEMPLATE_ID, PUBLIC_KEY });
-      return;
-    }
-
-    setSendingInvitation(prev => ({ ...prev, [appointmentId]: true }));
+  const handleStatusChange = async (aptId, newStatus) => {
     try {
-      // 1. Get appointment details
-      const appointment = appointments.find(a => a.id === appointmentId);
-      if (!appointment) throw new Error('Appointment not found');
-
-      // 2. Generate Meeting Link (Frontend side)
-      // Format: http://localhost:5173/meeting?meetingId=UUID&role=client
-      const meetingId = appointment.id;
-      // Encode the ID to handle special characters (like Microsoft Graph IDs) safely
-      const encodedId = encodeURIComponent(meetingId);
-      const meetingLink = `${window.location.origin}/meeting?meetingId=${encodedId}&role=client`;
-
-      // 3. Send Email using EmailJS
-      // Matching variables from your template screenshot:
-      // {{to_email}}, {{customer_name}}, {{meeting_time}}, {{meeting_id}}, {{passcode}}, {{join_link}}, {{description}}, {{email}}
-      
-      const dateStr = bookingsService.formatDate(appointment.startDateTime);
-      const timeStr = bookingsService.formatTime(appointment.startDateTime);
-      
-      const emailParams = {
-        // Recipient Mapping
-        to_email: appointment.customerEmailAddress,
-        email: 'agent@securelife.com', // For "Reply To" field (or put agent's email here)
-        
-        // Content Mapping
-        customer_name: appointment.customerName,
-        meeting_time: `${dateStr} at ${timeStr}`,
-        meeting_id: meetingId,
-        passcode: 'No Passcode Required', // Or 'Direct Link'
-        join_link: meetingLink,
-        description: appointment.serviceName || 'Insurance Consultation',
-        
-        // Keep old ones just in case
-        date: dateStr,
-        time: timeStr,
-        service_name: appointment.serviceName
-      };
-
-      console.log('Sending email with params:', emailParams);
-      await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
-
-      let smsSent = false;
-
-      // 4. Send SMS (if phone number exists)
-      if (appointment.customerPhone) {
-        try {
-          const smsMessage = `Hello ${appointment.customerName}, your meeting is scheduled for ${dateStr} at ${timeStr}. Join here: ${meetingLink}`;
-          await fetch(`${API_URL}/api/send-sms`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              to: appointment.customerPhone,
-              message: smsMessage
-            })
-          });
-          console.log('📱 SMS sent successfully');
-          smsSent = true;
-        } catch (smsError) {
-          console.error('Failed to send SMS:', smsError);
-          // Don't alert user about SMS failure if email succeeded, checking console is enough
-        }
-      }
-
-      // 5. Update UI
-      setInvitationStatus(prev => {
-        const newState = { ...prev, [appointmentId]: true };
-        localStorage.setItem('invitationStatus', JSON.stringify(newState));
-        return newState;
-      });
-      
-      // Show Success Modal instead of alert
-      setSuccessModal({
-        show: true,
-        email: appointment.customerEmailAddress,
-        phone: smsSent ? appointment.customerPhone : null,
-        link: meetingLink
-      });
-
-    } catch (error) {
-      console.error('Error sending invitation:', error);
-      alert(`Failed to send invitation: ${error.text || error.message}`);
-    } finally {
-      setSendingInvitation(prev => ({ ...prev, [appointmentId]: false }));
+      await bookingsService.updateAppointment(aptId, { status: newStatus });
+      fetchAppointments();
+    } catch {
+      setError('Failed to update appointment status.');
     }
   };
 
-  const handleJoinMeeting = (appointment) => {
-    // Navigate to the Meeting Page (Unified UI) as Admin
-    navigate(`/meeting?meetingId=${encodeURIComponent(appointment.id)}&role=admin`);
+  const handleCancel = async (aptId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+    try {
+      await bookingsService.cancelAppointment(aptId);
+      fetchAppointments();
+    } catch {
+      setError('Failed to cancel appointment.');
+    }
   };
 
-  const filteredAppointments = appointments.filter(apt => {
-    const searchLower = searchTerm.toLowerCase();
-    const apptDate = new Date(apt.startDateTime);
-    const now = new Date();
-    
-    // 1. Category Filter
-    let matchesCategory = true;
-    if (filter === 'upcoming') {
-      matchesCategory = apptDate >= now;
-    } else if (filter === 'past') {
-      matchesCategory = apptDate < now;
-    } else if (filter === 'invitation_sent') {
-      matchesCategory = invitationStatus[apt.id];
-    }
-    // 'all' matches everything
-    
-    // 2. Search Filter
-    const matchesSearch = (
-      apt.customerName.toLowerCase().includes(searchLower) ||
-      apt.customerEmailAddress.toLowerCase().includes(searchLower) ||
-      apt.serviceName.toLowerCase().includes(searchLower) ||
-      (apt.customerPhone && apt.customerPhone.includes(searchLower))
+  const handleJoinMeeting = (meetingLink) => {
+    if (meetingLink) navigate(meetingLink);
+  };
+
+  const filtered = appointments.filter(apt => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (apt.customerName || '').toLowerCase().includes(q) ||
+      (apt.customerEmail || '').toLowerCase().includes(q) ||
+      (apt.bookingRef || '').toLowerCase().includes(q) ||
+      (apt.date || '').includes(q) ||
+      (apt.serviceName || '').toLowerCase().includes(q)
     );
-    
-    return matchesCategory && matchesSearch;
   });
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800 border-green-300';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'completed': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled': return <XCircle className="h-4 w-4" />;
-      default: return null;
-    }
-  };
+  const upcoming = filtered.filter(a => a.status === 'confirmed' || a.status === 'pending').sort((a, b) => a.date.localeCompare(b.date));
+  const past = filtered.filter(a => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Scheduled Meetings</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your appointments and consultations</p>
+          <h1 className="text-2xl font-bold text-white">Appointments</h1>
+          <p className="text-gray-400 text-sm mt-1">{appointments.length} total appointments</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden md:block px-4 py-2 bg-blue-100 dark:bg-blue-600/20 rounded-lg border border-blue-200 dark:border-blue-500/30">
-            <div className="text-xs text-blue-600 dark:text-blue-300">Total</div>
-            <div className="text-xl font-bold text-gray-900 dark:text-white">{filteredAppointments.length}</div>
-          </div>
+        <div className="flex gap-3">
           <button
             onClick={fetchAppointments}
-            className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg text-gray-700 dark:text-white transition-all flex items-center gap-2"
-            title="Refresh Appointments"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 rounded-xl hover:bg-white/10 transition-all text-sm"
           >
-            <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden md:inline">Refresh</span>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        {/* Filter buttons */}
-        <div className="flex flex-wrap gap-2">
-          {['upcoming', 'past', 'all', 'invitation_sent'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                filter === f
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
-                  : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'
-              }`}
-            >
-              {f === 'invitation_sent' ? 'Invitation Sent' : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, email, or date..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+          />
         </div>
-
-        {/* Search */}
-        <div className="relative w-full md:max-w-xs">
-           {/* Search Icon was missing in imports or implementation, ensuring it exists or using simple input */}
-           <input
-              type="text"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        <div className="relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="pl-10 pr-10 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white appearance-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+          >
+            <option value="" className="bg-slate-800">All Statuses</option>
+            <option value="confirmed" className="bg-slate-800">Confirmed</option>
+            <option value="pending" className="bg-slate-800">Pending</option>
+            <option value="completed" className="bg-slate-800">Completed</option>
+            <option value="cancelled" className="bg-slate-800">Cancelled</option>
+            <option value="no_show" className="bg-slate-800">No Show</option>
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
         </div>
       </div>
 
-      {/* Loading state */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader className="h-12 w-12 text-blue-400 animate-spin" />
-        </div>
-      ) : filteredAppointments.length === 0 ? (
-        <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/10">
-          <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No appointments found</h3>
-          <p className="text-gray-500 dark:text-gray-400">Try adjusting your filters or search term</p>
-        </div>
-      ) : (
-        /* Appointments grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAppointments.map((appointment) => (
-            <div
-              key={appointment.id}
-              className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/10 p-6 hover:shadow-lg transition-all shadow-sm flex flex-col"
-            >
-              {/* Status badge */}
-              <div className="flex items-center justify-between mb-4">
-                <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(appointment.status)}`}>
-                  {getStatusIcon(appointment.status)}
-                  <span>{appointment.status.toUpperCase()}</span>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {bookingsService.getRelativeTime(appointment.startDateTime)}
-                </div>
-              </div>
-
-              {/* Service name */}
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{appointment.serviceName}</h3>
-
-              {/* Date and time */}
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                  <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                  <span>{bookingsService.formatDate(appointment.startDateTime)}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                  <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                  <span>
-                    {bookingsService.formatTime(appointment.startDateTime)} - {bookingsService.formatTime(appointment.endDateTime)}
-                    {' '}({bookingsService.calculateDuration(appointment.startDateTime, appointment.endDateTime)} min)
-                  </span>
-                </div>
-              </div>
-
-              {/* Customer info */}
-              <div className="border-t border-gray-100 dark:border-white/5 pt-4 mb-4 space-y-2 flex-grow">
-                <div className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-                  <User className="h-4 w-4 text-green-500 dark:text-green-400" />
-                  <span className="font-medium">{appointment.customerName}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                  <Mail className="h-3 w-3" />
-                  <span className="truncate">{appointment.customerEmailAddress}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                  <Phone className="h-3 w-3" />
-                  <span>{appointment.customerPhone}</span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {appointment.customerNotes && (
-                <div className="bg-gray-50 dark:bg-black/20 rounded-lg p-3 mb-4 border border-gray-100 dark:border-white/5">
-                  <div className="flex items-start space-x-2">
-                    <FileText className="h-4 w-4 text-purple-500 dark:text-purple-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">{appointment.customerNotes}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-white/5 mt-auto">
-                <button
-                  onClick={() => handleSendInvitation(appointment.id)}
-                  disabled={sendingInvitation[appointment.id]}
-                  className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all text-sm"
-                >
-                  {sendingInvitation[appointment.id] ? (
-                    <>
-                      <Loader className="h-3 w-3 animate-spin" />
-                      <span>Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-3 w-3" />
-                      <span>Invite</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => handleJoinMeeting(appointment)}
-                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all text-sm flex items-center gap-1"
-                >
-                  <span className="whitespace-nowrap">Join</span>
-                </button>
-              </div>
-            </div>
-          ))}
+      {error && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
         </div>
       )}
 
-      {/* Success Modal */}
-      {successModal.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 border border-green-500/30 p-8 rounded-2xl shadow-2xl max-w-lg w-full relative animate-fadeIn">
-            <button 
-              onClick={() => setSuccessModal({ ...successModal, show: false })}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              <XCircle className="h-6 w-6" />
-            </button>
-            
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
-                <CheckCircle className="h-10 w-10 text-green-400" />
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader className="w-8 h-8 text-blue-400 animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Upcoming Section */}
+          {upcoming.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Upcoming ({upcoming.length})
+              </h2>
+              <div className="space-y-3">
+                {upcoming.map(apt => (
+                  <AppointmentCard
+                    key={apt.id}
+                    apt={apt}
+                    expanded={expandedId === apt.id}
+                    onToggle={() => setExpandedId(expandedId === apt.id ? null : apt.id)}
+                    onStatusChange={handleStatusChange}
+                    onCancel={handleCancel}
+                    onJoin={handleJoinMeeting}
+                  />
+                ))}
               </div>
-              
-              <h2 className="text-2xl font-bold text-white mb-2">Invitation Sent!</h2>
-              <p className="text-gray-300 mb-6">
-                The meeting details have been successfully delivered.
-              </p>
-              
-              <div className="bg-white/5 rounded-xl p-4 w-full space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="h-5 w-5 text-blue-400" />
-                  <span className="text-gray-300">Email sent to:</span>
-                  <span className="text-white font-medium ml-auto truncate max-w-[200px]">{successModal.email}</span>
-                </div>
-                
-                {successModal.phone && (
-                  <div className="flex items-center gap-3 text-sm border-t border-white/10 pt-3">
-                    <Phone className="h-5 w-5 text-green-400" />
-                    <span className="text-gray-300">SMS sent to:</span>
-                    <span className="text-white font-medium ml-auto">{successModal.phone}</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="w-full">
-                <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 text-left">Meeting Link</label>
-                <div className="bg-black/50 p-3 rounded-lg border border-white/10 flex items-center justify-between group">
-                  <code className="text-blue-300 text-sm truncate mr-4">{successModal.link}</code>
-                  <button 
-                    onClick={() => navigator.clipboard.writeText(successModal.link)}
-                    className="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Copy Link"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSuccessModal({ ...successModal, show: false })}
-                className="mt-8 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all w-full"
-              >
-                Done
-              </button>
             </div>
+          )}
+
+          {/* Past Section */}
+          {past.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Past ({past.length})
+              </h2>
+              <div className="space-y-3">
+                {past.map(apt => (
+                  <AppointmentCard
+                    key={apt.id}
+                    apt={apt}
+                    expanded={expandedId === apt.id}
+                    onToggle={() => setExpandedId(expandedId === apt.id ? null : apt.id)}
+                    onStatusChange={handleStatusChange}
+                    onCancel={handleCancel}
+                    onJoin={handleJoinMeeting}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filtered.length === 0 && (
+            <div className="text-center py-20">
+              <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400 text-lg">No appointments found</p>
+              <p className="text-gray-500 text-sm mt-1">Appointments will appear here when leads book consultations.</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, onJoin }) {
+  const status = STATUS_COLORS[apt.status] || STATUS_COLORS.pending;
+  const isUpcoming = apt.status === 'confirmed' || apt.status === 'pending';
+
+  return (
+    <div className={`bg-white/5 border border-white/10 rounded-xl overflow-hidden transition-all hover:border-white/20`}>
+      {/* Header Row */}
+      <div
+        className="flex items-center justify-between px-5 py-4 cursor-pointer"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <User className="w-5 h-5 text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-white font-medium truncate">{apt.customerName || 'Unknown'}</p>
+              {apt.bookingRef && (
+                <span className="px-2 py-0.5 bg-blue-600/20 text-blue-300 text-xs font-bold rounded">
+                  {apt.bookingRef}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-400 text-sm truncate">{apt.serviceName}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-white text-sm font-medium">
+              {bookingsService.formatDate(apt.date)}
+            </p>
+            <p className="text-gray-400 text-sm">
+              {bookingsService.formatTime(apt.startTime)} – {bookingsService.formatTime(apt.endTime)}
+            </p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status.bg} ${status.text} border ${status.border}`}>
+            {status.label}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {expanded && (
+        <div className="border-t border-white/5 px-5 py-4">
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <span className="text-gray-400">Date:</span>
+              <span className="text-white">{bookingsService.formatDate(apt.date)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-gray-500" />
+              <span className="text-gray-400">Time:</span>
+              <span className="text-white">
+                {bookingsService.formatTime(apt.startTime)} – {bookingsService.formatTime(apt.endTime)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <span className="text-gray-400">Timezone:</span>
+              <span className="text-white">{apt.timezone}</span>
+            </div>
+            {apt.customerEmail && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-400">Email:</span>
+                <span className="text-white">{apt.customerEmail}</span>
+              </div>
+            )}
+            {apt.customerPhone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-400">Phone:</span>
+                <span className="text-white">{apt.customerPhone}</span>
+              </div>
+            )}
+          </div>
+
+          {apt.notes && (
+            <div className="text-sm text-gray-400 mb-4 bg-white/5 rounded-lg p-3">
+              <span className="font-medium text-gray-300">Notes:</span> {apt.notes}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            {isUpcoming && apt.meetingLink && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onJoin(apt.meetingLink); }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all"
+              >
+                <Video className="w-4 h-4" />
+                Join Meeting
+              </button>
+            )}
+            {apt.status === 'confirmed' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onStatusChange(apt.id, 'completed'); }}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-600/30 transition-all"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Mark Complete
+              </button>
+            )}
+            {apt.status === 'confirmed' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onStatusChange(apt.id, 'no_show'); }}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-500/20 rounded-lg text-sm font-medium hover:bg-gray-600/30 transition-all"
+              >
+                No Show
+              </button>
+            )}
+            {isUpcoming && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onCancel(apt.id); }}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/20 rounded-lg text-sm font-medium hover:bg-red-600/30 transition-all"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       )}

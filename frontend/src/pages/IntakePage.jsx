@@ -82,7 +82,37 @@ export default function IntakePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-900 dark:to-slate-900">
+      {/* Navigation Header */}
+      <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center space-x-2 text-white hover:text-blue-400 transition-colors"
+            >
+              <Shield className="h-5 w-5 text-blue-400" />
+              <span className="text-lg font-bold">Elite Deal Broker</span>
+            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => navigate('/admin')}
+                className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 font-medium py-1.5 px-3 rounded-lg text-sm transition-all border border-blue-500/30"
+              >
+                Admin Panel
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex items-center justify-center p-4 min-h-[calc(100vh-56px)]">
       <div className="max-w-xl w-full bg-white dark:bg-white/10 backdrop-blur-xl border border-gray-200 dark:border-white/20 rounded-2xl shadow-2xl p-8 transition-all">
         
         {/* Progress Bar */}
@@ -279,6 +309,7 @@ export default function IntakePage() {
             </p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

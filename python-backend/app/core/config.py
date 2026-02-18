@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # GoHighLevel
     GHL_API_KEY: str = ""
     GHL_LOCATION_ID: str = ""
+
+    # Twilio
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+
+    # App
+    APP_BASE_URL: str = "http://localhost:5173"
     
     # Application Params
     PORT: int = 8000
@@ -56,3 +64,4 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+

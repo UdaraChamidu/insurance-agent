@@ -11,6 +11,8 @@ import ProfilePage from './pages/ProfilePage';
 import DocumentsPage from './pages/DocumentsPage';
 import IntakePage from './pages/IntakePage';
 import LeadsPage from './pages/LeadsPage';
+import ClientProfilePage from './pages/ClientProfilePage';
+import ManageAppointmentPage from './pages/ManageAppointmentPage';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -26,12 +28,14 @@ function App() {
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/meeting" element={<MeetingPage />} />
+            <Route path="/appointment/manage/:token" element={<ManageAppointmentPage />} />
             
             {/* Admin Routes with Layout */}
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/bookings" replace />} />
               <Route path="bookings" element={<BookingsPage />} />
               <Route path="leads" element={<LeadsPage />} />
+              <Route path="leads/:leadId" element={<ClientProfilePage />} />
               <Route path="documents" element={<DocumentsPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>

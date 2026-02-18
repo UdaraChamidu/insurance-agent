@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -28,9 +28,13 @@ class Lead(Base):
     utmCampaign = Column(String, nullable=True)
     utmTerm = Column(String, nullable=True)
     utmContent = Column(String, nullable=True)
+
+    # Pipeline status: new, appointment_booked, quoted, enrolled, lost
+    pipelineStatus = Column(String, default="new")
     
     # Relation to Session
     session = relationship("Session", uselist=False, back_populates="lead")
+    appointments = relationship("Appointment", back_populates="lead")
 
 class Session(Base):
     __tablename__ = "Session"
@@ -81,3 +85,56 @@ class Notification(Base):
     
     metadata_json = Column(JSON, nullable=True)
 
+
+class Appointment(Base):
+    __tablename__ = "Appointment"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Human-readable booking reference (EDB-001, EDB-002, ...)
+    bookingRef = Column(String, unique=True, nullable=True, index=True)
+    # Secure token for manage links (cancel/reschedule via email)
+    manageToken = Column(String, unique=True, nullable=True, index=True)
+
+    leadId = Column(String, ForeignKey("Lead.id"), nullable=False)
+
+    # Scheduling
+    date = Column(String, nullable=False)          # YYYY-MM-DD
+    startTime = Column(String, nullable=False)     # HH:MM (24h)
+    endTime = Column(String, nullable=False)       # HH:MM (24h)
+    timezone = Column(String, default="America/New_York")
+    durationMinutes = Column(Integer, default=30)
+
+    # Meeting Link (internal WebRTC)
+    meetingLink = Column(String, nullable=True)
+    meetingId = Column(String, nullable=True)
+
+    # Status: pending, confirmed, cancelled, completed, no_show
+    status = Column(String, default="confirmed")
+
+    # Communication tracking
+    confirmationSentAt = Column(DateTime, nullable=True)
+    reminderSentAt = Column(DateTime, nullable=True)
+
+    notes = Column(Text, nullable=True)
+    serviceName = Column(String, default="Insurance Consultation")
+
+    # Relationships
+    lead = relationship("Lead", back_populates="appointments")
+
+
+class AvailabilitySlot(Base):
+    __tablename__ = "AvailabilitySlot"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    createdAt = Column(DateTime, default=datetime.utcnow)
+
+    dayOfWeek = Column(Integer, nullable=False)      # 0=Mon, 1=Tue, ..., 6=Sun
+    startTime = Column(String, nullable=False)       # HH:MM (24h)
+    endTime = Column(String, nullable=False)         # HH:MM (24h)
+    timezone = Column(String, default="America/New_York")
+    slotDurationMinutes = Column(Integer, default=30)
+    bufferMinutes = Column(Integer, default=10)
+    isActive = Column(Boolean, default=True)

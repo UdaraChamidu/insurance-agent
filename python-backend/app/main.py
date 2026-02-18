@@ -25,6 +25,30 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
+    # Create any new database tables
+    from app.core.database import engine, Base
+    from app.models import Lead, Session, Transcript, Notification, Appointment, AvailabilitySlot
+    Base.metadata.create_all(bind=engine)
+
+    # Add missing columns to existing tables (create_all won't alter existing tables)
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        migrations = [
+            ("Lead", "pipelineStatus", "VARCHAR DEFAULT 'new'"),
+            ("Appointment", "bookingRef", "VARCHAR UNIQUE"),
+            ("Appointment", "manageToken", "VARCHAR UNIQUE"),
+        ]
+        for table, column, col_type in migrations:
+            try:
+                conn.execute(text(
+                    f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{column}" {col_type}'
+                ))
+                conn.commit()
+            except Exception as e:
+                print(f"Migration note ({table}.{column}): {e}")
+
+    print("✅ Database tables synced")
+
     from app.services.document.poller import document_poller
     await document_poller.start()
 
