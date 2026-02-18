@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -29,8 +29,7 @@ class Lead(Base):
     utmTerm = Column(String, nullable=True)
     utmContent = Column(String, nullable=True)
     
-    # Relation to Session (One-to-One based on Prisma unique, but SQLAlchemy usually One-to-Many unless uselist=False)
-    # Prisma: session Session?
+    # Relation to Session
     session = relationship("Session", uselist=False, back_populates="lead")
 
 class Session(Base):
@@ -68,3 +67,17 @@ class Transcript(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     session = relationship("Session", back_populates="transcripts")
+
+class Notification(Base):
+    __tablename__ = "Notification"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    
+    type = Column(String, nullable=False) # file, booking, lead, info
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    isRead = Column(Boolean, default=False)
+    
+    metadata_json = Column(JSON, nullable=True)
+

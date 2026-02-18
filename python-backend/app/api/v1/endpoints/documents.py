@@ -59,6 +59,18 @@ async def reprocess_file(request: ReprocessRequest):
         if not removed_file:
             raise HTTPException(status_code=404, detail="File not found in tracking")
             
+        # Trigger Notification
+        from app.services.notification_service import notification_service
+        # We can run this in background task if we inject it, but for now simple await or sync call if async allowed
+        # notification_service is async for create_notification
+        # We need to await it
+        await notification_service.create_notification(
+            type="file",
+            title="File Reprocessing Started",
+            message=f"Queueing {removed_file.get('fileName')} for re-ingestion",
+            metadata={"fileKey": request.fileKey}
+        )
+            
         return {
              "success": True, 
              "fileName": removed_file.get("fileName"),

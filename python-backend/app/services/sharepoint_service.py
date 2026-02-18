@@ -178,21 +178,43 @@ class SharePointService:
     def download_document(self, download_url: Optional[str], drive_id: str, item_id: str) -> bytes:
         """Download document content"""
         try:
-            # 1. Try direct download URL
+            import time
+            retries = 3
+            
+            # 1. Try direct download URL with retries
             if download_url:
-                response = requests.get(download_url)
-                if response.status_code == 200:
-                    return response.content
+                for attempt in range(retries):
+                    try:
+                        response = requests.get(download_url)
+                        if response.status_code == 200:
+                            return response.content
+                        elif response.status_code == 503:
+                            logger.warning(f"503 Service Unavailable (Attempt {attempt+1}/{retries}). Retrying...")
+                            time.sleep(2 * (attempt + 1))
+                        else:
+                            break # Go to fallback
+                    except Exception as e:
+                        logger.warning(f"Download error (Attempt {attempt+1}/{retries}): {e}")
             
             # 2. Fallback to Graph API
             if drive_id and item_id:
                 headers = self._get_headers()
                 url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}/content"
-                response = requests.get(url, headers=headers)
-                response.raise_for_status()
-                return response.content
-                
-            raise ValueError("No download URL and no drive/item ID provided")
+                for attempt in range(retries):
+                    try:
+                        response = requests.get(url, headers=headers)
+                        if response.status_code == 503:
+                            logger.warning(f"Graph API 503 (Attempt {attempt+1}/{retries}). Retrying...")
+                            time.sleep(2 * (attempt + 1))
+                            continue
+                        response.raise_for_status()
+                        return response.content
+                    except Exception as e:
+                         if attempt == retries - 1:
+                             raise
+                         time.sleep(2)
+                         
+            raise ValueError("No download URL and no drive/item ID provided (or all attempts failed)")
             
         except Exception as e:
             logger.error(f"Error downloading document: {str(e)}")

@@ -11,6 +11,7 @@ import {
   Bell,
   Search
 } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -110,10 +111,7 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
-            </button>
+            <NotificationCenter />
             <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold">
               A
             </div>

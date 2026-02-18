@@ -23,6 +23,16 @@ if settings.CORS_ORIGINS:
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+@app.on_event("startup")
+async def startup_event():
+    from app.services.document.poller import document_poller
+    await document_poller.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    from app.services.document.poller import document_poller
+    await document_poller.stop()
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "insurance-ai-backend-python"}

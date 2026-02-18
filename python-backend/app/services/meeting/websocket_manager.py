@@ -70,4 +70,40 @@ class ConnectionManager:
             except Exception as e:
                 print(f"Error broadcasting to admin: {e}")
 
+    # --- Global Admin / Notification Support ---
+
+    async def connect_admin_global(self, websocket: WebSocket):
+        """
+        Connect an admin to the global notification channel (no specific meeting)
+        """
+        await websocket.accept()
+        connection_id = str(uuid.uuid4())
+        
+        # We use a special "global" meeting ID or just track separately
+        # For simplicity, we'll store them in 'active_meetings["global_admin"]'
+        # ensuring we don't conflict with real meetings (UUIDs)
+        
+        if "global_admin" not in self.active_meetings:
+            self.active_meetings["global_admin"] = []
+            
+        self.active_meetings["global_admin"].append(websocket)
+        self.connections[connection_id] = {
+            "ws": websocket,
+            "meeting_id": "global_admin",
+            "user_id": "admin",
+            "role": "admin"
+        }
+        print(f"Admin connected to global notification channel")
+
+    async def broadcast_global(self, message: dict):
+        """
+        Broadcast to ALL connected global admins
+        """
+        if "global_admin" in self.active_meetings:
+            for connection in self.active_meetings["global_admin"]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    print(f"Error broadcasting global: {e}")
+
 manager = ConnectionManager()

@@ -132,6 +132,16 @@ async def create_lead_intake(
         if lead_in.email or lead_in.phone:
             background_tasks.add_task(sync_lead_to_ghl, lead_id)
 
+        # 4. Create Notification
+        from app.services.notification_service import notification_service
+        background_tasks.add_task(
+            notification_service.create_notification,
+            type="lead",
+            title="New Lead Captured",
+            message=f"{lead_in.first_name} {lead_in.last_name} - {lead_in.product_type}",
+            metadata={"leadId": lead_id}
+        )
+
         return {"success": True, "leadId": lead_id}
 
     except Exception as e:

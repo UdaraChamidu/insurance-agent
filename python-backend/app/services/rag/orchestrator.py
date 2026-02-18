@@ -7,7 +7,7 @@ class IngestionOrchestrator:
     def __init__(self):
         pass
 
-    async def process_file(self, content: bytes, filename: str, folder_name: str, namespace: str):
+    async def process_file_content(self, content: bytes, filename: str, folder_name: str, namespace: str):
         """
         Full RAG Pipeline: Extract -> Chunk -> Embed -> Upsert
         """
@@ -52,7 +52,11 @@ class IngestionOrchestrator:
             success = pinecone_service.upsert(vectors, namespace)
             if success:
                 print(f"Successfully upserted {len(vectors)} chunks to Pinecone.")
+                return len(chunks), len(vectors)
             else:
                 print("Failed to upsert to Pinecone.")
+                return len(chunks), 0
+        
+        return 0, 0
 
 ingestion_orchestrator = IngestionOrchestrator()

@@ -1,0 +1,20 @@
+{
+  "isRunning": true,
+  "processedFileCount": 1,
+  "totalChecks": 6,
+  "lastCheck": "2026-02-18T03:15:26.327246",
+  "pollingIntervalMinutes": 5,
+  "files": [
+    {
+      "key": "01WKFFU5BV3UNVOIYGCZHLTUWI2MKHZB5G",
+      "fileName": "Health Insurance Master File.docx",
+      "namespace": "training-reference",
+      "status": "success",
+      "error": "503 Server Error: Service Unavailable for url: https://helmygenesis.sharepoint.com/sites/EliteDealBroker/_layouts/15/download.aspx?UniqueId=571bdd35-0623-4e16-b9d2-c8d3147c87a6&Translate=false&tempauth=v1.eyJzaXRlaWQiOiI1MTdiY2UzNy00YzgwLTRlOGUtYjlmNC02YjBjY2VkZDE3MWYiLCJhcHBfZGlzcGxheW5hbWUiOiJLQi1SQUctSW5nZXN0aW9uIiwibmFtZWlkIjoiYTZhMWYzMjgtZjI1OC00YWMyLWJhZGEtYjE3YmU2NDU3MjIwQDMxNmRmNjhmLTYzNzAtNDFlNC04ZjIzLTk3NWY4ZTQ3MzgwOSIsImF1ZCI6IjAwMDAwMDAzLTAwMDAtMGZmMS1jZTAwLTAwMDAwMDAwMDAwMC9oZWxteWdlbmVzaXMuc2hhcmVwb2ludC5jb21AMzE2ZGY2OGYtNjM3MC00MWU0LThmMjMtOTc1ZjhlNDczODA5IiwiZXhwIjoiMTc3MTM4NzQ0NCJ9.CkAKDGVudHJhX2NsYWltcxIwQ1BIVjFNd0dFQUFhRmsxWExYazVWVFZ1VFRCTFQxWk5hV0ZuZDFGS1FVRXFBQT09CjIKCmFjdG9yYXBwaWQSJDAwMDAwMDAzLTAwMDAtMDAwMC1jMDAwLTAwMDAwMDAwMDAwMAoKCgRzbmlkEgI2NBILCLyU0f2Mqfc-EAUaDTIwLjE5MC4xNjMuOTYqLHJ4TEVabmtyanArK2VERWo0N3N2Y2FFekErTFNwcXJJYTB2TWRCMGpuRVU9MJEBOAFCEKH4DhRH8AAAVPwXInKNgxpKEGhhc2hlZHByb29mdG9rZW56ATG6ARxhbGxzaXRlcy5yZWFkIGFsbHNpdGVzLndyaXRlyAEB.JvRq9dKjYBR68mlTRq0hbytOO5KeJ_pPLXvSJ-LkzlI&ApiVersion=2.0",
+      "lastModified": "2026-01-21T19:41:00Z",
+      "processedAt": "2026-02-18T03:13:45.311399",
+      "chunks": 0,
+      "vectors": 0
+    }
+  ]
+}

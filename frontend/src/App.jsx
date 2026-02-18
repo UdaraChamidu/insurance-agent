@@ -14,29 +14,33 @@ import LeadsPage from './pages/LeadsPage';
 
 import { ThemeProvider } from './context/ThemeContext';
 
+import { NotificationProvider } from './context/NotificationContext';
+
 function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/schedule" element={<SchedulePage />} />
-          <Route path="/intake" element={<IntakePage />} />
-          <Route path="/meeting" element={<MeetingPage />} />
-          
-          {/* Admin Routes with Layout */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/bookings" replace />} />
-            <Route path="bookings" element={<BookingsPage />} />
-            <Route path="leads" element={<LeadsPage />} />
-            <Route path="documents" element={<DocumentsPage />} />
-            <Route path="profile" element={<ProfilePage />} />
-          </Route>
-
-          {/* Standalone Admin Views */}
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        </Routes>
-      </Router>
+      <NotificationProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/schedule" element={<SchedulePage />} />
+            <Route path="/intake" element={<IntakePage />} />
+            <Route path="/meeting" element={<MeetingPage />} />
+            
+            {/* Admin Routes with Layout */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/bookings" replace />} />
+              <Route path="bookings" element={<BookingsPage />} />
+              <Route path="leads" element={<LeadsPage />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+            </Route>
+  
+            {/* Standalone Admin Views */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          </Routes>
+        </Router>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }
