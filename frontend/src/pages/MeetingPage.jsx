@@ -148,6 +148,15 @@ export default function MeetingPage() {
           }]);
         };
       }
+
+      // Handle Participant Left
+      meetingService.onParticipantLeft = (data) => {
+          addLog(`👋 Participant ${data.userId} left`);
+          if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = null;
+          }
+          alert("The other participant has left the meeting.");
+      };
       
       // Join meeting (peer connections handled automatically)
       addLog(`Joining meeting: ${meetingId}`);
@@ -300,9 +309,10 @@ export default function MeetingPage() {
 
           <button
             onClick={handleJoinMeeting}
-            className="w-full btn-primary text-lg py-3"
+            disabled={isJoined || error} // Simple disable, ideally add isJoining state
+            className={`w-full btn-primary text-lg py-3 ${isJoined ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Join Meeting
+            {isJoined ? 'Joining...' : 'Join Meeting'}
           </button>
         </div>
       </div>

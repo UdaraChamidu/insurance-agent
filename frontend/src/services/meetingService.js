@@ -310,32 +310,51 @@ class MeetingService {
   }
 
   startAudioProcessing() {
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: 16000 // Force 16kHz for Whisper
-    });
+    try {
+      // Try to use 16kHz context for backend compatibility
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 16000 
+      });
+    } catch (e) {
+      console.warn('⚠️ Could not force 16kHz sample rate, falling back to default:', e);
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
     const source = this.audioContext.createMediaStreamSource(this.localStream);
     
+    // Use 4096 buffer size. 
+    // If sampleRate is 48000, 4096 is ~0.08s. If 16000, it's ~0.25s.
     this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
     
-    let audioChunks = [];
+    let audioChunksBuffer = []; // renamed to avoid shadowing
     let chunkCount = 0;
-    const CHUNKS_PER_SECOND = Math.floor(this.audioContext.sampleRate / 4096);
-    const SEND_INTERVAL = CHUNKS_PER_SECOND * 4; // Send every 4 seconds for lower latency
     
-    console.log(`🎤 Audio processing started at ${this.audioContext.sampleRate}Hz, sending every ${SEND_INTERVAL} chunks (${4}s)`);
+    const contextRate = this.audioContext.sampleRate;
+    const CHUNKS_PER_SECOND = Math.floor(contextRate / 4096);
+    // Send roughly every 4 seconds
+    const SEND_INTERVAL = CHUNKS_PER_SECOND * 4; 
     
+    console.log(`🎤 Audio processing started at ${contextRate}Hz`);
+    
+    // If rate is NOT 16000, we theoretically should resample. 
+    // For now, we'll warn if mismatch, as simple linear resampling in JS is heavy.
+    if (contextRate !== 16000) {
+        console.warn("⚠️ Audio sampling rate mismatch. Backend expects 16000Hz. Audio may sound distorted.");
+        // TODO: Implement downsampling worker if needed
+    }
+
     this.audioProcessor.onaudioprocess = (e) => {
       if (!this.isRecording) return;
       
       const inputData = e.inputBuffer.getChannelData(0);
       const audioData = new Float32Array(inputData);
-      audioChunks.push(audioData);
+      audioChunksBuffer.push(audioData);
       chunkCount++;
       
       if (chunkCount >= SEND_INTERVAL) {
-        console.log(`🎵 Sending ${audioChunks.length} audio chunks`);
-        this.sendAudioChunk(audioChunks);
-        audioChunks = [];
+        console.log(`🎵 Sending ${audioChunksBuffer.length} audio chunks`);
+        this.sendAudioChunk(audioChunksBuffer);
+        audioChunksBuffer = [];
         chunkCount = 0;
       }
     };
