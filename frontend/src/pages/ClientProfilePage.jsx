@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, Clock,
   FileText, MessageSquare, Shield, CheckCircle, AlertCircle,
-  Loader, Edit2, Save, X, Video, ChevronDown
+  Loader, Edit2, Save, X, Video, ChevronDown, Download
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 
@@ -33,6 +33,7 @@ export default function ClientProfilePage() {
   const [session, setSession] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [transcripts, setTranscripts] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
@@ -61,6 +62,17 @@ export default function ClientProfilePage() {
         const leadApts = allApts.filter(a => a.leadId === leadId);
         setAppointments(leadApts);
       } catch { }
+      
+      // Fetch documents
+      try {
+        const docRes = await fetch(`${API_URL}/api/client-docs/lead/${leadId}`);
+        const docData = await docRes.json();
+        if (docData.success) {
+            setDocuments(docData.documents);
+        }
+      } catch (err) {
+         console.error('Error fetching docs:', err);
+      }
 
     } catch (err) {
       console.error('Error fetching client data:', err);
@@ -126,6 +138,7 @@ export default function ClientProfilePage() {
   const tabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'appointments', label: `Appointments (${appointments.length})` },
+    { key: 'documents', label: `Documents (${documents.length})` },
     { key: 'transcripts', label: `Transcripts (${transcripts.length})` },
     { key: 'notes', label: 'AI Notes' },
   ];
@@ -308,6 +321,40 @@ export default function ClientProfilePage() {
                     </button>
                   )}
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'documents' && (
+        <div className="space-y-3">
+          {documents.length === 0 ? (
+            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+              <FileText className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400">No documents uploaded.</p>
+            </div>
+          ) : (
+            documents.map(doc => (
+              <div key={doc.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                     <p className="text-white font-medium">{doc.filename}</p>
+                     <p className="text-xs text-gray-400">
+                        {new Date(doc.createdAt).toLocaleDateString()} • {(doc.fileSize / 1024).toFixed(0)} KB
+                     </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleDownload(doc.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-sm transition-all border border-white/10"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
               </div>
             ))
           )}

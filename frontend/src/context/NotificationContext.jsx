@@ -26,50 +26,7 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => {
     fetchNotifications();
-
-    // Connect WebSocket
-    const connectById = () => {
-        // We use a specific endpoint for global notifications
-        // The backend expects /api/v1/notifications/ws
-        // But backend router prefix is /api/v1/notifications
-        // So full path: ws://localhost:8000/api/v1/notifications/ws
-        const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/api/v1/notifications/ws`;
-        
-        ws.current = new WebSocket(wsUrl);
-
-        ws.current.onopen = () => {
-            console.log("Notification WS Connected");
-            setIsConnected(true);
-        };
-
-        ws.current.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === "notification") {
-                    const newNotif = data.notification;
-                    setNotifications(prev => [newNotif, ...prev]);
-                    setUnreadCount(prev => prev + 1);
-                    
-                    // Optional: Show toast here if you have a toast system
-                }
-            } catch (e) {
-                console.error("WS Message Error:", e);
-            }
-        };
-
-        ws.current.onclose = () => {
-            console.log("Notification WS Disconnected");
-            setIsConnected(false);
-            // Reconnect after 5s
-            setTimeout(connectById, 5000);
-        };
-    };
-
-    connectById();
-
-    return () => {
-        if (ws.current) ws.current.close();
-    };
+    // WebSocket disabled
   }, []);
 
   const markAsRead = async (id) => {

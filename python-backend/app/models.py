@@ -35,6 +35,7 @@ class Lead(Base):
     # Relation to Session
     session = relationship("Session", uselist=False, back_populates="lead")
     appointments = relationship("Appointment", back_populates="lead")
+    documents = relationship("Document", back_populates="lead")
 
 class Session(Base):
     __tablename__ = "Session"
@@ -138,3 +139,21 @@ class AvailabilitySlot(Base):
     slotDurationMinutes = Column(Integer, default=30)
     bufferMinutes = Column(Integer, default=10)
     isActive = Column(Boolean, default=True)
+
+
+class Document(Base):
+    __tablename__ = "Document"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    
+    leadId = Column(String, ForeignKey("Lead.id"), nullable=False)
+    
+    filename = Column(String, nullable=False)
+    filePath = Column(String, nullable=False) # Storage path
+    fileType = Column(String, nullable=True)
+    fileSize = Column(Integer, default=0)
+    
+    description = Column(String, nullable=True) # Notes from user
+    
+    lead = relationship("Lead", back_populates="documents")

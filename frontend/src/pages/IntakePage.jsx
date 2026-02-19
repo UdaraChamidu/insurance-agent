@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Shield, MapPin, AlertCircle, ArrowRight, Check, User, Mail, Phone, Loader } from 'lucide-react';
+import { Shield, MapPin, AlertCircle, ArrowRight, Check, User, Mail, Phone, Loader, Upload, X, FileText } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -21,6 +21,7 @@ export default function IntakePage() {
     phone: '',
     notes: ''
   });
+  const [selectedFiles, setSelectedFiles] = useState([]);
 
   // Capture UTMs on mount
   const utms = {
@@ -57,6 +58,43 @@ export default function IntakePage() {
       if (data.success) {
         // Save leadId and redirect to Schedule (which is the Microsoft Bookings page)
         localStorage.setItem('currentLeadId', data.leadId);
+
+        // Upload files if any
+        if (selectedFiles.length > 0) {
+          for (const file of selectedFiles) {
+             const formData = new FormData();
+             formData.append('file', file);
+             formData.append('lead_id', data.leadId);
+             try {
+                // Pre-check connectivity
+                try {
+                    const testRes = await fetch(`${API_URL}/api/client-docs/test`);
+                    if (!testRes.ok) console.warn("Test endpoint failed");
+                    else console.log("Test endpoint OK");
+                } catch (e) {
+                    console.error("Test endpoint network error", e);
+                }
+
+                const uploadUrl = `${API_URL}/api/client-docs/upload-file`;
+                console.log(`Uploading to: ${uploadUrl}`);
+
+                const uploadRes = await fetch(uploadUrl, {
+                  method: 'POST',
+                  body: formData
+                });
+                
+                if (!uploadRes.ok) {
+                    const errData = await uploadRes.json();
+                    console.error('Upload failed:', errData);
+                    alert(`Failed to upload file: ${file.name}. \nURL: ${uploadUrl} \nError: ${errData.detail || 'Unknown error'}`);
+                }
+             } catch (err) {
+                console.error('File upload network error', err);
+                alert(`Network error uploading ${file.name}. \nTarget: ${API_URL}/api/client-docs/upload-file \nCheck console for details.`);
+             }
+          }
+        }
+        
         
         // Smart Routing Logic based on Product Type
         // You could route to different booking pages here if needed
@@ -117,7 +155,7 @@ export default function IntakePage() {
         
         {/* Progress Bar */}
         <div className="flex gap-2 mb-8">
-          {[1, 2, 3, 4].map(i => (
+          {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= i ? 'bg-blue-500' : 'bg-gray-200 dark:bg-white/10'}`} />
           ))}
         </div>
@@ -233,8 +271,64 @@ export default function IntakePage() {
           </div>
         )}
 
-        {/* Step 4: Contact Info */}
+        {/* Step 4: Documents (New) */}
         {step === 4 && (
+          <div className="animate-fadeIn">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Documents (Optional)</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Upload any relevant documents (ID, Income Proof, etc.) to a secure vault.</p>
+
+            <div className="mb-6">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <Upload className="w-8 h-8 mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">PDF, PNG, JPG (MAX. 10MB)</p>
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  multiple
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* File List */}
+            {selectedFiles.length > 0 && (
+              <div className="space-y-2 mb-6 max-h-40 overflow-y-auto">
+                {selectedFiles.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{file.name}</span>
+                      <span className="text-xs text-gray-400">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={handleBack} className="px-6 py-3 rounded-xl border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">Back</button>
+              <button onClick={handleNext} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all">
+                {selectedFiles.length > 0 ? `Upload ${selectedFiles.length} file(s) & Continue` : 'Skip / Continue'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Contact Info */}
+        {step === 5 && (
             <div className="animate-fadeIn">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Final Step</h2>
             <p className="text-gray-500 dark:text-gray-400 mb-6">Enter your contact info to schedule.</p>
