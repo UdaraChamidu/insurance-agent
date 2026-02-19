@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Video, Mic, MicOff, VideoOff, Phone, MessageSquare, Sparkles, Users } from 'lucide-react';
 import meetingService from '../services/meetingService';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const WS_URL = `${WS_BASE_URL.replace(/\/$/, '')}/api/meetings/ws`;
 
 export default function AdminDashboard() {
   const navigate = useNavigate();

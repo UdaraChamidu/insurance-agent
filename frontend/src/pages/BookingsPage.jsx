@@ -63,8 +63,34 @@ export default function BookingsPage() {
     }
   };
 
-  const handleJoinMeeting = (meetingLink) => {
-    if (meetingLink) navigate(meetingLink);
+  const handleJoinMeeting = (appointment) => {
+    if (!appointment) return;
+
+    let resolvedMeetingId = appointment.meetingId;
+
+    if (!resolvedMeetingId && appointment.meetingLink) {
+      try {
+        const link = new URL(appointment.meetingLink, window.location.origin);
+        resolvedMeetingId = link.searchParams.get('meetingId') || link.searchParams.get('id');
+      } catch (e) {
+        console.error('Failed to parse meetingLink:', e);
+      }
+    }
+
+    if (!resolvedMeetingId) {
+      setError('Unable to join: meeting ID is missing for this appointment.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      meetingId: resolvedMeetingId,
+      role: 'admin',
+    });
+
+    if (appointment.leadId) params.set('leadId', appointment.leadId);
+    if (appointment.id) params.set('appointmentId', appointment.id);
+
+    navigate(`/meeting?${params.toString()}`);
   };
 
   const filtered = appointments.filter(apt => {
@@ -290,9 +316,9 @@ function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, on
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
-            {isUpcoming && apt.meetingLink && (
+            {isUpcoming && (apt.meetingId || apt.meetingLink) && (
               <button
-                onClick={(e) => { e.stopPropagation(); onJoin(apt.meetingLink); }}
+                onClick={(e) => { e.stopPropagation(); onJoin(apt); }}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all"
               >
                 <Video className="w-4 h-4" />

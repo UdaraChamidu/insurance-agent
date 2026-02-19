@@ -1,4 +1,3 @@
-import json
 from typing import Dict, List, Any, Optional
 from fastapi import WebSocket
 import uuid
@@ -11,8 +10,6 @@ class ConnectionManager:
         self.connections: Dict[str, Dict[str, Any]] = {}
 
     async def connect(self, websocket: WebSocket, meeting_id: str, connection_id: str, user_id: Optional[str] = None, role: str = "customer"):
-        await websocket.accept()
-        
         if meeting_id not in self.active_meetings:
             self.active_meetings[meeting_id] = []
         
@@ -27,7 +24,7 @@ class ConnectionManager:
         
         print(f"User {user_id or 'anon'} ({role}) connected to meeting {meeting_id}")
 
-    def disconnect(self, connection_id: str):
+    def disconnect(self, connection_id: str) -> Optional[Dict[str, Any]]:
         if connection_id in self.connections:
             conn_info = self.connections[connection_id]
             meeting_id = conn_info["meeting_id"]
@@ -42,6 +39,36 @@ class ConnectionManager:
             
             del self.connections[connection_id]
             print(f"Connection {connection_id} disconnected")
+            return conn_info
+        return None
+
+    def get_participants(self, meeting_id: str) -> List[Dict[str, Any]]:
+        participants: List[Dict[str, Any]] = []
+        for connection_id, info in self.connections.items():
+            if info.get("meeting_id") == meeting_id:
+                participants.append({
+                    "connectionId": connection_id,
+                    "userId": info.get("user_id"),
+                    "role": info.get("role", "customer"),
+                })
+        return participants
+
+    async def send_to_connection(self, connection_id: str, message: dict) -> bool:
+        info = self.connections.get(connection_id)
+        if not info:
+            return False
+        try:
+            await info["ws"].send_json(message)
+            return True
+        except Exception as e:
+            print(f"Error sending to connection {connection_id}: {e}")
+            return False
+
+    async def send_to_user(self, meeting_id: str, user_id: str, message: dict) -> bool:
+        for connection_id, info in self.connections.items():
+            if info.get("meeting_id") == meeting_id and info.get("user_id") == user_id:
+                return await self.send_to_connection(connection_id, message)
+        return False
 
     async def broadcast_to_meeting(self, meeting_id: str, message: dict, exclude: Optional[WebSocket] = None):
         if meeting_id in self.active_meetings:

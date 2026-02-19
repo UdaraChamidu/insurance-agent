@@ -91,6 +91,13 @@ class MeetingService {
       
       case 'participant-left':
         console.log('👋 Participant left:', data);
+        if (data.userId && data.userId === this.targetUserId) {
+          this.targetUserId = null;
+          if (this.peerConnection) {
+            this.peerConnection.close();
+            this.peerConnection = null;
+          }
+        }
         if (this.onParticipantLeft) {
           this.onParticipantLeft(data);
         }
@@ -257,13 +264,14 @@ class MeetingService {
 
   async handleOffer(data) {
     try {
-      console.log('📥 Received offer from:', data.fromUserId);
+      const fromUserId = data.fromUserId || data.from;
+      console.log('📥 Received offer from:', fromUserId);
       
-      this.targetUserId = data.fromUserId;
+      this.targetUserId = fromUserId;
       this.createPeerConnection();
       
       await this.peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data.signal)
+        new RTCSessionDescription(data.signal || data.offer)
       );
       
       const answer = await this.peerConnection.createAnswer();
@@ -286,10 +294,10 @@ class MeetingService {
 
   async handleAnswer(data) {
     try {
-      console.log('📥 Received answer from:', data.fromUserId);
+      console.log('📥 Received answer from:', data.fromUserId || data.from);
       
       await this.peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data.signal)
+        new RTCSessionDescription(data.signal || data.answer)
       );
     } catch (error) {
       console.error('❌ Error handling answer:', error);
@@ -298,10 +306,11 @@ class MeetingService {
 
   async handleIceCandidate(data) {
     try {
-      if (data.signal && data.signal.candidate) {
+      const candidate = data.signal?.candidate || data.candidate;
+      if (candidate) {
         console.log('🧊 Adding ICE candidate');
         await this.peerConnection.addIceCandidate(
-          new RTCIceCandidate(data.signal.candidate)
+          new RTCIceCandidate(candidate)
         );
       }
     } catch (error) {

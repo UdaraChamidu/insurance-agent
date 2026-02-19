@@ -5,9 +5,9 @@ import meetingService from '../services/meetingService';
 import ScriptPanel from '../components/ScriptPanel';
 import WrapUpModal from '../components/WrapUpModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-const WS_URL = (import.meta.env.VITE_WS_URL || 'ws://localhost:8000') + '/api/meetings/ws';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/i, 'ws');
+const WS_URL = `${WS_BASE_URL.replace(/\/$/, '')}/api/meetings/ws`;
 
 export default function MeetingPage() {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function MeetingPage() {
   // Support both 'meetingId' and 'id' (legacy/backend generated)
   const meetingId = searchParams.get('meetingId') || searchParams.get('id');
   const role = searchParams.get('role') || 'client';
+  const leadIdFromQuery = searchParams.get('leadId');
   
   const [error, setError] = useState(null); // Add error state
   const [logs, setLogs] = useState([]); // Visual logs
@@ -49,15 +50,22 @@ export default function MeetingPage() {
   useEffect(() => {
     const fetchLead = async () => {
       const storedLeadId = localStorage.getItem('currentLeadId');
-      if (storedLeadId) {
+      const effectiveLeadId = leadIdFromQuery || storedLeadId;
+
+      if (leadIdFromQuery) {
+        localStorage.setItem('currentLeadId', leadIdFromQuery);
+      }
+
+      if (effectiveLeadId) {
         try {
-          const res = await fetch(`${API_URL}/api/leads/${storedLeadId}`);
+          const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}`);
           if (res.ok) {
             const data = await res.json();
             setLeadContext(data);
-            if (data.contactInfo?.firstName) {
+            const firstName = data.contactInfo?.firstName || data.firstName;
+            if (firstName) {
                // Update username if generic
-               if (!userName) setUserName(`${data.contactInfo.firstName} (Host)`);
+               setUserName(prev => prev || `${firstName} (Host)`);
             }
           }
         } catch (err) {
@@ -66,7 +74,7 @@ export default function MeetingPage() {
       }
     };
     if (role === 'admin') fetchLead();
-  }, [role]);
+  }, [role, leadIdFromQuery]);
 
   useEffect(() => {
     if (!meetingId) {
@@ -216,15 +224,16 @@ export default function MeetingPage() {
 
   const endCall = async () => {
     if (confirm('Are you sure you want to leave the consultation?')) {
+      const effectiveLeadId = leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId');
       // 1. Leave Meeting
       meetingService.leaveMeeting();
       
       // 2. Trigger AI Summary Generation (if admin and lead context exists)
-      if (role === 'admin' && leadContext?.id) {
+      if (role === 'admin' && effectiveLeadId) {
           addLog("🤖 Generating Call Summary...");
           try {
               // Non-blocking fetch to trigger summary
-              fetch(`${API_URL}/api/leads/${leadContext.id}/generate-summary`, { method: 'POST' })
+              fetch(`${API_URL}/api/leads/${effectiveLeadId}/generate-summary`, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
                     if(data.success) {
@@ -620,7 +629,7 @@ export default function MeetingPage() {
           <WrapUpModal 
             isOpen={showWrapUp} 
             onClose={() => setShowWrapUp(false)}
-            leadId={leadContext?.id || localStorage.getItem('currentLeadId')}
+            leadId={leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId')}
             onSave={(data) => {
               addLog(`✅ Wrap-up saved: ${data.disposition}`);
             }}

@@ -1,7 +1,6 @@
 import uuid
-import json
 from typing import Dict, Any
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.meeting.websocket_manager import manager
 
 from app.services.meeting.audio_service import audio_service
@@ -23,35 +22,44 @@ async def get_meeting(meeting_id: str):
     """
     Get meeting details (active participants)
     """
-    if meeting_id not in manager.active_meetings:
-         # For now, return empty if not active, or 404?
-         # The frontend uses this to check if meeting exists? 
-         # Node.js backend returns 404 if not in map.
-         # But usually we allow joining a meeting that is just created.
-         pass
-
-    # For strict parity with Node.js backend:
-    # Node.js: const meeting = meetings.get(req.params.meetingId);
-    # Node.js: if (!meeting) return 404
-    # The Node.js backend stores meeting state in memory map `meetings`.
-    # We should probably track meeting metadata in `manager` too.
-    
-    # Returning basic info for now
+    participants = manager.get_participants(meeting_id)
     return {
         "meetingId": meeting_id,
-        "activeParticipants": len(manager.active_meetings.get(meeting_id, []))
+        "activeParticipants": len(participants),
+        "participants": participants,
     }
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # We can't use query params easily here for meetingId/userId in the decorator path
-    # So we accept connection, then wait for "join-meeting" message?
-    # Or frontend sends params in URL? `ws://.../ws?meetingId=...`
-    # Node.js: `wss.on('connection', ...)` then waits for `message` with type `join-meeting`.
-    
-    # We accept generic connection first
     await websocket.accept()
     connection_id = str(uuid.uuid4())
+    meeting_id = None
+    user_id = None
+    role = "customer"
+
+    async def _forward_signal(message_type: str, data: Dict[str, Any]):
+        signal = data.get("signal")
+        if not signal:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"{message_type} missing signal payload",
+            })
+            return
+
+        payload = {
+            "type": message_type,
+            "signal": signal,
+            "fromUserId": user_id,
+            "fromConnectionId": connection_id,
+        }
+
+        target_user_id = data.get("targetUserId")
+        if target_user_id:
+            delivered = await manager.send_to_user(meeting_id, target_user_id, payload)
+            if delivered:
+                return
+
+        await manager.broadcast_to_meeting(meeting_id, payload, exclude=websocket)
     
     try:
         while True:
@@ -60,72 +68,89 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if message_type == "join-meeting":
                 meeting_id = data.get("meetingId")
-                user_id = data.get("userId")
+                user_id = data.get("userId") or f"anon-{connection_id[:8]}"
                 role = data.get("role", "customer")
+
+                if not meeting_id:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "meetingId is required",
+                    })
+                    continue
                 
                 # Register with manager
                 await manager.connect(websocket, meeting_id, connection_id, user_id, role)
-                
-                # Notify others
-                await manager.broadcast_to_meeting(meeting_id, {
-                    "type": "participant-joined",
-                    "userId": user_id,
-                    "role": role,
-                    "connectionId": connection_id
-                }, exclude=websocket)
+                participants = manager.get_participants(meeting_id)
                 
                 # Acknowledge join
                 await websocket.send_json({
                     "type": "joined-meeting",
                     "meetingId": meeting_id,
-                    "userId": user_id
+                    "userId": user_id,
+                    "role": role,
+                    "participants": participants,
                 })
-                
-            elif message_type == "offer":
-                # Forward to specific target or broadcast?
-                # WebRTC typically targets a specific peer or broadcasts to all (mesh)
-                # Node.js implementation:
-                # broadcastToMeeting(meetingId, { type: 'offer', ... }, connectionId)
-                meeting_id = manager.connections[connection_id]["meeting_id"]
+
+                # Notify others
                 await manager.broadcast_to_meeting(meeting_id, {
-                    "type": "offer",
-                    "offer": data.get("offer"),
-                    "from": connection_id
+                    "type": "participant-joined",
+                    "userId": user_id,
+                    "role": role,
+                    "connectionId": connection_id,
+                    "participants": participants,
                 }, exclude=websocket)
+
+            elif message_type == "offer":
+                if not meeting_id:
+                    await websocket.send_json({"type": "error", "message": "join-meeting required before offer"})
+                    continue
+                await _forward_signal("offer", data)
 
             elif message_type == "answer":
-                meeting_id = manager.connections[connection_id]["meeting_id"]
-                await manager.broadcast_to_meeting(meeting_id, {
-                    "type": "answer",
-                    "answer": data.get("answer"),
-                    "from": connection_id
-                }, exclude=websocket)
+                if not meeting_id:
+                    await websocket.send_json({"type": "error", "message": "join-meeting required before answer"})
+                    continue
+                await _forward_signal("answer", data)
 
             elif message_type == "ice-candidate":
-                meeting_id = manager.connections[connection_id]["meeting_id"]
-                await manager.broadcast_to_meeting(meeting_id, {
-                    "type": "ice-candidate",
-                    "candidate": data.get("candidate"),
-                    "from": connection_id
-                }, exclude=websocket)
+                if not meeting_id:
+                    await websocket.send_json({"type": "error", "message": "join-meeting required before ice-candidate"})
+                    continue
+                await _forward_signal("ice-candidate", data)
             
             elif message_type == "audio-chunk":
                 # Real-time audio processing
+                current_meeting_id = meeting_id or data.get("meetingId")
+                current_user_id = data.get("userId") or user_id
                 audio_data = data.get("audioData")
-                if audio_data:
-                    await audio_service.process_audio_chunk(meeting_id, user_id, audio_data)
+                if current_meeting_id and current_user_id and audio_data:
+                    await audio_service.process_audio_chunk(current_meeting_id, current_user_id, audio_data)
 
             elif message_type == "request-ai-suggestion":
+                current_meeting_id = meeting_id or data.get("meetingId")
+                request_user_id = data.get("userId") or user_id or "customer"
                 text = data.get("text")
-                if text:
-                    await audio_service.generate_ai_suggestion(meeting_id, user_id, text)
+                if current_meeting_id and text:
+                    await audio_service.generate_ai_suggestion(current_meeting_id, request_user_id, text)
+
+            elif message_type == "leave-meeting":
+                break
 
     except WebSocketDisconnect:
-        manager.disconnect(connection_id)
-        # Notify others
-        # We need to know which meeting they were in to broadcast leave
-        # But disconnect() cleans up. We should retrieve meeting_id *before* disconnect or have disconnect return it.
         pass
     except Exception as e:
         print(f"WebSocket error: {e}")
-        manager.disconnect(connection_id)
+    finally:
+        conn_info = manager.disconnect(connection_id)
+        if conn_info:
+            left_meeting_id = conn_info.get("meeting_id")
+            left_user_id = conn_info.get("user_id")
+            left_role = conn_info.get("role", "customer")
+            if left_meeting_id and left_user_id:
+                await manager.broadcast_to_meeting(left_meeting_id, {
+                    "type": "participant-left",
+                    "userId": left_user_id,
+                    "role": left_role,
+                    "connectionId": connection_id,
+                    "participants": manager.get_participants(left_meeting_id),
+                })

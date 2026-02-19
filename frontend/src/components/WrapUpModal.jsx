@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, Loader, Sparkles } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function WrapUpModal({ isOpen, onClose, leadId, onSave }) {
   if (!isOpen) return null;

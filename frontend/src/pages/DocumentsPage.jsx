@@ -6,7 +6,7 @@ import {
   RotateCcw, XCircle, ChevronDown, ChevronUp, Bell
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
 export default function DocumentsPage() {

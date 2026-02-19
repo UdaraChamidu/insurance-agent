@@ -197,9 +197,9 @@ class SchedulingService:
             end_dt = start_dt + timedelta(minutes=duration)
             end_time = end_dt.strftime("%H:%M")
 
-            # Generate internal meeting link
+            # Generate internal meeting link (client-facing)
             meeting_id = str(uuid.uuid4())
-            meeting_link = f"/meeting?id={meeting_id}"
+            meeting_link = f"/meeting?meetingId={meeting_id}&role=client"
 
             # Generate booking reference and manage token
             booking_ref = self._generate_booking_ref(db)

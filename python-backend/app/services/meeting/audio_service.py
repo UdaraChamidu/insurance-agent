@@ -146,7 +146,11 @@ class AudioService:
             for ns in namespaces:
                 matches = pinecone_service.query(embedding, ns, top_k=2)
                 for m in matches:
-                    score = m.score if hasattr(m, 'score') else 0
+                    raw_score = m.score if hasattr(m, 'score') else 0
+                    try:
+                        score = float(raw_score)
+                    except (TypeError, ValueError):
+                        score = 0.0
                     if score > 0.75: # Compliance Threshold
                         text_content = m.metadata.get('text', '')
                         source = m.metadata.get('filename', 'Unknown Source')
@@ -209,6 +213,27 @@ class AudioService:
         except Exception as e:
             print(f"AI Suggestion error: {e}")
 
+    def _resolve_session_id(self, db, meeting_id: str):
+        from app.models import Session as DbSession, Appointment
+
+        # Backward compatibility: meeting_id might already be a Session.id
+        direct_session = db.query(DbSession).filter(DbSession.id == meeting_id).first()
+        if direct_session:
+            return direct_session.id
+
+        # Normal flow: meeting_id maps to Appointment.meetingId, then to Session by leadId
+        appointment = (
+            db.query(Appointment)
+            .filter(Appointment.meetingId == meeting_id)
+            .order_by(Appointment.createdAt.desc())
+            .first()
+        )
+        if not appointment:
+            return None
+
+        mapped_session = db.query(DbSession).filter(DbSession.leadId == appointment.leadId).first()
+        return mapped_session.id if mapped_session else None
+
     def save_transcript_to_db(self, meeting_id: str, user_id: str, content: str, role: str):
         # Fire and forget db save
         try:
@@ -218,12 +243,14 @@ class AudioService:
             # Start DB session
             db = SessionLocal()
             
-            # We need to map meeting_id (which might be session_id or appointment_id) to Session.id
-            # Assuming meeting_id IS the session_id for simplicity in this architecture
-            # If not, we'd need a lookup.
+            session_id = self._resolve_session_id(db, meeting_id)
+            if not session_id:
+                print(f"Transcript save skipped: could not resolve session for meeting {meeting_id}")
+                db.close()
+                return
             
             transcript_entry = Transcript(
-                sessionId=meeting_id, 
+                sessionId=session_id,
                 role=role,
                 content=content
             )

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Loader, CheckCircle, Globe, MapPin, AlertCircle } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 import { sendBookingConfirmation } from '../services/frontendEmailService';
 

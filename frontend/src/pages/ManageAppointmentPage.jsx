@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { sendCancellationEmail, sendRescheduleEmail } from '../services/frontendEmailService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },

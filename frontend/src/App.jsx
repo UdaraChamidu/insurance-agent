@@ -1,11 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import SchedulePage from './pages/SchedulePage';
 import BookingsPage from './pages/BookingsPage';
 import AdminLayout from './components/AdminLayout';
-import AdminPage from './pages/AdminPage'; // Keeping for reference if needed, but routing replaced
-import AdminDashboard from './pages/AdminDashboard';
 import MeetingPage from './pages/MeetingPage';
 import ProfilePage from './pages/ProfilePage';
 import DocumentsPage from './pages/DocumentsPage';
@@ -17,6 +15,22 @@ import ManageAppointmentPage from './pages/ManageAppointmentPage';
 import { ThemeProvider } from './context/ThemeContext';
 
 import { NotificationProvider } from './context/NotificationContext';
+
+function LegacyAdminDashboardRedirect() {
+  const [searchParams] = useSearchParams();
+  const meetingId = searchParams.get('meetingId') || searchParams.get('id');
+
+  if (!meetingId) {
+    return <Navigate to="/admin/bookings" replace />;
+  }
+
+  const nextParams = new URLSearchParams(searchParams);
+  nextParams.set('meetingId', meetingId);
+  nextParams.set('role', 'admin');
+  nextParams.delete('id');
+
+  return <Navigate to={`/meeting?${nextParams.toString()}`} replace />;
+}
 
 function App() {
   return (
@@ -40,8 +54,8 @@ function App() {
               <Route path="profile" element={<ProfilePage />} />
             </Route>
   
-            {/* Standalone Admin Views */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            {/* Legacy route: redirect into canonical meeting page */}
+            <Route path="/admin/dashboard" element={<LegacyAdminDashboardRedirect />} />
           </Routes>
         </Router>
       </NotificationProvider>

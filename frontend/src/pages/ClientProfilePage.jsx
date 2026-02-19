@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const PIPELINE_STAGES = ['new', 'appointment_booked', 'quoted', 'enrolled', 'lost'];
 const PIPELINE_LABELS = {
