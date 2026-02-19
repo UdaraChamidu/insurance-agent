@@ -35,10 +35,12 @@ export default function AdminPage() {
 
   const loadMeetings = async () => {
     try {
-      console.log('📅 Loading real appointments from Microsoft Bookings...');
+      console.log('📅 Loading appointments from Local Database...');
       
       // Fetch real appointments from the API
-      const response = await fetch(`${API_URL}/api/bookings/appointments`, {
+      // Was: /api/bookings/appointments (MS Bookings)
+      // Now: /api/appointments (Local DB)
+      const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -52,33 +54,31 @@ export default function AdminPage() {
       const data = await response.json();
       console.log('📦 Raw API Response:', data);
 
-      // Handle different response structures (Array vs { value: [] } vs undefined)
-      let appointmentsList = [];
-      if (Array.isArray(data)) {
-        appointmentsList = data;
-      } else if (data && Array.isArray(data.value)) {
-        appointmentsList = data.value;
-      } else if (data && Array.isArray(data.appointments)) {
-         appointmentsList = data.appointments;
-      } else {
-        console.warn('⚠️ API returned unexpected format:', data);
-      }
+      // Helper to combine date/time strings
+      const getDateTime = (dateStr, timeStr) => {
+          if (!dateStr || !timeStr) return new Date();
+          return new Date(`${dateStr}T${timeStr}`);
+      };
+
+      let appointmentsList = Array.isArray(data) ? data : [];
       
       console.log(`✅ Loaded ${appointmentsList.length} appointments`);
       
       // Transform appointments to match our UI structure
       const transformedMeetings = appointmentsList.map(apt => ({
         id: apt.id,
+        meetingId: apt.meetingId, // Use the specific meeting room ID
         clientName: apt.customerName || 'Unknown',
-        email: apt.customerEmailAddress || 'N/A',
-        date: new Date(apt.startDateTime?.dateTime || apt.startDateTime).toLocaleDateString(),
-        time: new Date(apt.startDateTime?.dateTime || apt.startDateTime).toLocaleTimeString('en-US', {
+        email: apt.customerEmail || 'N/A',
+        // Local DB has separated date (YYYY-MM-DD) and startTime (HH:MM)
+        date: new Date(`${apt.date}T${apt.startTime}`).toLocaleDateString(),
+        time: new Date(`${apt.date}T${apt.startTime}`).toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         }),
         type: apt.serviceName || 'Consultation',
-        status: 'scheduled'
+        status: apt.status || 'scheduled'
       }));
       
       setMeetings(transformedMeetings);
@@ -114,6 +114,7 @@ export default function AdminPage() {
   };
 
   const joinMeeting = (meetingId) => {
+    // Prefer the explicit meetingId UUID, fallback to appointment ID if missing
     navigate(`/meeting?meetingId=${meetingId}&role=admin`);
   };
 
@@ -287,7 +288,7 @@ export default function AdminPage() {
                         {meeting.status}
                       </span>
                       <button
-                        onClick={() => joinMeeting(meeting.id)}
+                        onClick={() => joinMeeting(meeting.meetingId || meeting.id)}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 flex-1 md:flex-none justify-center transition-all shadow-lg shadow-blue-600/20"
                       >
                         <Video className="h-4 w-4" />

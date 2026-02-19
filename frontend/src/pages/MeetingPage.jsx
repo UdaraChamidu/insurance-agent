@@ -7,12 +7,13 @@ import WrapUpModal from '../components/WrapUpModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
+const WS_URL = (import.meta.env.VITE_WS_URL || 'ws://localhost:8000') + '/api/meetings/ws';
 
 export default function MeetingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const meetingId = searchParams.get('meetingId');
+  // Support both 'meetingId' and 'id' (legacy/backend generated)
+  const meetingId = searchParams.get('meetingId') || searchParams.get('id');
   const role = searchParams.get('role') || 'client';
   
   const [error, setError] = useState(null); // Add error state
@@ -69,6 +70,8 @@ export default function MeetingPage() {
 
   useEffect(() => {
     if (!meetingId) {
+      // If still missing after checking both params, redirect
+      console.warn('❌ Missing meeting ID, redirecting to home.');
       navigate('/');
       return;
     }
