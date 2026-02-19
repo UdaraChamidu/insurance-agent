@@ -23,6 +23,9 @@ This is the migrated Python backend using **FastAPI** and **Supabase**.
 3.  **Environment Variables**:
     - Copy `.env.example` to `.env`
     - Fill in your `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY`, etc.
+    - For higher-accuracy meeting transcription, set:
+      - `DEEPGRAM_API_KEY`
+      - `MEETING_STT_PROVIDER=deepgram`
 
 ## Running the Server
 

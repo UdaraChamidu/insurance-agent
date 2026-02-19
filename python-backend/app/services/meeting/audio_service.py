@@ -5,6 +5,7 @@ import asyncio
 import os
 import time
 import google.generativeai as genai
+import requests
 from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.services.meeting.websocket_manager import manager
@@ -34,7 +35,33 @@ class AudioService:
         # meeting_id -> { user_id -> recent enqueue metadata }
         self.ai_recent_enqueues: Dict[str, Dict[str, Dict[str, Any]]] = {}
         
-        self.model_name = "gemini-2.5-flash"
+        self.ai_model_name = os.getenv("MEETING_AI_MODEL", "gemini-2.5-flash")
+        self.deepgram_api_key = os.getenv("DEEPGRAM_API_KEY", "").strip()
+        requested_stt_provider = os.getenv("MEETING_STT_PROVIDER", "").strip().lower()
+        if requested_stt_provider in {"deepgram", "gemini"}:
+            self.stt_provider = requested_stt_provider
+        else:
+            self.stt_provider = "deepgram" if self.deepgram_api_key else "gemini"
+        self.deepgram_model = os.getenv("MEETING_DEEPGRAM_MODEL", "nova-3")
+        self.deepgram_language = os.getenv("MEETING_DEEPGRAM_LANGUAGE", "en-US")
+        self.deepgram_url = os.getenv("MEETING_DEEPGRAM_URL", "https://api.deepgram.com/v1/listen")
+        self.deepgram_timeout_sec = self._read_non_negative_int_env("MEETING_DEEPGRAM_TIMEOUT_SEC", 12)
+        keyterms_env = os.getenv("MEETING_DEEPGRAM_KEYTERMS", "").strip()
+        if keyterms_env:
+            self.deepgram_keyterms = [term.strip() for term in keyterms_env.split(",") if term.strip()]
+        else:
+            self.deepgram_keyterms = [
+                "medicare",
+                "supplement",
+                "advantage",
+                "deductible",
+                "premium",
+                "copay",
+                "coinsurance",
+                "prescription",
+                "network",
+                "enrollment",
+            ]
         self.AUTO_AI_ON_TRANSCRIPTION = (
             os.getenv("MEETING_AUTO_AI_ON_TRANSCRIPTION", "false").lower()
             in {"1", "true", "yes", "on"}
@@ -121,6 +148,65 @@ class AudioService:
             return None
 
         return asyncio.create_task(_noop())
+
+    async def _transcribe_with_gemini(self, wav_data: bytes) -> str:
+        model = genai.GenerativeModel(self.ai_model_name)
+        response = await model.generate_content_async([
+            {
+                "mime_type": "audio/wav",
+                "data": wav_data
+            },
+            "Transcribe this audio exactly. Return ONLY the spoken words. If silence, return empty string."
+        ])
+        return (response.text or "").strip()
+
+    def _transcribe_with_deepgram_sync(self, wav_data: bytes) -> str:
+        if not self.deepgram_api_key:
+            raise RuntimeError("Missing DEEPGRAM_API_KEY")
+
+        params: List[tuple[str, Any]] = [
+            ("model", self.deepgram_model),
+            ("language", self.deepgram_language),
+            ("smart_format", "true"),
+            ("punctuate", "true"),
+        ]
+        for keyterm in self.deepgram_keyterms:
+            params.append(("keyterm", keyterm))
+
+        response = requests.post(
+            self.deepgram_url,
+            params=params,
+            headers={
+                "Authorization": f"Token {self.deepgram_api_key}",
+                "Content-Type": "audio/wav",
+            },
+            data=wav_data,
+            timeout=self.deepgram_timeout_sec,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return (
+            payload.get("results", {})
+            .get("channels", [{}])[0]
+            .get("alternatives", [{}])[0]
+            .get("transcript", "")
+            .strip()
+        )
+
+    async def _transcribe_with_deepgram(self, wav_data: bytes) -> str:
+        return await asyncio.to_thread(self._transcribe_with_deepgram_sync, wav_data)
+
+    async def _transcribe_audio(self, wav_data: bytes) -> str:
+        provider = self.stt_provider
+
+        if provider == "deepgram":
+            try:
+                return await self._transcribe_with_deepgram(wav_data)
+            except Exception as e:
+                print(f"Deepgram transcription error, falling back to Gemini: {e}")
+                return await self._transcribe_with_gemini(wav_data)
+
+        return await self._transcribe_with_gemini(wav_data)
 
     def _record_latency_metric(self, metric_key: str, value_ms: Any):
         if self.LATENCY_METRICS_WINDOW <= 0:
@@ -427,20 +513,7 @@ class AudioService:
             sample_rate = self._get_sample_rate(meeting_id, user_id)
             print(f"Transcribing {len(pcm_data)} bytes for {user_id} at {sample_rate}Hz...")
             wav_data = self.pcm_to_wav(pcm_data, sample_rate)
-
-            # Gemini Call
-            model = genai.GenerativeModel(self.model_name)
-
-            # Gemini explicitly needs mime_type for inline data
-            response = await model.generate_content_async([
-                {
-                    "mime_type": "audio/wav",
-                    "data": wav_data
-                },
-                "Transcribe this audio exactly. Return ONLY the spoken words. If silence, return empty string."
-            ])
-
-            text = response.text.strip()
+            text = await self._transcribe_audio(wav_data)
 
             if text:
                 print(f"Transcription: {text}")
@@ -580,7 +653,7 @@ class AudioService:
             Provide a short suggestion for the agent:
             """
             
-            model = genai.GenerativeModel(self.model_name)
+            model = genai.GenerativeModel(self.ai_model_name)
             response = await model.generate_content_async(system_prompt + user_prompt)
             
             suggestion = response.text.strip()
@@ -666,4 +739,3 @@ class AudioService:
             return wav_io.getvalue()
 
 audio_service = AudioService()
-

@@ -39,6 +39,7 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             
             # Init Service
             service = AudioService()
+            service.stt_provider = "gemini"
             service.PROCESS_THRESHOLD = 10 # Low threshold
             service.AUTO_AI_ON_TRANSCRIPTION = True
             
@@ -265,6 +266,19 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
         transcription_to_ai = snapshot["metrics"]["transcriptionToAiMs"]
         self.assertEqual(transcription_to_ai["count"], 1)
         self.assertEqual(transcription_to_ai["lastMs"], 150)
+
+    async def test_transcribe_audio_falls_back_to_gemini_when_deepgram_fails(self):
+        service = AudioService()
+        service.stt_provider = "deepgram"
+        service.deepgram_api_key = "test-key"
+        service._transcribe_with_deepgram = AsyncMock(side_effect=RuntimeError("deepgram down"))
+        service._transcribe_with_gemini = AsyncMock(return_value="fallback transcript")
+
+        transcript = await service._transcribe_audio(b"fake-wav")
+
+        self.assertEqual(transcript, "fallback transcript")
+        service._transcribe_with_deepgram.assert_awaited_once()
+        service._transcribe_with_gemini.assert_awaited_once()
 
 if __name__ == "__main__":
     unittest.main()
