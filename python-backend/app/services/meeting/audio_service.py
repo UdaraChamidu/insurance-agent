@@ -123,36 +123,62 @@ class AudioService:
 
     async def generate_ai_suggestion(self, meeting_id: str, user_id: str, text: str):
         try:
+            # 1a. Store Transcript to DB
+            self.save_transcript_to_db(meeting_id, user_id, text, "customer")
+
             # RAG Lookup
             embedding = await embedding_service.generate_embedding(text)
             if not embedding:
                  return
 
-            # Query namespaces
+            # Determine Namespace based on Lead Product (Mock for now, should fetch from DB)
+            # In real app: fetch session -> lead -> productType
+            # For now, searching all relevant namespaces
             namespaces = [
                 'training-reference',
                 'fl-state-authority', 
                 'cms-medicare'
-                # Add others as needed
             ]
             
             context_results = []
+            citations = []
+            
             for ns in namespaces:
                 matches = pinecone_service.query(embedding, ns, top_k=2)
                 for m in matches:
-                    context_results.append(f"[Source: {ns}]\n{m.metadata.get('text', '')}")
+                    score = m.score if hasattr(m, 'score') else 0
+                    if score > 0.75: # Compliance Threshold
+                        text_content = m.metadata.get('text', '')
+                        source = m.metadata.get('filename', 'Unknown Source')
+                        context_results.append(f"[Source: {source} (Score: {score:.2f})]\n{text_content}")
+                        citations.append({"source": source, "score": score, "text": text_content[:100] + "..."})
             
-            # Format Context
-            retrieved_context = "\n\n".join(context_results[:5]) # limit context
-            if not retrieved_context:
-                retrieved_context = "No specific regulatory documents found."
+            # Compliance Gate: No Sources Found
+            if not context_results:
+                warning_msg = "⚠️ NO VERIFIED SOURCES FOUND. ESCALATE OR VERIFY MANUAL."
+                await manager.broadcast_to_admin(meeting_id, {
+                    "type": "ai-suggestion",
+                    "suggestion": warning_msg,
+                    "relatedTo": text,
+                    "citations": []
+                })
+                # Save AI response (warning) to transcript
+                self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
+                return
 
-            # System Prompt
+            # Format Context
+            retrieved_context = "\n\n".join(context_results[:3]) 
+
+            # System Prompt with Mandatory Disclaimers
             system_prompt = """
             You are a compliance-first AI insurance assistant. 
             Your role is to guide the agent based on the provided context.
-            Suggest a SHORT, compliant response or action.
-            Cite the source if available in context.
+            
+            RULES:
+            1. Suggest a SHORT, compliant response.
+            2. IF context is missing, admit you don't know.
+            3. ALWAYS include a mandatory disclaimer if mentioning benefits.
+            4. Cite the source provided in context.
             """
             
             user_prompt = f"""
@@ -169,15 +195,43 @@ class AudioService:
             
             suggestion = response.text.strip()
             
-            # Broadcast Suggestion
+            # Broadcast Suggestion WITH Citations
             await manager.broadcast_to_admin(meeting_id, {
                 "type": "ai-suggestion",
                 "suggestion": suggestion,
-                "relatedTo": text
+                "relatedTo": text,
+                "citations": citations
             })
+            
+            # Save AI response to transcript
+            self.save_transcript_to_db(meeting_id, "ai_assistant", suggestion, "ai")
             
         except Exception as e:
             print(f"AI Suggestion error: {e}")
+
+    def save_transcript_to_db(self, meeting_id: str, user_id: str, content: str, role: str):
+        # Fire and forget db save
+        try:
+            from app.core.database import SessionLocal
+            from app.models import Transcript
+            
+            # Start DB session
+            db = SessionLocal()
+            
+            # We need to map meeting_id (which might be session_id or appointment_id) to Session.id
+            # Assuming meeting_id IS the session_id for simplicity in this architecture
+            # If not, we'd need a lookup.
+            
+            transcript_entry = Transcript(
+                sessionId=meeting_id, 
+                role=role,
+                content=content
+            )
+            db.add(transcript_entry)
+            db.commit()
+            db.close()
+        except Exception as e:
+            print(f"Error saving transcript: {e}")
 
     def pcm_to_wav(self, pcm_bytes: bytes) -> bytes:
         with io.BytesIO() as wav_io:

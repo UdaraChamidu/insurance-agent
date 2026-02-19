@@ -59,6 +59,14 @@ class Session(Base):
     
     lead = relationship("Lead", back_populates="session")
     transcripts = relationship("Transcript", back_populates="session")
+    
+    # New Fields for Structured Wrap-Up / AI Summary
+    callSummary = Column(Text, nullable=True)
+    recordingLink = Column(String, nullable=True)
+    transcriptLink = Column(String, nullable=True)
+    citationsBundleLink = Column(String, nullable=True)
+    complianceFlags = Column(JSON, nullable=True)
+    actionItems = Column(JSON, nullable=True)
 
 class Transcript(Base):
     __tablename__ = "Transcript"

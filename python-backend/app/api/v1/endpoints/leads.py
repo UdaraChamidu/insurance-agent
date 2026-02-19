@@ -62,9 +62,23 @@ async def sync_wrapup_to_ghl(lead_id: str):
             "tags": [f"Disposition: {session.disposition}"],
             "customFields": {
                 "plan_sold": session.planName,
-                "premium_amount": session.premium
+                "premium_amount": session.premium,
+                # New Fields
+                "call_summary": session.callSummary,
+                "recording_link": session.recordingLink,
+                "citations_link": session.citationsBundleLink
             }
         }
+        
+        # Add compliance warnings as tag if any
+        if session.complianceFlags:
+             # Just an example logic:
+             flags = session.complianceFlags
+             if isinstance(flags, dict):
+                 if not flags.get("disclaimerRead"):
+                     update_data["tags"].append("Compliance: Missing Disclaimer")
+                 if flags.get("forbiddenTopics"):
+                     update_data["tags"].append("Compliance: Forbidden Topic")
         
         await ghl_service.update_contact(session.ghlContactId, update_data)
         
@@ -260,6 +274,14 @@ async def lead_wrapup(
              session.planName = update_in.plan_name
         if hasattr(update_in, "premium") and update_in.premium:
              session.premium = update_in.premium
+
+        # New Fields
+        if update_in.call_summary: session.callSummary = update_in.call_summary
+        if update_in.recording_link: session.recordingLink = update_in.recording_link
+        if update_in.transcript_link: session.transcriptLink = update_in.transcript_link
+        if update_in.citations_bundle_link: session.citationsBundleLink = update_in.citations_bundle_link
+        if update_in.compliance_flags: session.complianceFlags = update_in.compliance_flags
+        if update_in.action_items: session.actionItems = update_in.action_items
             
         db.commit()
         db.refresh(session)
@@ -272,4 +294,29 @@ async def lead_wrapup(
     except Exception as e:
         db.rollback()
         print(f"Error in wrap-up: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{lead_id}/generate-summary", response_model=Dict[str, Any])
+async def generate_summary(
+    lead_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger AI summarization for the session
+    """
+    try:
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+            
+        from app.services.meeting.summary_service import summary_service
+        result = await summary_service.generate_call_summary(session.id)
+        
+        if not result:
+            return {"success": False, "message": "Failed to generate summary or no transcripts found"}
+            
+        return {"success": True, "data": result}
+        
+    except Exception as e:
+        print(f"Error generating summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

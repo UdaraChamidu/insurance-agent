@@ -56,6 +56,14 @@ class SessionUpdate(BaseModel):
     plan_name: Optional[str] = Field(None, alias="planName")
     premium: Optional[str] = None
     ghl_contact_id: Optional[str] = Field(None, alias="ghlContactId")
+    
+    # New Fields
+    call_summary: Optional[str] = Field(None, alias="callSummary")
+    recording_link: Optional[str] = Field(None, alias="recordingLink")
+    transcript_link: Optional[str] = Field(None, alias="transcriptLink")
+    citations_bundle_link: Optional[str] = Field(None, alias="citationsBundleLink")
+    compliance_flags: Optional[Dict[str, Any]] = Field(None, alias="complianceFlags")
+    action_items: Optional[Dict[str, Any]] = Field(None, alias="actionItems")
 
 class Session(SessionBase, TimestampSchema):
     id: str

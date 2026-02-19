@@ -38,6 +38,13 @@ async def startup_event():
             ("Lead", "pipelineStatus", "VARCHAR DEFAULT 'new'"),
             ("Appointment", "bookingRef", "VARCHAR UNIQUE"),
             ("Appointment", "manageToken", "VARCHAR UNIQUE"),
+            # Session migrations
+            ("Session", "callSummary", "TEXT"),
+            ("Session", "recordingLink", "VARCHAR"),
+            ("Session", "transcriptLink", "VARCHAR"),
+            ("Session", "citationsBundleLink", "VARCHAR"),
+            ("Session", "complianceFlags", "JSONB"), # Postgres JSONB is better, but sqlalchemy JSON maps to JSON usually. Using JSON for broader compat if needed but usually text/json is fine. Let's stick to generic types for safety in raw SQL if we don't know dialect perfectly, but JSON usually works in PG.
+            ("Session", "actionItems", "JSONB"),
         ]
         for table, column, col_type in migrations:
             try:

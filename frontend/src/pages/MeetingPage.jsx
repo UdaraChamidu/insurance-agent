@@ -124,14 +124,26 @@ export default function MeetingPage() {
         
         meetingService.onAISuggestion = (data) => {
           addLog('💡 AI Suggestion received');
+          // Format citations if present
+          let suggestionText = data.suggestion;
+          let citations = data.citations || [];
+          
           const entry = {
-            suggestion: data.suggestion,
+            suggestion: suggestionText,
+            citations: citations,
             timestamp: new Date().toLocaleTimeString()
           };
           setAiSuggestions(prev => [...prev, entry]);
+          
+          // Add to conversation history with citations
+          let historyText = suggestionText;
+          if (citations.length > 0) {
+              historyText += `\n[Sources: ${citations.map(c => c.source).join(', ')}]`;
+          }
+          
           setConversationHistory(prev => [...prev, {
             type: 'ai',
-            text: data.suggestion,
+            text: historyText,
             timestamp: entry.timestamp
           }]);
         };
@@ -190,10 +202,34 @@ export default function MeetingPage() {
     }
   };
 
-  const endCall = () => {
+  const endCall = async () => {
     if (confirm('Are you sure you want to leave the consultation?')) {
+      // 1. Leave Meeting
       meetingService.leaveMeeting();
-      navigate('/');
+      
+      // 2. Trigger AI Summary Generation (if admin and lead context exists)
+      if (role === 'admin' && leadContext?.id) {
+          addLog("🤖 Generating Call Summary...");
+          try {
+              // Non-blocking fetch to trigger summary
+              fetch(`${API_URL}/api/leads/${leadContext.id}/generate-summary`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        addLog("✅ Summary Generated");
+                        // Ideally we would refresh leadContext here or pass data to modal
+                    }
+                })
+                .catch(err => console.error("Summary gen error", err));
+          } catch (e) {
+              console.error(e);
+          }
+           
+          // Show Wrap Up
+          setShowWrapUp(true);
+      } else {
+          navigate('/');
+      }
     }
   };
 
@@ -498,6 +534,16 @@ export default function MeetingPage() {
                     <div key={index} className="bg-blue-900 bg-opacity-30 border border-blue-700 rounded p-2">
                       <div className="text-xs text-blue-300 mb-1">{item.timestamp}</div>
                       <div className="text-xs text-white">{item.suggestion}</div>
+                      {item.citations && item.citations.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-blue-800">
+                              <p className="text-[10px] text-gray-400 font-semibold mb-1">Sources:</p>
+                              {item.citations.map((cit, cIdx) => (
+                                  <div key={cIdx} className="text-[10px] text-blue-200 truncate">
+                                      • {cit.source} <span className="text-gray-500">({Math.round(cit.score*100)}%)</span>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
                     </div>
                   ))
                 )}
