@@ -63,7 +63,7 @@ class SessionUpdate(BaseModel):
     transcript_link: Optional[str] = Field(None, alias="transcriptLink")
     citations_bundle_link: Optional[str] = Field(None, alias="citationsBundleLink")
     compliance_flags: Optional[Dict[str, Any]] = Field(None, alias="complianceFlags")
-    action_items: Optional[Dict[str, Any]] = Field(None, alias="actionItems")
+    action_items: Optional[Any] = Field(None, alias="actionItems")
 
 class Session(SessionBase, TimestampSchema):
     id: str

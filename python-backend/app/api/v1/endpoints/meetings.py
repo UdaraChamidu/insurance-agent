@@ -123,17 +123,42 @@ async def websocket_endpoint(websocket: WebSocket):
                 current_meeting_id = meeting_id or data.get("meetingId")
                 current_user_id = data.get("userId") or user_id
                 audio_data = data.get("audioData")
+                raw_sample_rate = data.get("sampleRate")
+                raw_client_sent_at = data.get("clientSentAtMs")
+                try:
+                    sample_rate = int(raw_sample_rate) if raw_sample_rate is not None else None
+                except (TypeError, ValueError):
+                    sample_rate = None
+                try:
+                    client_sent_at_ms = int(raw_client_sent_at) if raw_client_sent_at is not None else None
+                except (TypeError, ValueError):
+                    client_sent_at_ms = None
                 if current_meeting_id and current_user_id and audio_data:
-                    await audio_service.process_audio_chunk(current_meeting_id, current_user_id, audio_data)
+                    await audio_service.process_audio_chunk(
+                        current_meeting_id,
+                        current_user_id,
+                        audio_data,
+                        sample_rate=sample_rate,
+                        client_sent_at_ms=client_sent_at_ms,
+                    )
 
             elif message_type == "request-ai-suggestion":
                 current_meeting_id = meeting_id or data.get("meetingId")
                 request_user_id = data.get("userId") or user_id or "customer"
                 text = data.get("text")
+                metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
                 if current_meeting_id and text:
-                    await audio_service.generate_ai_suggestion(current_meeting_id, request_user_id, text)
+                    # Non-blocking AI generation keeps websocket receive loop responsive.
+                    audio_service.enqueue_ai_suggestion(
+                        current_meeting_id,
+                        request_user_id,
+                        text,
+                        metadata=metadata,
+                    )
 
             elif message_type == "leave-meeting":
+                if meeting_id and user_id:
+                    audio_service.clear_user_state(meeting_id, user_id)
                 break
 
     except WebSocketDisconnect:
@@ -147,6 +172,7 @@ async def websocket_endpoint(websocket: WebSocket):
             left_user_id = conn_info.get("user_id")
             left_role = conn_info.get("role", "customer")
             if left_meeting_id and left_user_id:
+                audio_service.clear_user_state(left_meeting_id, left_user_id)
                 await manager.broadcast_to_meeting(left_meeting_id, {
                     "type": "participant-left",
                     "userId": left_user_id,

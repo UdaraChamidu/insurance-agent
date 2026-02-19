@@ -1,8 +1,8 @@
 {
   "isRunning": true,
   "processedFileCount": 1,
-  "totalChecks": 140,
-  "lastCheck": "2026-02-19T13:44:25.331640",
+  "totalChecks": 201,
+  "lastCheck": "2026-02-19T17:39:26.411130",
   "pollingIntervalMinutes": 5,
   "files": [
     {

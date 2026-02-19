@@ -68,3 +68,12 @@ async def shutdown_event():
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "insurance-ai-backend-python"}
+
+@app.get("/health/latency")
+def health_latency():
+    from app.services.meeting.audio_service import audio_service
+    return {
+        "status": "ok",
+        "service": "insurance-ai-backend-python",
+        "latency": audio_service.get_latency_snapshot(),
+    }

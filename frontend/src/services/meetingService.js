@@ -1,4 +1,5 @@
 // Native WebRTC Meeting Service (no SimplePeer dependency)
+const AUDIO_CAPTURE_WORKLET_URL = new URL('../worklets/audioCaptureWorklet.js', import.meta.url);
 
 class MeetingService {
   constructor() {
@@ -11,7 +12,14 @@ class MeetingService {
     this.role = null;
     this.audioContext = null;
     this.audioProcessor = null;
+    this.audioSourceNode = null;
+    this.audioWorkletNode = null;
     this.isRecording = false;
+    this.audioSampleRate = 16000;
+    this.audioInputBufferSize = 2048;
+    this.audioSendIntervalMs = 800;
+    this.audioCaptureMode = 'script-processor';
+    this.audioWorkletModuleLoaded = false;
     this.targetUserId = null;
     this.makingOffer = false;
     this.ignoreOffer = false;
@@ -141,21 +149,38 @@ class MeetingService {
     this.role = role;
     
     try {
+      // Ensure stale tracks from a prior session do not interfere
+      if (this.localStream) {
+        this.localStream.getTracks().forEach(track => track.stop());
+        this.localStream = null;
+      }
+
       // Get user media
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: {
           echoCancellation: true,
-          noiseSuppression: true
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
           // Removed sampleRate: 16000 to fix OverconstrainedError on mobiles
           // browser will handle resampling in AudioContext
         }
       });
+
+      const videoTrack = this.localStream.getVideoTracks()[0];
+      if (!videoTrack || videoTrack.readyState !== 'live') {
+        throw new Error('Camera video track is unavailable.');
+      }
       
       console.log('✅ Got local media stream');
       
       // Start audio processing for transcription
-      this.startAudioProcessing();
+      await this.startAudioProcessing();
       
       // Send join message
       this.send({
@@ -168,6 +193,48 @@ class MeetingService {
       return this.localStream;
     } catch (error) {
       console.error('❌ Error getting user media:', error);
+      throw error;
+    }
+  }
+
+  async restartCameraTrack() {
+    try {
+      const freshStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+
+      const newVideoTrack = freshStream.getVideoTracks()[0];
+      if (!newVideoTrack) {
+        throw new Error('No new camera track available.');
+      }
+
+      if (!this.localStream) {
+        this.localStream = new MediaStream();
+      }
+
+      this.localStream.getVideoTracks().forEach(track => {
+        this.localStream.removeTrack(track);
+        track.stop();
+      });
+      this.localStream.addTrack(newVideoTrack);
+
+      if (this.peerConnection) {
+        const sender = this.peerConnection.getSenders().find(
+          s => s.track && s.track.kind === 'video'
+        );
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      return this.localStream;
+    } catch (error) {
+      console.error('❌ Error restarting camera track:', error);
       throw error;
     }
   }
@@ -318,62 +385,221 @@ class MeetingService {
     }
   }
 
-  startAudioProcessing() {
+  async startAudioProcessing() {
+    // Reset any previous graph before creating a new one.
+    if (this.audioWorkletNode) {
+      this.audioWorkletNode.port.onmessage = null;
+      this.audioWorkletNode.disconnect();
+      this.audioWorkletNode = null;
+    }
+    if (this.audioProcessor) {
+      this.audioProcessor.disconnect();
+      this.audioProcessor.onaudioprocess = null;
+      this.audioProcessor = null;
+    }
+    if (this.audioSourceNode) {
+      this.audioSourceNode.disconnect();
+      this.audioSourceNode = null;
+    }
+    if (this.audioContext) {
+      await this.audioContext.close();
+      this.audioContext = null;
+    }
+
     try {
       // Try to use 16kHz context for backend compatibility
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 16000 
+        sampleRate: 16000
       });
     } catch (e) {
-      console.warn('⚠️ Could not force 16kHz sample rate, falling back to default:', e);
+      console.warn('Could not force 16kHz sample rate, falling back to default:', e);
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    const source = this.audioContext.createMediaStreamSource(this.localStream);
-    
-    // Use 4096 buffer size. 
-    // If sampleRate is 48000, 4096 is ~0.08s. If 16000, it's ~0.25s.
-    this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-    
-    let audioChunksBuffer = []; // renamed to avoid shadowing
-    let chunkCount = 0;
-    
-    const contextRate = this.audioContext.sampleRate;
-    const CHUNKS_PER_SECOND = Math.floor(contextRate / 4096);
-    // Send roughly every 4 seconds
-    const SEND_INTERVAL = CHUNKS_PER_SECOND * 4; 
-    
-    console.log(`🎤 Audio processing started at ${contextRate}Hz`);
-    
-    // If rate is NOT 16000, we theoretically should resample. 
-    // For now, we'll warn if mismatch, as simple linear resampling in JS is heavy.
-    if (contextRate !== 16000) {
-        console.warn("⚠️ Audio sampling rate mismatch. Backend expects 16000Hz. Audio may sound distorted.");
-        // TODO: Implement downsampling worker if needed
+    this.audioSourceNode = this.audioContext.createMediaStreamSource(this.localStream);
+    this.audioSampleRate = this.audioContext.sampleRate || 16000;
+    this.audioCaptureMode = 'script-processor';
+
+    let pendingChunks = [];
+    let pendingLength = 0;
+    let lastFlushAt = performance.now();
+
+    const flushAudio = (force = false) => {
+      if (pendingLength === 0) return;
+
+      const elapsedMs = performance.now() - lastFlushAt;
+      const minSamples = Math.floor(this.audioSampleRate * 0.2);
+      if (!force && elapsedMs < this.audioSendIntervalMs && pendingLength < minSamples) {
+        return;
+      }
+
+      this.sendAudioChunk(pendingChunks, this.audioSampleRate);
+      pendingChunks = [];
+      pendingLength = 0;
+      lastFlushAt = performance.now();
+    };
+
+    const handleAudioFrame = (frame) => {
+      if (!this.isRecording || !frame) return;
+      const audioData = frame instanceof Float32Array ? frame : new Float32Array(frame);
+      pendingChunks.push(audioData);
+      pendingLength += audioData.length;
+      flushAudio(false);
+    };
+
+    const setupScriptProcessor = () => {
+      this.audioCaptureMode = 'script-processor';
+      const rmsThreshold = 0.008;
+      const speechStartMs = 80;
+      const speechEndMs = 380;
+      const preRollMs = 140;
+      const preRollFrameLimit = Math.max(
+        2,
+        Math.ceil((preRollMs / 1000) * this.audioSampleRate / this.audioInputBufferSize)
+      );
+      const preRollFrames = [];
+      let speechActive = false;
+      let speechCandidateStartAt = 0;
+      let lastSpeechAt = 0;
+
+      const calcRms = (frame) => {
+        if (!frame || frame.length === 0) return 0;
+        let sumSquares = 0;
+        for (let i = 0; i < frame.length; i++) {
+          const value = frame[i];
+          sumSquares += value * value;
+        }
+        return Math.sqrt(sumSquares / frame.length);
+      };
+
+      this.audioProcessor = this.audioContext.createScriptProcessor(this.audioInputBufferSize, 1, 1);
+      this.audioProcessor.onaudioprocess = (e) => {
+        if (!this.isRecording) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        const frame = new Float32Array(inputData);
+        const now = performance.now();
+        const rms = calcRms(frame);
+        const hasVoice = rms >= rmsThreshold;
+
+        preRollFrames.push(frame);
+        if (preRollFrames.length > preRollFrameLimit) {
+          preRollFrames.shift();
+        }
+
+        if (hasVoice) {
+          let emittedCurrentViaPreRoll = false;
+          if (!speechActive) {
+            if (!speechCandidateStartAt) {
+              speechCandidateStartAt = now;
+            }
+            if ((now - speechCandidateStartAt) >= speechStartMs) {
+              speechActive = true;
+              lastSpeechAt = now;
+              // Include buffered lead-in audio so first syllables are not clipped.
+              preRollFrames.forEach((bufferedFrame) => handleAudioFrame(bufferedFrame));
+              emittedCurrentViaPreRoll = true;
+              preRollFrames.length = 0;
+            }
+          } else {
+            lastSpeechAt = now;
+          }
+
+          if (speechActive && !emittedCurrentViaPreRoll) {
+            handleAudioFrame(frame);
+          }
+          return;
+        }
+
+        // Reset start candidate while below threshold.
+        speechCandidateStartAt = 0;
+
+        if (!speechActive) {
+          return;
+        }
+
+        // Keep brief tail silence for more natural sentence endings.
+        handleAudioFrame(frame);
+        if ((now - lastSpeechAt) >= speechEndMs) {
+          speechActive = false;
+          flushAudio(true);
+        }
+      };
+      this.audioSourceNode.connect(this.audioProcessor);
+      this.audioProcessor.connect(this.audioContext.destination);
+    };
+
+    let workletReady = false;
+    if (this.audioContext.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
+      try {
+        if (!this.audioWorkletModuleLoaded) {
+          await this.audioContext.audioWorklet.addModule(AUDIO_CAPTURE_WORKLET_URL);
+          this.audioWorkletModuleLoaded = true;
+        }
+
+        this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'audio-capture-processor', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1],
+          channelCount: 1,
+          channelCountMode: 'explicit',
+          processorOptions: {
+            rmsThreshold: 0.012,
+            speechStartMs: 100,
+            speechEndMs: 320,
+            preRollMs: 120,
+            silenceHeartbeatMs: 2500
+          }
+        });
+
+        this.audioWorkletNode.port.onmessage = (event) => {
+          const payload = event.data;
+          if (!payload) return;
+
+          if (payload.type === 'audio-frame') {
+            handleAudioFrame(payload.frame);
+            return;
+          }
+
+          if (payload.type === 'vad-state') {
+            if (payload.flush) {
+              flushAudio(true);
+            }
+            return;
+          }
+
+          if (payload.type === 'silence-heartbeat') {
+            // Keepalive marker from worklet; no audio sent during silence.
+            return;
+          }
+
+          // Backward compatibility if a raw frame is ever posted directly.
+          handleAudioFrame(payload);
+        };
+
+        this.audioSourceNode.connect(this.audioWorkletNode);
+        this.audioWorkletNode.connect(this.audioContext.destination);
+        this.audioCaptureMode = 'audio-worklet';
+        workletReady = true;
+      } catch (error) {
+        console.warn('AudioWorklet capture unavailable, falling back to ScriptProcessor.', error);
+        if (this.audioWorkletNode) {
+          this.audioWorkletNode.port.onmessage = null;
+          this.audioWorkletNode.disconnect();
+          this.audioWorkletNode = null;
+        }
+      }
     }
 
-    this.audioProcessor.onaudioprocess = (e) => {
-      if (!this.isRecording) return;
-      
-      const inputData = e.inputBuffer.getChannelData(0);
-      const audioData = new Float32Array(inputData);
-      audioChunksBuffer.push(audioData);
-      chunkCount++;
-      
-      if (chunkCount >= SEND_INTERVAL) {
-        console.log(`🎵 Sending ${audioChunksBuffer.length} audio chunks`);
-        this.sendAudioChunk(audioChunksBuffer);
-        audioChunksBuffer = [];
-        chunkCount = 0;
-      }
-    };
-    
-    source.connect(this.audioProcessor);
-    this.audioProcessor.connect(this.audioContext.destination);
+    if (!workletReady) {
+      setupScriptProcessor();
+    }
+
     this.isRecording = true;
+    console.log(`Audio processing started at ${this.audioSampleRate}Hz using ${this.audioCaptureMode}`);
   }
 
-  sendAudioChunk(audioChunks) {
+  sendAudioChunk(audioChunks, sampleRate = 16000) {
     const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
     const combined = new Float32Array(totalLength);
     let offset = 0;
@@ -396,6 +622,8 @@ class MeetingService {
       type: 'audio-chunk',
       meetingId: this.meetingId,
       userId: this.userId,
+      clientSentAtMs: Date.now(),
+      sampleRate,
       audioData: base64
     });
   }
@@ -409,12 +637,13 @@ class MeetingService {
     return btoa(binary);
   }
 
-  requestAISuggestion(meetingId, text, userId) {
+  requestAISuggestion(meetingId, text, userId, metadata = {}) {
     this.send({
       type: 'request-ai-suggestion',
       meetingId,
       text,
-      userId
+      userId,
+      metadata
     });
   }
 
@@ -486,10 +715,22 @@ class MeetingService {
 
   cleanup() {
     this.isRecording = false;
+
+    if (this.audioWorkletNode) {
+      this.audioWorkletNode.port.onmessage = null;
+      this.audioWorkletNode.disconnect();
+      this.audioWorkletNode = null;
+    }
     
     if (this.audioProcessor) {
       this.audioProcessor.disconnect();
+      this.audioProcessor.onaudioprocess = null;
       this.audioProcessor = null;
+    }
+
+    if (this.audioSourceNode) {
+      this.audioSourceNode.disconnect();
+      this.audioSourceNode = null;
     }
     
     if (this.audioContext) {
@@ -515,3 +756,4 @@ class MeetingService {
 }
 
 export default new MeetingService();
+

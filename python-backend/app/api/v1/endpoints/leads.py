@@ -1,10 +1,13 @@
 import uuid
+import csv
+import io
+import json
 from datetime import datetime
 from typing import Any, Dict, List
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
-from app.models import Lead, Session as DbSession
+from app.models import Lead, Session as DbSession, Transcript
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
 from app.services.integrations.ghl import ghl_service
 
@@ -228,6 +231,9 @@ async def get_lead_session(
             "startTime": session.startTime,
             "status": session.status,
             "ghlContactId": session.ghlContactId,
+            "callSummary": session.callSummary,
+            "complianceFlags": session.complianceFlags,
+            "actionItems": session.actionItems,
             # Merge lead fields
             "productType": lead.productType,
             "state": lead.state,
@@ -319,4 +325,146 @@ async def generate_summary(
         
     except Exception as e:
         print(f"Error generating summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{lead_id}/meeting-artifacts", response_model=Dict[str, Any])
+async def get_meeting_artifacts(
+    lead_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Return persisted meeting artifacts for admin review/download:
+    - customer transcriptions
+    - AI responses
+    - merged full chat
+    - latest summary/compliance/action items
+    """
+    try:
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        transcript_rows = (
+            db.query(Transcript)
+            .filter(Transcript.sessionId == session.id)
+            .order_by(Transcript.timestamp.asc())
+            .all()
+        )
+
+        transcriptions: List[Dict[str, Any]] = []
+        ai_responses: List[Dict[str, Any]] = []
+        full_chat: List[Dict[str, Any]] = []
+
+        for row in transcript_rows:
+            timestamp_iso = row.timestamp.isoformat() if row.timestamp else None
+            item = {
+                "id": row.id,
+                "role": row.role,
+                "content": row.content,
+                "timestamp": timestamp_iso,
+            }
+
+            if row.role == "customer":
+                transcriptions.append(item)
+            elif row.role == "ai":
+                ai_responses.append(item)
+
+            full_chat.append(item)
+
+        return {
+            "success": True,
+            "leadId": lead_id,
+            "sessionId": session.id,
+            "status": session.status,
+            "disposition": session.disposition,
+            "summary": {
+                "callSummary": session.callSummary,
+                "complianceFlags": session.complianceFlags,
+                "actionItems": session.actionItems,
+            },
+            "transcriptions": transcriptions,
+            "aiResponses": ai_responses,
+            "fullChat": full_chat,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching meeting artifacts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{lead_id}/meeting-artifacts.csv")
+async def download_meeting_artifacts_csv(
+    lead_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Download persisted meeting artifacts as CSV:
+    summary + compliance + full chat timeline.
+    """
+    try:
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        transcript_rows = (
+            db.query(Transcript)
+            .filter(Transcript.sessionId == session.id)
+            .order_by(Transcript.timestamp.asc())
+            .all()
+        )
+
+        compliance = session.complianceFlags if isinstance(session.complianceFlags, dict) else {}
+        action_items = session.actionItems
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "section",
+            "timestamp",
+            "role",
+            "content",
+            "call_summary",
+            "action_items",
+            "compliance_notes",
+            "disclaimer_read",
+            "forbidden_topics",
+        ])
+
+        writer.writerow([
+            "summary",
+            "",
+            "ai",
+            "",
+            session.callSummary or "",
+            json.dumps(action_items, ensure_ascii=False) if action_items is not None else "",
+            compliance.get("notes", "") if isinstance(compliance, dict) else "",
+            compliance.get("disclaimerRead", "") if isinstance(compliance, dict) else "",
+            compliance.get("forbiddenTopics", "") if isinstance(compliance, dict) else "",
+        ])
+
+        for row in transcript_rows:
+            writer.writerow([
+                "chat",
+                row.timestamp.isoformat() if row.timestamp else "",
+                row.role,
+                row.content,
+                "",
+                "",
+                "",
+                "",
+                "",
+            ])
+
+        csv_content = output.getvalue()
+        output.close()
+
+        filename = f"meeting-artifacts-{lead_id}-{datetime.utcnow().strftime('%Y%m%d')}.csv"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return Response(content=csv_content, media_type="text/csv", headers=headers)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading meeting artifacts CSV: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

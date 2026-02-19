@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MessageSquare, MonitorUp, FileText, CheckSquare, X } from 'lucide-react';
+import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MonitorUp, CheckSquare, Save } from 'lucide-react';
 import meetingService from '../services/meetingService';
 import ScriptPanel from '../components/ScriptPanel';
 import WrapUpModal from '../components/WrapUpModal';
@@ -8,6 +8,10 @@ import WrapUpModal from '../components/WrapUpModal';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/i, 'ws');
 const WS_URL = `${WS_BASE_URL.replace(/\/$/, '')}/api/meetings/ws`;
+const AI_REQUEST_COOLDOWN_MS = 3000;
+const AI_MANUAL_REQUEST_TIMEOUT_MS = 12000;
+const LATENCY_SAMPLE_WINDOW = 60;
+const LATENCY_LOG_INTERVAL = 5;
 
 export default function MeetingPage() {
   const navigate = useNavigate();
@@ -19,11 +23,90 @@ export default function MeetingPage() {
   
   const [error, setError] = useState(null); // Add error state
   const [logs, setLogs] = useState([]); // Visual logs
+  const latencyMetricsRef = useRef({
+    audioToTranscriptMs: [],
+    requestToAiMs: [],
+    audioToAiMs: []
+  });
 
   // Helper to add logs
   const addLog = (msg) => {
     console.log(msg);
     setLogs(prev => [...prev.slice(-10), `${new Date().toLocaleTimeString()} - ${msg}`]);
+  };
+
+  const toPositiveNumber = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const percentile = (values, p) => {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+    return Math.round(sorted[idx]);
+  };
+
+  const recordLatencyMetric = (metricKey, metricLabel, valueMs) => {
+    const numericValue = toPositiveNumber(valueMs);
+    if (!numericValue) return;
+
+    const store = latencyMetricsRef.current[metricKey];
+    if (!store) return;
+
+    store.push(numericValue);
+    if (store.length > LATENCY_SAMPLE_WINDOW) {
+      store.splice(0, store.length - LATENCY_SAMPLE_WINDOW);
+    }
+
+    const sampleCount = store.length;
+    if (sampleCount === 1 || sampleCount % LATENCY_LOG_INTERVAL === 0) {
+      const p50 = percentile(store, 50);
+      const p95 = percentile(store, 95);
+      addLog(`[Latency] ${metricLabel}: last=${Math.round(numericValue)}ms p50=${p50}ms p95=${p95}ms n=${sampleCount}`);
+    }
+  };
+
+  const registerAIRequest = (requestId, requestedAtMs) => {
+    const normalizedRequestedAt = toPositiveNumber(requestedAtMs) || Date.now();
+    if (requestId) {
+      latestAIRequestRef.current.requestId = requestId;
+    }
+    latestAIRequestRef.current.requestedAtMs = normalizedRequestedAt;
+  };
+
+  const shouldDropAIResponse = (payload) => {
+    const responseRequestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+    const responseRequestedAtMs = toPositiveNumber(payload?.requestedAtMs);
+    const latest = latestAIRequestRef.current;
+
+    if (responseRequestId) {
+      const seen = seenAIResponseIdsRef.current;
+      if (seen.includes(responseRequestId)) {
+        return true;
+      }
+      seen.push(responseRequestId);
+      if (seen.length > 120) {
+        seen.splice(0, seen.length - 120);
+      }
+    }
+
+    if (responseRequestedAtMs && latest.requestedAtMs && responseRequestedAtMs < latest.requestedAtMs) {
+      return true;
+    }
+
+    if (
+      responseRequestId &&
+      latest.requestId &&
+      responseRequestedAtMs &&
+      latest.requestedAtMs &&
+      responseRequestedAtMs === latest.requestedAtMs &&
+      responseRequestId !== latest.requestId
+    ) {
+      return true;
+    }
+
+    return false;
   };
 
   const [isConnected, setIsConnected] = useState(false);
@@ -36,7 +119,16 @@ export default function MeetingPage() {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [isAIMonitoring, setIsAIMonitoring] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [meetingNotices, setMeetingNotices] = useState([]);
+  const [localDisplayStream, setLocalDisplayStream] = useState(null);
+  const [remoteDisplayStream, setRemoteDisplayStream] = useState(null);
+  const [isManualAIRequestPending, setIsManualAIRequestPending] = useState(false);
   const isMonitoringRef = useRef(false);
+  const lastAIRequestAtRef = useRef(0);
+  const lastAIRequestTextRef = useRef('');
+  const latestAIRequestRef = useRef({ requestId: '', requestedAtMs: 0 });
+  const seenAIResponseIdsRef = useRef([]);
+  const pendingManualAIRequestRef = useRef({ requestId: '', timeoutId: null });
   
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -45,6 +137,224 @@ export default function MeetingPage() {
   const [activeTab, setActiveTab] = useState('ai'); // 'ai' or 'scripts'
   const [showWrapUp, setShowWrapUp] = useState(false);
   const [leadContext, setLeadContext] = useState(null);
+  const [summaryData, setSummaryData] = useState(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [isSavingArtifacts, setIsSavingArtifacts] = useState(false);
+
+  const pushMeetingNotice = (message, level = 'info') => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setMeetingNotices(prev => [...prev, { id, message, level }]);
+    setTimeout(() => {
+      setMeetingNotices(prev => prev.filter(item => item.id !== id));
+    }, 4500);
+  };
+
+  const clearManualAIRequestTimer = () => {
+    const timeoutId = pendingManualAIRequestRef.current.timeoutId;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    pendingManualAIRequestRef.current.timeoutId = null;
+  };
+
+  const settleManualAIRequest = (requestId = '') => {
+    const activeRequestId = pendingManualAIRequestRef.current.requestId;
+    if (!activeRequestId) {
+      return;
+    }
+    if (requestId && requestId !== activeRequestId) {
+      return;
+    }
+    clearManualAIRequestTimer();
+    pendingManualAIRequestRef.current.requestId = '';
+    setIsManualAIRequestPending(false);
+  };
+
+  const beginManualAIRequest = (requestId) => {
+    clearManualAIRequestTimer();
+    pendingManualAIRequestRef.current.requestId = requestId;
+    setIsManualAIRequestPending(true);
+    pendingManualAIRequestRef.current.timeoutId = setTimeout(() => {
+      if (pendingManualAIRequestRef.current.requestId !== requestId) {
+        return;
+      }
+      settleManualAIRequest(requestId);
+      addLog('AI request timeout. Retry Ask AI.');
+      pushMeetingNotice('AI response delayed. You can retry now.', 'warning');
+    }, AI_MANUAL_REQUEST_TIMEOUT_MS);
+  };
+
+  const getEffectiveLeadId = () => (
+    leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId')
+  );
+
+  const mapServerTimestamp = (rawTimestamp) => {
+    if (!rawTimestamp) return new Date().toLocaleTimeString();
+    const dt = new Date(rawTimestamp);
+    return Number.isNaN(dt.getTime()) ? new Date().toLocaleTimeString() : dt.toLocaleTimeString();
+  };
+
+  const hydratePersistedArtifacts = (payload) => {
+    if (!payload || !payload.success) return;
+
+    if (payload.summary) {
+      setSummaryData({
+        callSummary: payload.summary.callSummary || '',
+        complianceFlags: payload.summary.complianceFlags || null,
+        actionItems: payload.summary.actionItems || null
+      });
+    }
+
+    const persistedTranscriptions = Array.isArray(payload.transcriptions)
+      ? payload.transcriptions.map((item) => ({
+          text: item.content || '',
+          timestamp: mapServerTimestamp(item.timestamp),
+          receivedAtMs: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+          clientAudioStartMs: null,
+          audioToTranscriptMs: null
+        }))
+      : [];
+
+    const persistedAISuggestions = Array.isArray(payload.aiResponses)
+      ? payload.aiResponses.map((item) => ({
+          suggestion: item.content || '',
+          citations: [],
+          timestamp: mapServerTimestamp(item.timestamp),
+          requestToAiMs: null,
+          audioToAiMs: null
+        }))
+      : [];
+
+    const persistedFullChat = Array.isArray(payload.fullChat)
+      ? payload.fullChat.map((item) => ({
+          type: item.role === 'ai' ? 'ai' : 'customer',
+          text: item.content || '',
+          timestamp: mapServerTimestamp(item.timestamp)
+        }))
+      : [];
+
+    setTranscriptions((prev) => (prev.length > 0 ? prev : persistedTranscriptions));
+    setAiSuggestions((prev) => (prev.length > 0 ? prev : persistedAISuggestions));
+    setConversationHistory((prev) => (prev.length > 0 ? prev : persistedFullChat));
+  };
+
+  const loadMeetingArtifacts = async () => {
+    const effectiveLeadId = getEffectiveLeadId();
+    if (!effectiveLeadId) return null;
+
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}/meeting-artifacts`);
+      if (!res.ok) {
+        return null;
+      }
+
+      const payload = await res.json();
+      hydratePersistedArtifacts(payload);
+      return payload;
+    } catch (err) {
+      console.error('Error loading meeting artifacts:', err);
+      return null;
+    }
+  };
+
+  const generateFinalSummary = async () => {
+    const effectiveLeadId = getEffectiveLeadId();
+    if (!effectiveLeadId) {
+      pushMeetingNotice('Lead context missing. Cannot generate summary.', 'warning');
+      return;
+    }
+
+    setIsSummaryLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}/generate-summary`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.data) {
+        pushMeetingNotice('Summary generation failed.', 'warning');
+        return;
+      }
+
+      setSummaryData({
+        callSummary: data.data.callSummary || '',
+        complianceFlags: data.data.complianceFlags || null,
+        actionItems: data.data.actionItems || null
+      });
+      addLog('Summary generated and saved to Supabase');
+      pushMeetingNotice('Final summary generated.', 'success');
+    } catch (err) {
+      console.error('Summary generation failed:', err);
+      pushMeetingNotice('Summary generation failed.', 'warning');
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  };
+
+  const saveSummaryToSupabase = async () => {
+    const effectiveLeadId = getEffectiveLeadId();
+    if (!effectiveLeadId) {
+      pushMeetingNotice('Lead context missing. Cannot save summary.', 'warning');
+      return;
+    }
+    if (!summaryData?.callSummary) {
+      pushMeetingNotice('Generate summary first.', 'warning');
+      return;
+    }
+
+    setIsSavingArtifacts(true);
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}/wrapup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callSummary: summaryData.callSummary,
+          complianceFlags: summaryData.complianceFlags || null,
+          actionItems: summaryData.actionItems || null
+        })
+      });
+      if (!res.ok) {
+        pushMeetingNotice('Failed to save summary.', 'warning');
+        return;
+      }
+      await loadMeetingArtifacts();
+      addLog('Summary saved to Supabase session record');
+      pushMeetingNotice('Summary saved to Supabase.', 'success');
+    } catch (err) {
+      console.error('Error saving summary:', err);
+      pushMeetingNotice('Failed to save summary.', 'warning');
+    } finally {
+      setIsSavingArtifacts(false);
+    }
+  };
+
+  const bindStreamToVideo = async (videoEl, stream, muted = false) => {
+    if (!videoEl) return;
+
+    if (!stream) {
+      videoEl.srcObject = null;
+      return;
+    }
+
+    if (videoEl.srcObject !== stream) {
+      videoEl.srcObject = stream;
+    }
+
+    videoEl.muted = muted;
+    videoEl.playsInline = true;
+
+    try {
+      await videoEl.play();
+    } catch (err) {
+      // Some browsers require metadata readiness before play resolves
+      videoEl.onloadedmetadata = async () => {
+        try {
+          await videoEl.play();
+        } catch (playErr) {
+          console.warn('Video play retry failed:', playErr);
+        }
+      };
+    }
+  };
 
   // Fetch Lead Context (Phase 2)
   useEffect(() => {
@@ -85,11 +395,25 @@ export default function MeetingPage() {
     }
 
     return () => {
+      settleManualAIRequest();
       if (meetingService) {
         meetingService.leaveMeeting();
       }
     };
   }, [meetingId]);
+
+  useEffect(() => {
+    bindStreamToVideo(localVideoRef.current, localDisplayStream, true);
+  }, [localDisplayStream, isJoined, isScreenSharing]);
+
+  useEffect(() => {
+    bindStreamToVideo(remoteVideoRef.current, remoteDisplayStream, false);
+  }, [remoteDisplayStream, isJoined]);
+
+  useEffect(() => {
+    if (role !== 'admin' || !isJoined) return;
+    loadMeetingArtifacts();
+  }, [role, isJoined, leadContext?.id, leadIdFromQuery]);
 
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
@@ -106,18 +430,31 @@ export default function MeetingPage() {
       // Set up callback for remote stream
       meetingService.onRemoteStream = (stream) => {
         addLog('📹 Remote stream received');
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = stream;
+        setRemoteDisplayStream(stream);
+        setIsConnected(true);
+      };
+
+      meetingService.onParticipantJoined = (data) => {
+        if (data?.userId && data.userId !== meetingService.userId) {
+          addLog(`Participant ${data.userId} joined`);
+          pushMeetingNotice(`Participant joined: ${data.userId}`, 'success');
         }
       };
       
       // Set up callbacks for transcriptions and AI suggestions (admin only)
       if (role === 'admin') {
         meetingService.onTranscription = (data) => {
+          const receivedAtMs = Date.now();
+          const clientAudioStartMs = toPositiveNumber(data?.clientAudioStartMs);
+          const audioToTranscriptMs = clientAudioStartMs ? receivedAtMs - clientAudioStartMs : null;
+          recordLatencyMetric('audioToTranscriptMs', 'Audio -> Transcription', audioToTranscriptMs);
           addLog('📝 Transcription received');
           const entry = {
             text: data.text,
-            timestamp: new Date().toLocaleTimeString()
+            timestamp: new Date().toLocaleTimeString(),
+            receivedAtMs,
+            clientAudioStartMs,
+            audioToTranscriptMs
           };
           setTranscriptions(prev => [...prev, entry]);
           setConversationHistory(prev => [...prev, {
@@ -128,21 +465,61 @@ export default function MeetingPage() {
 
           // Auto-trigger AI suggestion ONLY when monitoring toggle is ON
           if (isMonitoringRef.current && data.text && data.text.trim().length > 5) {
-            addLog('🤖 Auto-requesting AI suggestion...');
-            meetingService.requestAISuggestion(meetingId, data.text, 'customer');
+            const normalizedText = data.text.trim().toLowerCase();
+            const now = Date.now();
+            const isDuplicate = normalizedText === lastAIRequestTextRef.current;
+            const isCoolingDown = (now - lastAIRequestAtRef.current) < AI_REQUEST_COOLDOWN_MS;
+
+            if (!isDuplicate && !isCoolingDown) {
+              addLog('Auto-requesting AI suggestion...');
+              lastAIRequestAtRef.current = now;
+              lastAIRequestTextRef.current = normalizedText;
+              const requestId = `auto-${now}-${Math.random().toString(36).slice(2, 8)}`;
+              registerAIRequest(requestId, now);
+              meetingService.requestAISuggestion(
+                meetingId,
+                data.text,
+                'customer',
+                {
+                  requestId,
+                  requestOrigin: 'auto-transcription',
+                  requestedAtMs: now,
+                  sourceAudioStartMs: clientAudioStartMs,
+                  sourceTranscriptionAtMs: receivedAtMs
+                }
+              );
+            }
           }
         };
         
         meetingService.onAISuggestion = (data) => {
+          const responseRequestId = typeof data?.requestId === 'string' ? data.requestId : '';
+          if (responseRequestId) {
+            settleManualAIRequest(responseRequestId);
+          }
+          if (shouldDropAIResponse(data)) {
+            addLog('Dropped stale AI suggestion response');
+            return;
+          }
           addLog('💡 AI Suggestion received');
           // Format citations if present
           let suggestionText = data.suggestion;
           let citations = data.citations || [];
+          const receivedAtMs = Date.now();
+          const requestedAtMs = toPositiveNumber(data?.requestedAtMs);
+          const sourceAudioStartMs = toPositiveNumber(data?.sourceAudioStartMs);
+          const requestToAiMs = requestedAtMs ? (receivedAtMs - requestedAtMs) : toPositiveNumber(data?.requestToAiLatencyMs);
+          const audioToAiMs = sourceAudioStartMs ? (receivedAtMs - sourceAudioStartMs) : toPositiveNumber(data?.audioToAiLatencyMs);
+
+          recordLatencyMetric('requestToAiMs', 'AI Request -> AI Response', requestToAiMs);
+          recordLatencyMetric('audioToAiMs', 'Audio -> AI Response', audioToAiMs);
           
           const entry = {
             suggestion: suggestionText,
             citations: citations,
-            timestamp: new Date().toLocaleTimeString()
+            timestamp: new Date().toLocaleTimeString(),
+            requestToAiMs,
+            audioToAiMs
           };
           setAiSuggestions(prev => [...prev, entry]);
           
@@ -163,10 +540,10 @@ export default function MeetingPage() {
       // Handle Participant Left
       meetingService.onParticipantLeft = (data) => {
           addLog(`👋 Participant ${data.userId} left`);
-          if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = null;
+          setRemoteDisplayStream(null);
+          if (data?.userId && data.userId !== meetingService.userId) {
+            pushMeetingNotice(`Participant left: ${data.userId}`, 'warning');
           }
-          alert("The other participant has left the meeting.");
       };
       
       // Join meeting (peer connections handled automatically)
@@ -177,17 +554,25 @@ export default function MeetingPage() {
         role
       );
       addLog('✅ Local stream acquired');
-      
-      // Set local video
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+
+      const localVideoTrack = stream.getVideoTracks()[0];
+      if (!localVideoTrack) {
+        throw new Error('Camera stream missing. Please verify camera access and retry.');
       }
+      localVideoTrack.onended = () => {
+        setIsVideoOff(true);
+        pushMeetingNotice('Camera stopped unexpectedly. Toggle camera to retry.', 'warning');
+      };
+      localVideoTrack.onunmute = () => setIsVideoOff(false);
+
+      setLocalDisplayStream(stream);
       
       setIsConnected(true);
+      setIsVideoOff(!localVideoTrack.enabled);
       setIsJoined(true);
-      // Monitoring off by default
-      setIsAIMonitoring(false);
-      isMonitoringRef.current = false;
+      const monitorEnabled = role === 'admin';
+      setIsAIMonitoring(monitorEnabled);
+      isMonitoringRef.current = monitorEnabled;
     } catch (error) {
       addLog(`❌ Error: ${error.message}`);
       setError(error.message);
@@ -212,9 +597,24 @@ export default function MeetingPage() {
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     if (meetingService.localStream) {
-      const videoTrack = meetingService.localStream.getVideoTracks()[0];
+      let videoTrack = meetingService.localStream.getVideoTracks()[0];
+
+      if (!videoTrack || videoTrack.readyState === 'ended') {
+        try {
+          const refreshedStream = await meetingService.restartCameraTrack();
+          videoTrack = refreshedStream.getVideoTracks()[0];
+          setLocalDisplayStream(isScreenSharing ? localDisplayStream : refreshedStream);
+          setIsVideoOff(false);
+          pushMeetingNotice('Camera restarted successfully.', 'success');
+        } catch (err) {
+          console.error('Camera restart failed:', err);
+          pushMeetingNotice('Camera restart failed. Check permissions/device.', 'warning');
+          return;
+        }
+      }
+
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoOff(!videoTrack.enabled);
@@ -226,26 +626,12 @@ export default function MeetingPage() {
     if (confirm('Are you sure you want to leave the consultation?')) {
       const effectiveLeadId = leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId');
       // 1. Leave Meeting
+      settleManualAIRequest();
       meetingService.leaveMeeting();
       
       // 2. Trigger AI Summary Generation (if admin and lead context exists)
       if (role === 'admin' && effectiveLeadId) {
-          addLog("🤖 Generating Call Summary...");
-          try {
-              // Non-blocking fetch to trigger summary
-              fetch(`${API_URL}/api/leads/${effectiveLeadId}/generate-summary`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if(data.success) {
-                        addLog("✅ Summary Generated");
-                        // Ideally we would refresh leadContext here or pass data to modal
-                    }
-                })
-                .catch(err => console.error("Summary gen error", err));
-          } catch (e) {
-              console.error(e);
-          }
-           
+          await generateFinalSummary();
           // Show Wrap Up
           setShowWrapUp(true);
       } else {
@@ -256,30 +642,58 @@ export default function MeetingPage() {
 
   const downloadConversation = () => {
     if (conversationHistory.length === 0) {
-      alert('No conversation to download yet!');
+      alert('No meeting data to download yet!');
       return;
     }
 
-    // Create CSV content
-    const csvContent = [
-      ['Time', 'Type', 'Message'],
-      ...conversationHistory.map(item => [
-        item.timestamp,
-        item.type === 'customer' ? 'Customer' : 'AI Suggestion',
-        item.text.replace(/"/g, '""') // Escape quotes
-      ])
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const report = {
+      generatedAt: new Date().toISOString(),
+      meetingId,
+      leadId: getEffectiveLeadId(),
+      summary: summaryData,
+      transcriptions,
+      aiResponses: aiSuggestions,
+      fullChat: conversationHistory
+    };
 
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meeting-${meetingId}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `meeting-report-${meetingId}-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const downloadPersistedCsv = async () => {
+    const effectiveLeadId = getEffectiveLeadId();
+    if (!effectiveLeadId) {
+      alert('Lead context missing. Cannot download CSV.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}/meeting-artifacts.csv`);
+      if (!res.ok) {
+        throw new Error(`CSV export failed (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meeting-artifacts-${effectiveLeadId}-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addLog('Downloaded persisted CSV artifacts');
+    } catch (err) {
+      console.error('CSV download error:', err);
+      pushMeetingNotice('Failed to download CSV artifacts.', 'warning');
+    }
   };
 
   if (!isJoined) {
@@ -378,6 +792,23 @@ export default function MeetingPage() {
             />
           </div>
 
+          {meetingNotices.length > 0 && (
+            <div className="absolute top-16 right-4 z-20 space-y-2 max-w-xs">
+              {meetingNotices.map((notice) => (
+                <div
+                  key={notice.id}
+                  className={`px-3 py-2 rounded-lg text-xs border backdrop-blur-sm ${
+                    notice.level === 'warning'
+                      ? 'bg-amber-900/70 text-amber-100 border-amber-700/60'
+                      : 'bg-emerald-900/70 text-emerald-100 border-emerald-700/60'
+                  }`}
+                >
+                  {notice.message}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Controls - Floating Bar */}
           <div className="absolute bottom-6 left-0 right-0 flex justify-center z-20 pointer-events-none">
             <div className="flex items-center space-x-4 bg-black/50 backdrop-blur-sm px-6 py-2 rounded-full pointer-events-auto">
@@ -403,17 +834,17 @@ export default function MeetingPage() {
                     try {
                       if (!isScreenSharing) {
                         const stream = await meetingService.startScreenShare();
-                        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+                        setLocalDisplayStream(stream);
                         setIsScreenSharing(true);
                         
                         // Detect when the stream ends (e.g. Stop sharing in browser)
                         stream.getVideoTracks()[0].onended = () => {
                           setIsScreenSharing(false);
-                          if (localVideoRef.current) localVideoRef.current.srcObject = meetingService.localStream;
+                          setLocalDisplayStream(meetingService.localStream);
                         };
                       } else {
                         await meetingService.stopScreenShare();
-                        if (localVideoRef.current) localVideoRef.current.srcObject = meetingService.localStream;
+                        setLocalDisplayStream(meetingService.localStream);
                         setIsScreenSharing(false);
                       }
                     } catch (err) {
@@ -503,26 +934,51 @@ export default function MeetingPage() {
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <span>Live Transcription</span>
-                  {!isAIMonitoring && <span className="text-[10px] text-gray-500 bg-gray-700 px-1 rounded animate-pulse">PAUSED</span>}
                 </h3>
                 <button 
                   onClick={() => {
+                    if (isManualAIRequestPending) {
+                      pushMeetingNotice('AI request already in progress. Please wait.', 'warning');
+                      return;
+                    }
                     if (transcriptions.length > 0) {
                       const lastEntry = transcriptions[transcriptions.length - 1];
-                      meetingService.requestAISuggestion(meetingId, lastEntry.text, 'customer');
+                      const now = Date.now();
+                      const requestId = `manual-${now}-${Math.random().toString(36).slice(2, 8)}`;
+                      beginManualAIRequest(requestId);
+                      lastAIRequestAtRef.current = now;
+                      lastAIRequestTextRef.current = lastEntry.text.trim().toLowerCase();
+                      registerAIRequest(requestId, now);
+                      meetingService.requestAISuggestion(
+                        meetingId,
+                        lastEntry.text,
+                        'customer',
+                        {
+                          requestId,
+                          requestOrigin: 'manual-button',
+                          requestedAtMs: now,
+                          sourceAudioStartMs: lastEntry.clientAudioStartMs || null,
+                          sourceTranscriptionAtMs: lastEntry.receivedAtMs || null
+                        }
+                      );
                     } else {
                       alert('No transcription available to analyze.');
                     }
                   }}
-                  className="px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white text-[10px] rounded flex items-center space-x-1 transition-colors"
+                  disabled={isManualAIRequestPending || transcriptions.length === 0}
+                  className={`px-2 py-0.5 text-white text-[10px] rounded flex items-center space-x-1 transition-colors ${
+                    isManualAIRequestPending || transcriptions.length === 0
+                      ? 'bg-purple-900 cursor-not-allowed opacity-70'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  }`}
                 >
-                  <span>Ask AI</span>
+                  <span>{isManualAIRequestPending ? 'Waiting...' : 'Ask AI'}</span>
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {transcriptions.length === 0 ? (
                   <div className="text-center text-gray-500 text-xs mt-4">
-                    <p>{!isAIMonitoring ? 'Feed Paused' : 'Waiting for customer...'}</p>
+                    <p>Waiting for customer...</p>
                   </div>
                 ) : (
                   transcriptions.map((item, index) => (
@@ -574,20 +1030,77 @@ export default function MeetingPage() {
           
             {/* Column 3: Full Conversation */}
             <div className="flex-1 flex flex-col">
-              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
-                <h3 className="text-xs font-semibold text-white">Full Chat</h3>
-                <button
-                  onClick={downloadConversation}
-                  className="flex items-center space-x-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition"
-                  title="Download conversation as CSV"
-                >
-                  <Download className="h-3 w-3" />
-                </button>
+              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-semibold text-white">Full Chat + Final Summary</h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={downloadPersistedCsv}
+                      className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white transition"
+                      title="Download persisted artifacts CSV"
+                    >
+                      CSV
+                    </button>
+                    <button
+                      onClick={downloadConversation}
+                      className="flex items-center space-x-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition"
+                      title="Download full meeting report (JSON)"
+                    >
+                      <Download className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={generateFinalSummary}
+                    disabled={isSummaryLoading}
+                    className={`px-2 py-1 rounded text-[10px] text-white flex items-center gap-1 ${
+                      isSummaryLoading ? 'bg-blue-900 opacity-70 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {isSummaryLoading ? 'Generating...' : 'Generate Summary'}
+                  </button>
+                  <button
+                    onClick={saveSummaryToSupabase}
+                    disabled={isSavingArtifacts || !summaryData?.callSummary}
+                    className={`px-2 py-1 rounded text-[10px] text-white flex items-center gap-1 ${
+                      isSavingArtifacts || !summaryData?.callSummary
+                        ? 'bg-emerald-900 opacity-70 cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    <Save className="w-3 h-3" />
+                    {isSavingArtifacts ? 'Saving...' : 'Save to Supabase'}
+                  </button>
+                </div>
+
+                {summaryData?.callSummary ? (
+                  <div className="bg-gray-900/70 border border-gray-700 rounded p-2 space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Summary</p>
+                    <p className="text-xs text-gray-100">{summaryData.callSummary}</p>
+                    {Array.isArray(summaryData.actionItems) && summaryData.actionItems.length > 0 && (
+                      <div className="text-[10px] text-gray-300">
+                        {summaryData.actionItems.map((item, idx) => (
+                          <div key={`${idx}-${item}`}>- {item}</div>
+                        ))}
+                      </div>
+                    )}
+                    {summaryData.complianceFlags && (
+                      <div className="text-[10px] text-amber-300">
+                        Compliance: {summaryData.complianceFlags.notes || 'Review compliance flags in wrap-up.'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-400">No final summary yet. Generate one during or after the call.</p>
+                )}
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {conversationHistory.length === 0 ? (
                   <div className="text-center text-gray-500 text-xs mt-4">
-                    <p>{!isAIMonitoring ? 'History Hidden' : 'Chat will appear...'}</p>
+                    <p>Chat will appear...</p>
                   </div>
                 ) : (
                   conversationHistory.map((item, index) => (
@@ -630,6 +1143,7 @@ export default function MeetingPage() {
             isOpen={showWrapUp} 
             onClose={() => setShowWrapUp(false)}
             leadId={leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId')}
+            initialSummary={summaryData}
             onSave={(data) => {
               addLog(`✅ Wrap-up saved: ${data.disposition}`);
             }}

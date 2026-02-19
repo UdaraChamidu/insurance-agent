@@ -10,7 +10,7 @@ if settings.GEMINI_API_KEY:
 
 class SummaryService:
     def __init__(self):
-        self.model_name = "gemini-1.5-flash"
+        self.model_name = "gemini-2.5-flash"
 
     async def generate_call_summary(self, session_id: str):
         db = SessionLocal()

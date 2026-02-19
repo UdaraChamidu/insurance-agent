@@ -40,6 +40,7 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             # Init Service
             service = AudioService()
             service.PROCESS_THRESHOLD = 10 # Low threshold
+            service.AUTO_AI_ON_TRANSCRIPTION = True
             
             # Simulate Audio Chunk (base64)
             # 10 bytes of data
@@ -63,16 +64,17 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             # Check if generate_content_async was called (STT)
             mock_model.generate_content_async.assert_called()
             
-            # 2. Transcription broadcast
-            mock_manager.broadcast_to_admin.assert_any_call(
-                meeting_id, 
-                {
-                    "type": "transcription",
-                    "userId": user_id,
-                    "text": "Hello world",
-                    "timestamp": "now"
-                }
-            )
+            # 2. Transcription broadcast (allow extra latency metadata fields)
+            transcription_payloads = [
+                call_args[0][1]
+                for call_args in mock_manager.broadcast_to_admin.call_args_list
+                if call_args[0][0] == meeting_id and call_args[0][1].get("type") == "transcription"
+            ]
+            self.assertTrue(transcription_payloads, "Expected at least one transcription payload")
+            latest_transcription = transcription_payloads[-1]
+            self.assertEqual(latest_transcription.get("userId"), user_id)
+            self.assertEqual(latest_transcription.get("text"), "Hello world")
+            self.assertEqual(latest_transcription.get("timestamp"), "now")
             
             # 3. AI Suggestion broadcast
             # "Hello world" > 10 chars? length is 11.
@@ -83,6 +85,186 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(args[1]["type"], "ai-suggestion")
             
             print("✅ AudioService Unit Test Passed")
+
+    async def test_generate_ai_suggestion_drops_stale_overlapping_request(self):
+        with patch('app.services.meeting.audio_service.genai') as mock_genai, \
+             patch('app.services.meeting.audio_service.manager') as mock_manager, \
+             patch('app.services.meeting.audio_service.pinecone_service') as mock_pinecone, \
+             patch('app.services.meeting.audio_service.embedding_service') as mock_embedding:
+
+            mock_model = MagicMock()
+            mock_genai.GenerativeModel.return_value = mock_model
+            mock_model.generate_content_async = AsyncMock(
+                return_value=MagicMock(text="Latest suggestion")
+            )
+
+            mock_manager.broadcast_to_admin = AsyncMock()
+            mock_pinecone.query.return_value = [
+                MagicMock(
+                    score=0.92,
+                    metadata={"text": "Verified policy context", "filename": "policy.pdf"},
+                )
+            ]
+
+            async def embedding_side_effect(text):
+                # Slow first request so the second becomes latest before generation.
+                if text == "first request":
+                    await asyncio.sleep(0.05)
+                else:
+                    await asyncio.sleep(0.001)
+                return [0.1] * 768
+
+            mock_embedding.generate_embedding = AsyncMock(side_effect=embedding_side_effect)
+
+            service = AudioService()
+            service.save_transcript_to_db = MagicMock()
+
+            meeting_id = "m-overlap"
+            user_id = "u-overlap"
+
+            task_first = asyncio.create_task(
+                service.generate_ai_suggestion(
+                    meeting_id,
+                    user_id,
+                    "first request",
+                    metadata={"requestId": "req-1", "requestedAtMs": 1000},
+                )
+            )
+            await asyncio.sleep(0.01)
+            task_second = asyncio.create_task(
+                service.generate_ai_suggestion(
+                    meeting_id,
+                    user_id,
+                    "second request",
+                    metadata={"requestId": "req-2", "requestedAtMs": 2000},
+                )
+            )
+
+            await asyncio.gather(task_first, task_second)
+
+            ai_payloads = [
+                call_args[0][1]
+                for call_args in mock_manager.broadcast_to_admin.call_args_list
+                if call_args[0][0] == meeting_id and call_args[0][1].get("type") == "ai-suggestion"
+            ]
+            self.assertEqual(len(ai_payloads), 1)
+            self.assertEqual(ai_payloads[0].get("relatedTo"), "second request")
+            self.assertEqual(ai_payloads[0].get("requestId"), "req-2")
+
+    async def test_enqueue_ai_suggestion_cancels_previous_task(self):
+        service = AudioService()
+        cancelled_texts = []
+        completed_texts = []
+
+        async def fake_generate_ai_suggestion(meeting_id, user_id, text, metadata=None):
+            try:
+                if text == "first request":
+                    await asyncio.sleep(0.05)
+                else:
+                    await asyncio.sleep(0.001)
+                completed_texts.append(text)
+            except asyncio.CancelledError:
+                cancelled_texts.append(text)
+                raise
+
+        service.generate_ai_suggestion = fake_generate_ai_suggestion
+
+        task_first = service.enqueue_ai_suggestion("meeting-1", "user-1", "first request")
+        await asyncio.sleep(0.01)
+        task_second = service.enqueue_ai_suggestion("meeting-1", "user-1", "second request")
+
+        results = await asyncio.gather(task_first, task_second, return_exceptions=True)
+
+        self.assertTrue(isinstance(results[0], asyncio.CancelledError))
+        self.assertIsNone(results[1])
+        self.assertIn("first request", cancelled_texts)
+        self.assertEqual(completed_texts, ["second request"])
+        self.assertEqual(service.ai_generation_tasks, {})
+
+    async def test_enqueue_ai_suggestion_skips_recent_duplicate_text(self):
+        service = AudioService()
+        service.AI_MIN_REQUEST_INTERVAL_MS = 0
+        service.AI_DUPLICATE_WINDOW_MS = 5000
+        seen_texts = []
+
+        async def fake_generate_ai_suggestion(meeting_id, user_id, text, metadata=None):
+            seen_texts.append(text)
+            await asyncio.sleep(0.001)
+
+        service.generate_ai_suggestion = fake_generate_ai_suggestion
+
+        first = service.enqueue_ai_suggestion("meeting-dup", "user-dup", "Hello customer")
+        await asyncio.gather(first)
+
+        duplicate = service.enqueue_ai_suggestion("meeting-dup", "user-dup", "  hello   customer  ")
+        await asyncio.gather(duplicate)
+
+        self.assertEqual(seen_texts, ["Hello customer"])
+        self.assertEqual(service.ai_generation_tasks, {})
+
+    async def test_enqueue_ai_suggestion_throttles_when_idle(self):
+        service = AudioService()
+        service.AI_MIN_REQUEST_INTERVAL_MS = 1000
+        service.AI_DUPLICATE_WINDOW_MS = 0
+        seen_texts = []
+
+        async def fake_generate_ai_suggestion(meeting_id, user_id, text, metadata=None):
+            seen_texts.append(text)
+            await asyncio.sleep(0.001)
+
+        service.generate_ai_suggestion = fake_generate_ai_suggestion
+
+        first = service.enqueue_ai_suggestion("meeting-throttle", "user-throttle", "first")
+        await asyncio.gather(first)
+
+        second = service.enqueue_ai_suggestion("meeting-throttle", "user-throttle", "second")
+        await asyncio.gather(second)
+
+        # Simulate enough time passing for next request to be accepted.
+        service.ai_recent_enqueues["meeting-throttle"]["user-throttle"]["arrivedAtMs"] -= 1500
+
+        third = service.enqueue_ai_suggestion("meeting-throttle", "user-throttle", "third")
+        await asyncio.gather(third)
+
+        self.assertEqual(seen_texts, ["first", "third"])
+        self.assertEqual(service.ai_generation_tasks, {})
+
+    async def test_latency_snapshot_respects_window_and_percentiles(self):
+        service = AudioService()
+        service.LATENCY_METRICS_WINDOW = 3
+
+        for value in [100, 200, 300, 400]:
+            service._record_latency_metric("audioToTranscriptMs", value)
+
+        service._record_ai_latency_metrics({
+            "requestToAiLatencyMs": 250,
+            "audioToAiLatencyMs": 550,
+            "transcriptionToAiLatencyMs": 150,
+        })
+
+        snapshot = service.get_latency_snapshot()
+        self.assertEqual(snapshot["windowSize"], 3)
+        self.assertIn("generatedAtMs", snapshot)
+
+        audio_to_transcript = snapshot["metrics"]["audioToTranscriptMs"]
+        self.assertEqual(audio_to_transcript["count"], 3)
+        self.assertEqual(audio_to_transcript["lastMs"], 400)
+        self.assertEqual(audio_to_transcript["minMs"], 200)
+        self.assertEqual(audio_to_transcript["maxMs"], 400)
+        self.assertEqual(audio_to_transcript["p50Ms"], 300)
+        self.assertEqual(audio_to_transcript["p95Ms"], 400)
+
+        request_to_ai = snapshot["metrics"]["requestToAiMs"]
+        self.assertEqual(request_to_ai["count"], 1)
+        self.assertEqual(request_to_ai["lastMs"], 250)
+
+        audio_to_ai = snapshot["metrics"]["audioToAiMs"]
+        self.assertEqual(audio_to_ai["count"], 1)
+        self.assertEqual(audio_to_ai["lastMs"], 550)
+
+        transcription_to_ai = snapshot["metrics"]["transcriptionToAiMs"]
+        self.assertEqual(transcription_to_ai["count"], 1)
+        self.assertEqual(transcription_to_ai["lastMs"], 150)
 
 if __name__ == "__main__":
     unittest.main()
