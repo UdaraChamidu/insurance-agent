@@ -280,5 +280,112 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
         service._transcribe_with_deepgram.assert_awaited_once()
         service._transcribe_with_gemini.assert_awaited_once()
 
+    async def test_deepgram_stream_emits_finalized_transcription(self):
+        with patch('app.services.meeting.audio_service.manager') as mock_manager:
+            mock_manager.broadcast_to_admin = AsyncMock()
+
+            service = AudioService()
+            service.AUTO_AI_ON_TRANSCRIPTION = False
+            state = service._get_deepgram_stream_state("m-stream", "u-stream")
+            state["currentAudioStartMs"] = 1000
+
+            await service._handle_deepgram_stream_message(
+                "m-stream",
+                "u-stream",
+                {
+                    "type": "Results",
+                    "is_final": True,
+                    "speech_final": True,
+                    "channel": {
+                        "alternatives": [
+                            {"transcript": "Hi there", "confidence": 0.92}
+                        ]
+                    },
+                },
+            )
+
+            mock_manager.broadcast_to_admin.assert_awaited_once()
+            args, _ = mock_manager.broadcast_to_admin.call_args
+            payload = args[1]
+            self.assertEqual(args[0], "m-stream")
+            self.assertEqual(payload["type"], "transcription")
+            self.assertEqual(payload["text"], "Hi there")
+            self.assertEqual(payload["sttProvider"], "deepgram-stream")
+            self.assertEqual(payload["clientAudioStartMs"], 1000)
+
+    async def test_deepgram_stream_drops_low_confidence_result(self):
+        with patch('app.services.meeting.audio_service.manager') as mock_manager:
+            mock_manager.broadcast_to_admin = AsyncMock()
+
+            service = AudioService()
+            service.AUTO_AI_ON_TRANSCRIPTION = False
+            service.deepgram_min_confidence = 0.6
+            state = service._get_deepgram_stream_state("m-lowconf", "u-lowconf")
+            state["currentAudioStartMs"] = 2000
+
+            await service._handle_deepgram_stream_message(
+                "m-lowconf",
+                "u-lowconf",
+                {
+                    "type": "Results",
+                    "is_final": True,
+                    "speech_final": True,
+                    "channel": {
+                        "alternatives": [
+                            {"transcript": "thank you", "confidence": 0.1}
+                        ]
+                    },
+                },
+            )
+
+            mock_manager.broadcast_to_admin.assert_not_awaited()
+
+    async def test_deepgram_stream_emits_on_is_final_without_speech_final(self):
+        with patch('app.services.meeting.audio_service.manager') as mock_manager:
+            mock_manager.broadcast_to_admin = AsyncMock()
+
+            service = AudioService()
+            service.AUTO_AI_ON_TRANSCRIPTION = False
+            state = service._get_deepgram_stream_state("m-final", "u-final")
+            state["currentAudioStartMs"] = 3000
+
+            await service._handle_deepgram_stream_message(
+                "m-final",
+                "u-final",
+                {
+                    "type": "Results",
+                    "is_final": True,
+                    "speech_final": False,
+                    "channel": {
+                        "alternatives": [
+                            {"transcript": "hello", "confidence": 0.95}
+                        ]
+                    },
+                },
+            )
+
+            mock_manager.broadcast_to_admin.assert_awaited_once()
+            args, _ = mock_manager.broadcast_to_admin.call_args
+            payload = args[1]
+            self.assertEqual(payload["type"], "transcription")
+            self.assertEqual(payload["text"], "hello")
+            self.assertEqual(payload["sttProvider"], "deepgram-stream")
+
+    async def test_deepgram_phrase_allows_long_low_confidence_transcript(self):
+        service = AudioService()
+        service.deepgram_min_confidence = 0.45
+
+        allowed = service._is_deepgram_phrase_valid(
+            "I need help with my policy details",
+            0.23,
+        )
+        blocked = service._is_deepgram_phrase_valid(
+            "thank you",
+            0.23,
+        )
+
+        self.assertTrue(allowed)
+        self.assertFalse(blocked)
+
 if __name__ == "__main__":
     unittest.main()

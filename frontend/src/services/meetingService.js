@@ -17,9 +17,17 @@ class MeetingService {
     this.isRecording = false;
     this.audioSampleRate = 16000;
     this.audioInputBufferSize = 2048;
-    this.audioSendIntervalMs = 800;
+    this.audioSendIntervalMs = 180;
     this.audioCaptureMode = 'script-processor';
     this.audioWorkletModuleLoaded = false;
+    this.audioAlwaysStream = true;
+    this.audioVADConfig = {
+      rmsThreshold: 0.006,
+      speechStartMs: 60,
+      speechEndMs: 420,
+      preRollMs: 140,
+      silenceHeartbeatMs: 2500
+    };
     this.targetUserId = null;
     this.makingOffer = false;
     this.ignoreOffer = false;
@@ -449,10 +457,10 @@ class MeetingService {
 
     const setupScriptProcessor = () => {
       this.audioCaptureMode = 'script-processor';
-      const rmsThreshold = 0.008;
-      const speechStartMs = 80;
-      const speechEndMs = 380;
-      const preRollMs = 140;
+      const rmsThreshold = this.audioVADConfig.rmsThreshold;
+      const speechStartMs = this.audioVADConfig.speechStartMs;
+      const speechEndMs = this.audioVADConfig.speechEndMs;
+      const preRollMs = this.audioVADConfig.preRollMs;
       const preRollFrameLimit = Math.max(
         2,
         Math.ceil((preRollMs / 1000) * this.audioSampleRate / this.audioInputBufferSize)
@@ -481,6 +489,11 @@ class MeetingService {
         const now = performance.now();
         const rms = calcRms(frame);
         const hasVoice = rms >= rmsThreshold;
+
+        if (this.audioAlwaysStream) {
+          handleAudioFrame(frame);
+          return;
+        }
 
         preRollFrames.push(frame);
         if (preRollFrames.length > preRollFrameLimit) {
@@ -544,11 +557,12 @@ class MeetingService {
           channelCount: 1,
           channelCountMode: 'explicit',
           processorOptions: {
-            rmsThreshold: 0.012,
-            speechStartMs: 100,
-            speechEndMs: 320,
-            preRollMs: 120,
-            silenceHeartbeatMs: 2500
+            alwaysStream: this.audioAlwaysStream,
+            rmsThreshold: this.audioVADConfig.rmsThreshold,
+            speechStartMs: this.audioVADConfig.speechStartMs,
+            speechEndMs: this.audioVADConfig.speechEndMs,
+            preRollMs: this.audioVADConfig.preRollMs,
+            silenceHeartbeatMs: this.audioVADConfig.silenceHeartbeatMs
           }
         });
 

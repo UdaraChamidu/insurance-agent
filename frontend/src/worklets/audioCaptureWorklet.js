@@ -3,6 +3,7 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
     super();
 
     const cfg = options?.processorOptions || {};
+    this.alwaysStream = Boolean(cfg.alwaysStream);
     this.rmsThreshold = typeof cfg.rmsThreshold === 'number' ? cfg.rmsThreshold : 0.012;
     this.speechStartMs = typeof cfg.speechStartMs === 'number' ? cfg.speechStartMs : 100;
     this.speechEndMs = typeof cfg.speechEndMs === 'number' ? cfg.speechEndMs : 320;
@@ -55,54 +56,8 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
       const frame = new Float32Array(channelData);
       const frameMs = this.frameDurationMs(frame.length);
       const rms = this.computeRms(frame);
-      const isSpeechFrame = rms >= this.rmsThreshold;
-
-      this.addPreRollFrame(frame, frameMs);
-
-      if (isSpeechFrame) {
-        this.speechMs += frameMs;
-        this.silenceMs = 0;
-      } else {
-        this.silenceMs += frameMs;
-        if (!this.isSpeaking) {
-          this.speechMs = 0;
-        }
-      }
-
-      let activatedNow = false;
-      if (!this.isSpeaking && this.speechMs >= this.speechStartMs) {
-        this.isSpeaking = true;
-        activatedNow = true;
-        this.port.postMessage({
-          type: 'vad-state',
-          speaking: true,
-          rms,
-        });
-        for (let i = 0; i < this.preRollFrames.length; i += 1) {
-          this.emitAudioFrame(this.preRollFrames[i]);
-        }
-        this.preRollFrames = [];
-        this.preRollDurationMs = 0;
-      }
-
-      if (this.isSpeaking) {
-        const keepStreaming = isSpeechFrame || this.silenceMs < this.speechEndMs;
-        if (!activatedNow && keepStreaming) {
-          this.emitAudioFrame(frame);
-        }
-
-        if (!isSpeechFrame && this.silenceMs >= this.speechEndMs) {
-          this.isSpeaking = false;
-          this.speechMs = 0;
-          this.silenceMs = 0;
-          this.port.postMessage({
-            type: 'vad-state',
-            speaking: false,
-            flush: true,
-            rms,
-          });
-        }
-      } else {
+      if (this.alwaysStream) {
+        this.emitAudioFrame(frame);
         const nowMs = currentTime * 1000;
         if ((nowMs - this.lastHeartbeatAtMs) >= this.silenceHeartbeatMs) {
           this.lastHeartbeatAtMs = nowMs;
@@ -110,6 +65,64 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
             type: 'silence-heartbeat',
             rms,
           });
+        }
+      } else {
+        const isSpeechFrame = rms >= this.rmsThreshold;
+
+        this.addPreRollFrame(frame, frameMs);
+
+        if (isSpeechFrame) {
+          this.speechMs += frameMs;
+          this.silenceMs = 0;
+        } else {
+          this.silenceMs += frameMs;
+          if (!this.isSpeaking) {
+            this.speechMs = 0;
+          }
+        }
+
+        let activatedNow = false;
+        if (!this.isSpeaking && this.speechMs >= this.speechStartMs) {
+          this.isSpeaking = true;
+          activatedNow = true;
+          this.port.postMessage({
+            type: 'vad-state',
+            speaking: true,
+            rms,
+          });
+          for (let i = 0; i < this.preRollFrames.length; i += 1) {
+            this.emitAudioFrame(this.preRollFrames[i]);
+          }
+          this.preRollFrames = [];
+          this.preRollDurationMs = 0;
+        }
+
+        if (this.isSpeaking) {
+          const keepStreaming = isSpeechFrame || this.silenceMs < this.speechEndMs;
+          if (!activatedNow && keepStreaming) {
+            this.emitAudioFrame(frame);
+          }
+
+          if (!isSpeechFrame && this.silenceMs >= this.speechEndMs) {
+            this.isSpeaking = false;
+            this.speechMs = 0;
+            this.silenceMs = 0;
+            this.port.postMessage({
+              type: 'vad-state',
+              speaking: false,
+              flush: true,
+              rms,
+            });
+          }
+        } else {
+          const nowMs = currentTime * 1000;
+          if ((nowMs - this.lastHeartbeatAtMs) >= this.silenceHeartbeatMs) {
+            this.lastHeartbeatAtMs = nowMs;
+            this.port.postMessage({
+              type: 'silence-heartbeat',
+              rms,
+            });
+          }
         }
       }
     }

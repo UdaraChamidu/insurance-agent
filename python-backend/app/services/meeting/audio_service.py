@@ -4,8 +4,12 @@ import base64
 import asyncio
 import os
 import time
+import json
+import inspect
 import google.generativeai as genai
 import requests
+import websockets
+from urllib.parse import urlencode
 from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.services.meeting.websocket_manager import manager
@@ -45,7 +49,54 @@ class AudioService:
         self.deepgram_model = os.getenv("MEETING_DEEPGRAM_MODEL", "nova-3")
         self.deepgram_language = os.getenv("MEETING_DEEPGRAM_LANGUAGE", "en-US")
         self.deepgram_url = os.getenv("MEETING_DEEPGRAM_URL", "https://api.deepgram.com/v1/listen")
+        self.deepgram_stream_url = os.getenv(
+            "MEETING_DEEPGRAM_STREAM_URL",
+            "wss://api.deepgram.com/v1/listen",
+        )
+        deepgram_connect_params = inspect.signature(websockets.connect).parameters
+        if "additional_headers" in deepgram_connect_params:
+            self.deepgram_ws_headers_arg = "additional_headers"
+        else:
+            self.deepgram_ws_headers_arg = "extra_headers"
         self.deepgram_timeout_sec = self._read_non_negative_int_env("MEETING_DEEPGRAM_TIMEOUT_SEC", 12)
+        self.deepgram_streaming_enabled = (
+            os.getenv("MEETING_DEEPGRAM_STREAMING", "true").lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self.deepgram_interim_results = (
+            os.getenv("MEETING_DEEPGRAM_INTERIM_RESULTS", "true").lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self.deepgram_keepalive_sec = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_KEEPALIVE_SEC",
+            4,
+        )
+        self.deepgram_endpointing_ms = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_ENDPOINTING_MS",
+            300,
+        )
+        self.deepgram_utterance_end_ms = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_UTTERANCE_END_MS",
+            1000,
+        )
+        self.deepgram_emit_dedup_window_ms = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_EMIT_DEDUP_WINDOW_MS",
+            1800,
+        )
+        self.deepgram_min_confidence = self._read_non_negative_float_env(
+            "MEETING_DEEPGRAM_MIN_CONFIDENCE",
+            0.45,
+        )
+        self.deepgram_min_chars = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_MIN_CHARS",
+            2,
+        )
+        ignored_phrases_env = os.getenv("MEETING_DEEPGRAM_IGNORE_PHRASES", "").strip()
+        self.deepgram_ignored_phrases = {
+            self._normalize_request_text(phrase)
+            for phrase in ignored_phrases_env.split(",")
+            if phrase.strip()
+        }
         keyterms_env = os.getenv("MEETING_DEEPGRAM_KEYTERMS", "").strip()
         if keyterms_env:
             self.deepgram_keyterms = [term.strip() for term in keyterms_env.split(",") if term.strip()]
@@ -84,6 +135,8 @@ class AudioService:
             "audioToAiMs": [],
             "transcriptionToAiMs": [],
         }
+        # meeting_id -> { user_id -> deepgram streaming state }
+        self.deepgram_streams: Dict[str, Dict[str, Dict[str, Any]]] = {}
         
         # Audio constants (must match frontend)
         self.SAMPLE_RATE = 16000
@@ -140,6 +193,16 @@ class AudioService:
             return default
         return parsed if parsed >= 0 else default
 
+    def _read_non_negative_float_env(self, key: str, default: float) -> float:
+        raw_value = os.getenv(key)
+        if raw_value is None:
+            return default
+        try:
+            parsed = float(raw_value)
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed >= 0 else default
+
     def _normalize_request_text(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
 
@@ -148,6 +211,437 @@ class AudioService:
             return None
 
         return asyncio.create_task(_noop())
+
+    def _should_use_deepgram_streaming(self) -> bool:
+        return (
+            self.stt_provider == "deepgram"
+            and bool(self.deepgram_api_key)
+            and self.deepgram_streaming_enabled
+        )
+
+    def _get_deepgram_stream_state(self, meeting_id: str, user_id: str) -> Dict[str, Any]:
+        meeting_streams = self.deepgram_streams.setdefault(meeting_id, {})
+        state = meeting_streams.get(user_id)
+        if state is None:
+            state = {
+                "ws": None,
+                "receiverTask": None,
+                "keepAliveTask": None,
+                "lock": asyncio.Lock(),
+                "sampleRate": self.SAMPLE_RATE,
+                "finalSegments": [],
+                "lastFinalSegmentNorm": "",
+                "lastEmittedNorm": "",
+                "lastEmittedAtMs": 0,
+                "currentAudioStartMs": None,
+                "lastAudioAtMs": 0,
+            }
+            meeting_streams[user_id] = state
+        return state
+
+    def _build_deepgram_stream_url(self, sample_rate: int) -> str:
+        params: List[tuple[str, str]] = [
+            ("model", self.deepgram_model),
+            ("language", self.deepgram_language),
+            ("encoding", "linear16"),
+            ("channels", str(self.CHANNELS)),
+            ("sample_rate", str(sample_rate)),
+            ("punctuate", "true"),
+            ("smart_format", "true"),
+            ("interim_results", "true" if self.deepgram_interim_results else "false"),
+            ("vad_events", "true"),
+        ]
+
+        if self.deepgram_endpointing_ms > 0:
+            params.append(("endpointing", str(self.deepgram_endpointing_ms)))
+        else:
+            params.append(("endpointing", "false"))
+
+        if self.deepgram_utterance_end_ms > 0:
+            params.append(("utterance_end_ms", str(self.deepgram_utterance_end_ms)))
+
+        for keyterm in self.deepgram_keyterms:
+            params.append(("keyterm", keyterm))
+
+        return f"{self.deepgram_stream_url}?{urlencode(params, doseq=True)}"
+
+    def _is_deepgram_phrase_valid(self, transcript: str, confidence: Optional[float]) -> bool:
+        text = transcript.strip()
+        if len(text) < self.deepgram_min_chars:
+            return False
+
+        normalized = self._normalize_request_text(text)
+        if not normalized:
+            return False
+
+        if normalized in self.deepgram_ignored_phrases:
+            return False
+
+        if confidence is None:
+            return True
+
+        try:
+            parsed_confidence = float(confidence)
+        except (TypeError, ValueError):
+            return True
+
+        if parsed_confidence >= self.deepgram_min_confidence:
+            return True
+
+        # Avoid dropping valid longer sentences that often score lower in noisy meetings.
+        words = normalized.split()
+        if len(words) >= 3 and len(normalized) >= 12 and parsed_confidence >= 0.2:
+            return True
+
+        return False
+
+    async def _update_stream_audio_start(
+        self,
+        meeting_id: str,
+        user_id: str,
+        client_sent_at_ms: Optional[int],
+    ):
+        parsed = self._coerce_positive_int(client_sent_at_ms)
+        if parsed is None:
+            return
+
+        state = self._get_deepgram_stream_state(meeting_id, user_id)
+        async with state["lock"]:
+            existing = self._coerce_positive_int(state.get("currentAudioStartMs"))
+            if existing is None or parsed < existing:
+                state["currentAudioStartMs"] = parsed
+
+    async def _append_deepgram_final_segment(self, meeting_id: str, user_id: str, transcript: str):
+        text = transcript.strip()
+        if not text:
+            return
+
+        normalized = self._normalize_request_text(text)
+        if not normalized:
+            return
+
+        state = self._get_deepgram_stream_state(meeting_id, user_id)
+        async with state["lock"]:
+            if normalized == state.get("lastFinalSegmentNorm"):
+                return
+            state["lastFinalSegmentNorm"] = normalized
+            state.setdefault("finalSegments", []).append(text)
+
+    async def _emit_deepgram_utterance(self, meeting_id: str, user_id: str):
+        state = self.deepgram_streams.get(meeting_id, {}).get(user_id)
+        if not state:
+            return
+
+        text = ""
+        client_audio_start_ms: Optional[int] = None
+        should_emit = False
+        normalized = ""
+        now_ms = int(time.time() * 1000)
+
+        async with state["lock"]:
+            segments = state.get("finalSegments", [])
+            if not segments:
+                state["currentAudioStartMs"] = None
+                state["lastFinalSegmentNorm"] = ""
+                return
+
+            text = " ".join(segments).strip()
+            normalized = self._normalize_request_text(text)
+            last_emitted_norm = state.get("lastEmittedNorm")
+            last_emitted_at_ms = self._coerce_positive_int(state.get("lastEmittedAtMs")) or 0
+            dedup_window_active = (
+                normalized
+                and normalized == last_emitted_norm
+                and (now_ms - last_emitted_at_ms) < self.deepgram_emit_dedup_window_ms
+            )
+
+            state["finalSegments"] = []
+            state["lastFinalSegmentNorm"] = ""
+            client_audio_start_ms = self._coerce_positive_int(state.get("currentAudioStartMs"))
+            state["currentAudioStartMs"] = None
+
+            if not normalized or dedup_window_active:
+                return
+
+            state["lastEmittedNorm"] = normalized
+            state["lastEmittedAtMs"] = now_ms
+            should_emit = True
+
+        if should_emit:
+            await self._handle_transcription_result(
+                meeting_id,
+                user_id,
+                text,
+                client_audio_start_ms=client_audio_start_ms,
+                provider="deepgram-stream",
+            )
+
+    async def _handle_deepgram_stream_message(
+        self,
+        meeting_id: str,
+        user_id: str,
+        payload: Dict[str, Any],
+    ):
+        message_type = str(payload.get("type", "")).lower()
+        if message_type == "results":
+            channel = payload.get("channel", {})
+            alternatives = channel.get("alternatives") or []
+            best_alternative = alternatives[0] if alternatives else {}
+            transcript = (best_alternative.get("transcript") or "").strip()
+            confidence = best_alternative.get("confidence")
+            is_final = bool(payload.get("is_final"))
+            speech_final = bool(payload.get("speech_final"))
+
+            if is_final and transcript and self._is_deepgram_phrase_valid(transcript, confidence):
+                await self._append_deepgram_final_segment(meeting_id, user_id, transcript)
+                # Emit immediately on finalized chunks to avoid losing text when
+                # speech_final/utteranceend events don't arrive before a timeout.
+                if not speech_final:
+                    await self._emit_deepgram_utterance(meeting_id, user_id)
+
+            if speech_final:
+                await self._emit_deepgram_utterance(meeting_id, user_id)
+            return
+
+        if message_type == "utteranceend":
+            await self._emit_deepgram_utterance(meeting_id, user_id)
+
+    async def _deepgram_keepalive_loop(
+        self,
+        meeting_id: str,
+        user_id: str,
+        ws,
+    ):
+        if self.deepgram_keepalive_sec <= 0:
+            return
+
+        try:
+            while True:
+                await asyncio.sleep(self.deepgram_keepalive_sec)
+                state = self.deepgram_streams.get(meeting_id, {}).get(user_id)
+                if not state or state.get("ws") is not ws:
+                    return
+                await ws.send(json.dumps({"type": "KeepAlive"}))
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            print(f"Deepgram keepalive error for {meeting_id}/{user_id}: {error}")
+
+    async def _deepgram_receiver_loop(
+        self,
+        meeting_id: str,
+        user_id: str,
+        ws,
+    ):
+        try:
+            async for message in ws:
+                if isinstance(message, bytes):
+                    continue
+                try:
+                    payload = json.loads(message)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(payload, dict):
+                    await self._handle_deepgram_stream_message(meeting_id, user_id, payload)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            print(f"Deepgram stream receiver error for {meeting_id}/{user_id}: {error}")
+        finally:
+            state = self.deepgram_streams.get(meeting_id, {}).get(user_id)
+            if state:
+                if state.get("ws") is ws:
+                    state["ws"] = None
+                if state.get("receiverTask") is asyncio.current_task():
+                    state["receiverTask"] = None
+
+    async def _close_deepgram_stream_locked(
+        self,
+        meeting_id: str,
+        user_id: str,
+        state: Dict[str, Any],
+        flush: bool = False,
+    ):
+        ws = state.get("ws")
+        receiver_task = state.get("receiverTask")
+        keepalive_task = state.get("keepAliveTask")
+
+        if flush and ws is not None:
+            try:
+                await ws.send(json.dumps({"type": "Finalize"}))
+                await asyncio.sleep(0.15)
+            except Exception:
+                pass
+
+        if receiver_task and receiver_task is not asyncio.current_task():
+            receiver_task.cancel()
+            try:
+                await receiver_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        if keepalive_task and keepalive_task is not asyncio.current_task():
+            keepalive_task.cancel()
+            try:
+                await keepalive_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        if ws is not None:
+            try:
+                await ws.close()
+            except Exception:
+                pass
+
+        state["ws"] = None
+        state["receiverTask"] = None
+        state["keepAliveTask"] = None
+        state["finalSegments"] = []
+        state["lastFinalSegmentNorm"] = ""
+        state["currentAudioStartMs"] = None
+        state["lastAudioAtMs"] = 0
+
+    async def _close_deepgram_stream(self, meeting_id: str, user_id: str, flush: bool = False):
+        meeting_streams = self.deepgram_streams.get(meeting_id)
+        if not meeting_streams:
+            return
+
+        state = meeting_streams.get(user_id)
+        if not state:
+            return
+
+        async with state["lock"]:
+            await self._close_deepgram_stream_locked(
+                meeting_id,
+                user_id,
+                state,
+                flush=flush,
+            )
+
+        meeting_streams.pop(user_id, None)
+        if not meeting_streams:
+            self.deepgram_streams.pop(meeting_id, None)
+
+    async def _ensure_deepgram_stream(self, meeting_id: str, user_id: str, sample_rate: int) -> Dict[str, Any]:
+        state = self._get_deepgram_stream_state(meeting_id, user_id)
+        async with state["lock"]:
+            ws = state.get("ws")
+            receiver_task = state.get("receiverTask")
+            needs_fresh_connection = (
+                ws is None
+                or getattr(ws, "closed", False)
+                or receiver_task is None
+                or receiver_task.done()
+                or state.get("sampleRate") != sample_rate
+            )
+
+            if needs_fresh_connection:
+                await self._close_deepgram_stream_locked(meeting_id, user_id, state, flush=False)
+                stream_url = self._build_deepgram_stream_url(sample_rate)
+                connect_kwargs: Dict[str, Any] = {
+                    self.deepgram_ws_headers_arg: {"Authorization": f"Token {self.deepgram_api_key}"},
+                    "ping_interval": 20,
+                    "ping_timeout": 20,
+                    "close_timeout": 2,
+                    "max_size": 2**22,
+                }
+                state["ws"] = await websockets.connect(
+                    stream_url,
+                    **connect_kwargs,
+                )
+                state["sampleRate"] = sample_rate
+                state["receiverTask"] = asyncio.create_task(
+                    self._deepgram_receiver_loop(
+                        meeting_id,
+                        user_id,
+                        state["ws"],
+                    )
+                )
+                state["keepAliveTask"] = asyncio.create_task(
+                    self._deepgram_keepalive_loop(
+                        meeting_id,
+                        user_id,
+                        state["ws"],
+                    )
+                )
+        return state
+
+    async def _send_audio_to_deepgram_stream(
+        self,
+        meeting_id: str,
+        user_id: str,
+        audio_bytes: bytes,
+        sample_rate: Optional[int],
+        client_sent_at_ms: Optional[int],
+    ):
+        effective_sample_rate = sample_rate if sample_rate else self.SAMPLE_RATE
+        state = await self._ensure_deepgram_stream(meeting_id, user_id, effective_sample_rate)
+        await self._update_stream_audio_start(meeting_id, user_id, client_sent_at_ms)
+        state["lastAudioAtMs"] = int(time.time() * 1000)
+
+        try:
+            await state["ws"].send(audio_bytes)
+        except Exception:
+            await self._close_deepgram_stream(meeting_id, user_id, flush=False)
+            state = await self._ensure_deepgram_stream(meeting_id, user_id, effective_sample_rate)
+            state["lastAudioAtMs"] = int(time.time() * 1000)
+            await state["ws"].send(audio_bytes)
+
+    def _schedule_close_deepgram_stream(self, meeting_id: str, user_id: str, flush: bool):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._close_deepgram_stream(meeting_id, user_id, flush=flush))
+
+    async def _handle_transcription_result(
+        self,
+        meeting_id: str,
+        user_id: str,
+        text: str,
+        client_audio_start_ms: Optional[int] = None,
+        provider: Optional[str] = None,
+    ):
+        clean_text = (text or "").strip()
+        if not clean_text:
+            return
+
+        print(f"Transcription: {clean_text}")
+        transcribed_at_ms = int(time.time() * 1000)
+        transcription_latency_ms = (
+            transcribed_at_ms - client_audio_start_ms
+            if client_audio_start_ms
+            else None
+        )
+        self._record_latency_metric("audioToTranscriptMs", transcription_latency_ms)
+
+        await manager.broadcast_to_admin(meeting_id, {
+            "type": "transcription",
+            "userId": user_id,
+            "text": clean_text,
+            "timestamp": "now",
+            "clientAudioStartMs": client_audio_start_ms,
+            "transcribedAtMs": transcribed_at_ms,
+            "transcriptionLatencyMs": transcription_latency_ms,
+            "sttProvider": provider or self.stt_provider,
+        })
+
+        if self.AUTO_AI_ON_TRANSCRIPTION and len(clean_text) > 10:
+            self.enqueue_ai_suggestion(
+                meeting_id,
+                user_id,
+                clean_text,
+                metadata={
+                    "requestOrigin": "auto-transcription",
+                    "requestedAtMs": transcribed_at_ms,
+                    "sourceAudioStartMs": client_audio_start_ms,
+                    "sourceTranscriptionAtMs": transcribed_at_ms,
+                },
+            )
 
     async def _transcribe_with_gemini(self, wav_data: bytes) -> str:
         model = genai.GenerativeModel(self.ai_model_name)
@@ -441,6 +935,7 @@ class AudioService:
         )
 
     def clear_user_state(self, meeting_id: str, user_id: str):
+        self._schedule_close_deepgram_stream(meeting_id, user_id, flush=True)
         if meeting_id in self.buffers:
             self.buffers[meeting_id].pop(user_id, None)
             if not self.buffers[meeting_id]:
@@ -490,8 +985,19 @@ class AudioService:
         """
         try:
             audio_bytes = base64.b64decode(base64_audio)
-            
+
             self._set_sample_rate(meeting_id, user_id, sample_rate)
+
+            if self._should_use_deepgram_streaming():
+                await self._send_audio_to_deepgram_stream(
+                    meeting_id,
+                    user_id,
+                    audio_bytes,
+                    sample_rate=sample_rate,
+                    client_sent_at_ms=client_sent_at_ms,
+                )
+                return
+
             self._set_buffer_client_start(meeting_id, user_id, client_sent_at_ms)
             buffer_obj = self._get_buffer(meeting_id, user_id)
             buffer_obj.extend(audio_bytes)
@@ -516,39 +1022,13 @@ class AudioService:
             text = await self._transcribe_audio(wav_data)
 
             if text:
-                print(f"Transcription: {text}")
-                transcribed_at_ms = int(time.time() * 1000)
-                transcription_latency_ms = (
-                    transcribed_at_ms - client_audio_start_ms
-                    if client_audio_start_ms
-                    else None
+                await self._handle_transcription_result(
+                    meeting_id,
+                    user_id,
+                    text,
+                    client_audio_start_ms=client_audio_start_ms,
+                    provider=f"{self.stt_provider}-chunk",
                 )
-                self._record_latency_metric("audioToTranscriptMs", transcription_latency_ms)
-
-                # 1. Broadcast Transcription
-                await manager.broadcast_to_admin(meeting_id, {
-                    "type": "transcription",
-                    "userId": user_id,
-                    "text": text,
-                    "timestamp": "now", # In real app use ISO format
-                    "clientAudioStartMs": client_audio_start_ms,
-                    "transcribedAtMs": transcribed_at_ms,
-                    "transcriptionLatencyMs": transcription_latency_ms,
-                })
-
-                # 2. Optionally auto-generate AI suggestions without blocking transcription loop.
-                if self.AUTO_AI_ON_TRANSCRIPTION and len(text) > 10:
-                    self.enqueue_ai_suggestion(
-                        meeting_id,
-                        user_id,
-                        text,
-                        metadata={
-                            "requestOrigin": "auto-transcription",
-                            "requestedAtMs": transcribed_at_ms,
-                            "sourceAudioStartMs": client_audio_start_ms,
-                            "sourceTranscriptionAtMs": transcribed_at_ms,
-                        },
-                    )
 
         except Exception as e:
             print(f"Transcription error: {e}")
