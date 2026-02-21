@@ -247,6 +247,34 @@ class MeetingService {
     }
   }
 
+  async ensureVideoTrackBroadcast() {
+    if (!this.peerConnection || !this.localStream) {
+      return;
+    }
+    const cameraTrack = this.localStream.getVideoTracks()[0];
+    if (!cameraTrack) {
+      return;
+    }
+
+    const sender = this.peerConnection.getSenders().find(
+      s => s.track && s.track.kind === 'video'
+    );
+
+    if (sender) {
+      if (sender.track !== cameraTrack || sender.track.readyState !== 'live') {
+        await sender.replaceTrack(cameraTrack);
+      }
+      return;
+    }
+
+    // Last-resort path if sender was unexpectedly removed.
+    try {
+      this.peerConnection.addTrack(cameraTrack, this.localStream);
+    } catch (error) {
+      console.warn('Video track re-attach failed:', error);
+    }
+  }
+
   createPeerConnection() {
     if (this.peerConnection) {
       console.log('🔄 Closing existing peer connection');

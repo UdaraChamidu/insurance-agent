@@ -10,6 +10,83 @@ router = APIRouter()
 class ReprocessRequest(BaseModel):
     fileKey: str
 
+
+def _coerce_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_mapping(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if hasattr(value, "model_dump"):
+        try:
+            dumped = value.model_dump()
+            if isinstance(dumped, dict):
+                return dumped
+        except Exception:
+            pass
+    if hasattr(value, "to_dict"):
+        try:
+            dumped = value.to_dict()
+            if isinstance(dumped, dict):
+                return dumped
+        except Exception:
+            pass
+    if hasattr(value, "__dict__"):
+        data = {
+            key: val
+            for key, val in vars(value).items()
+            if not str(key).startswith("_")
+        }
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def _extract_total_vectors(stats_obj: Any) -> int:
+    if isinstance(stats_obj, dict):
+        for key in ("totalVectors", "totalRecordCount", "total_vector_count", "totalVectorCount"):
+            if key in stats_obj:
+                return _coerce_int(stats_obj.get(key), 0)
+    for attr in ("totalVectors", "totalRecordCount", "total_vector_count", "totalVectorCount"):
+        if hasattr(stats_obj, attr):
+            return _coerce_int(getattr(stats_obj, attr), 0)
+    return 0
+
+
+def _extract_namespaces(stats_obj: Any) -> Dict[str, Dict[str, int]]:
+    raw_namespaces: Any = {}
+    if isinstance(stats_obj, dict):
+        raw_namespaces = stats_obj.get("namespaces", {}) or {}
+    elif hasattr(stats_obj, "namespaces"):
+        raw_namespaces = getattr(stats_obj, "namespaces") or {}
+
+    if not isinstance(raw_namespaces, dict):
+        raw_namespaces = _to_mapping(raw_namespaces)
+
+    normalized: Dict[str, Dict[str, int]] = {}
+    for ns_name, raw_data in (raw_namespaces or {}).items():
+        namespace_name = str(ns_name or "")
+        mapping = _to_mapping(raw_data)
+        record_count = 0
+        if mapping:
+            for key in ("recordCount", "vector_count", "vectorCount", "totalRecordCount"):
+                if key in mapping:
+                    record_count = _coerce_int(mapping.get(key), 0)
+                    break
+        if record_count == 0 and not mapping:
+            for attr in ("recordCount", "vector_count", "vectorCount", "totalRecordCount"):
+                if hasattr(raw_data, attr):
+                    record_count = _coerce_int(getattr(raw_data, attr), 0)
+                    break
+        normalized[namespace_name] = {"recordCount": record_count}
+    return normalized
+
 @router.get("/stats", response_model=Dict[str, Any])
 async def get_document_stats():
     """
@@ -19,18 +96,26 @@ async def get_document_stats():
         # 1. Get Ingestion Stats (from local tracker)
         ingestion_stat = ingestion_service.get_stats()
         
-        # 2. Get Pinecone Stats (live)
-        pinecone_stats = {"totalRecordCount": 0, "namespaces": {}}
+        # 2. Get Pinecone Stats (live) with schema normalization across SDK versions.
+        pinecone_raw: Any = {"totalRecordCount": 0, "namespaces": {}}
         try:
-             pinecone_stats = pinecone_service.get_stats()
+            pinecone_raw = pinecone_service.get_stats()
         except Exception as e:
             print(f"Pinecone stats error: {e}")
+
+        pinecone_namespaces = _extract_namespaces(pinecone_raw)
+        pinecone_total = _extract_total_vectors(pinecone_raw)
+        if pinecone_total <= 0 and pinecone_namespaces:
+            pinecone_total = sum(
+                _coerce_int(ns_data.get("recordCount"), 0)
+                for ns_data in pinecone_namespaces.values()
+            )
 
         return {
             "ingestion": ingestion_stat,
             "pinecone": {
-                "totalVectors": pinecone_stats.get("totalRecordCount", 0),
-                "namespaces": pinecone_stats.get("namespaces", {})
+                "totalVectors": pinecone_total,
+                "namespaces": pinecone_namespaces
             }
         }
         

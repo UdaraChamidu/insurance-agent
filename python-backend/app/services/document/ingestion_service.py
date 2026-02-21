@@ -35,17 +35,69 @@ class IngestionService:
             print(f"Error saving ingestion state: {e}")
 
     def get_stats(self) -> Dict[str, Any]:
+        files = self.get_processed_files()
+        errors = []
+        processing_files = []
+        success_count = 0
+        no_vectors_count = 0
+        error_count = 0
+
+        for file_entry in files:
+            status = file_entry.get("status")
+            if status == "processing":
+                processing_files.append({
+                    "key": file_entry.get("key"),
+                    "fileName": file_entry.get("fileName"),
+                    "namespace": file_entry.get("namespace"),
+                    "startedAt": file_entry.get("processedAt"),
+                })
+            elif status == "success":
+                success_count += 1
+            elif status == "no_vectors":
+                no_vectors_count += 1
+            elif status == "error":
+                error_count += 1
+                errors.append({
+                    "file": file_entry.get("fileName"),
+                    "error": file_entry.get("error", "Unknown ingestion error"),
+                    "timestamp": file_entry.get("processedAt"),
+                })
+
         return {
             "isRunning": self.state.get("isRunning", True),
-            "processedFileCount": len(self.state.get("files", [])),
+            "processedFileCount": len(files),
+            "processingFileCount": len(processing_files),
+            "successFileCount": success_count,
+            "noVectorsFileCount": no_vectors_count,
+            "errorFileCount": error_count,
             "totalChecks": self.state.get("totalChecks", 0),
             "lastCheck": self.state.get("lastCheck", datetime.utcnow().isoformat()),
             "pollingIntervalMinutes": self.state.get("pollingIntervalMinutes", 5),
-            "errors": [] # Placeholder for now
+            "processingFiles": processing_files,
+            "errors": errors[-25:],
         }
 
     def get_processed_files(self) -> List[Dict[str, Any]]:
-        return self.state.get("files", [])
+        files = self.state.get("files", [])
+        normalized_files: List[Dict[str, Any]] = []
+        for file_entry in files:
+            normalized = dict(file_entry)
+            vectors = normalized.get("vectors", 0)
+            try:
+                vectors_count = int(vectors)
+            except (TypeError, ValueError):
+                vectors_count = 0
+
+            # If a file produced zero vectors, surface the operational state clearly.
+            if normalized.get("status") == "success" and vectors_count <= 0:
+                normalized["status"] = "no_vectors"
+
+            if normalized.get("status") in {"success", "no_vectors"}:
+                normalized.pop("error", None)
+
+            normalized_files.append(normalized)
+
+        return normalized_files
 
     def add_processed_file(self, file_data: Dict[str, Any]):
         """
@@ -57,9 +109,16 @@ class IngestionService:
         existing_idx = next((i for i, f in enumerate(files) if f["key"] == file_data["key"]), -1)
         
         if existing_idx >= 0:
-            files[existing_idx] = {**files[existing_idx], **file_data}
+            merged = {**files[existing_idx], **file_data}
+            # Avoid stale error message after a successful re-ingest.
+            if merged.get("status") in {"success", "no_vectors"}:
+                merged.pop("error", None)
+            files[existing_idx] = merged
         else:
-            files.append(file_data)
+            new_entry = dict(file_data)
+            if new_entry.get("status") in {"success", "no_vectors"}:
+                new_entry.pop("error", None)
+            files.append(new_entry)
             
         self.state["files"] = files
         self.state["processedFileCount"] = len(files)

@@ -133,6 +133,35 @@ class AudioService:
             "MEETING_AI_DUPLICATE_WINDOW_MS",
             3000,
         )
+        rag_namespaces_env = os.getenv("MEETING_RAG_NAMESPACES", "").strip()
+        if rag_namespaces_env:
+            self.rag_namespaces = [ns.strip() for ns in rag_namespaces_env.split(",") if ns.strip()]
+        else:
+            default_namespaces = list(getattr(pinecone_service, "namespaces", {}).values())
+            self.rag_namespaces = list(dict.fromkeys(default_namespaces)) if default_namespaces else [
+                "training-reference",
+                "fl-state-authority",
+                "cms-medicare",
+                "federal-aca",
+                "erisa-irs-selffunded",
+                "fl-medicaid-agency",
+                "carrier-fmo-policies",
+            ]
+        self.rag_top_k_per_namespace = max(
+            1,
+            self._read_non_negative_int_env("MEETING_RAG_TOP_K_PER_NAMESPACE", 3),
+        )
+        self.rag_min_score = self._read_non_negative_float_env("MEETING_RAG_MIN_SCORE", 0.62)
+        self.rag_fallback_min_score = self._read_non_negative_float_env(
+            "MEETING_RAG_FALLBACK_MIN_SCORE",
+            max(0.35, self.rag_min_score - 0.17),
+        )
+        if self.rag_fallback_min_score > self.rag_min_score:
+            self.rag_fallback_min_score = self.rag_min_score
+        self.allow_unverified_ai_fallback = (
+            os.getenv("MEETING_ALLOW_UNVERIFIED_AI_FALLBACK", "true").lower()
+            in {"1", "true", "yes", "on"}
+        )
         self.LATENCY_METRICS_WINDOW = self._read_non_negative_int_env(
             "MEETING_LATENCY_METRICS_WINDOW",
             200,
@@ -213,6 +242,53 @@ class AudioService:
 
     def _normalize_request_text(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
+
+    def _parse_match_hit(self, match_obj: Any, namespace: str) -> Optional[Dict[str, Any]]:
+        metadata = getattr(match_obj, "metadata", None)
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        text_content = str(
+            metadata.get("text")
+            or metadata.get("content")
+            or metadata.get("chunk_text")
+            or metadata.get("chunk")
+            or ""
+        ).strip()
+        if not text_content:
+            return None
+
+        source = str(
+            metadata.get("filename")
+            or metadata.get("source")
+            or metadata.get("title")
+            or metadata.get("document_id")
+            or f"{namespace}-document"
+        )
+        raw_score = getattr(match_obj, "score", 0)
+        try:
+            score = float(raw_score)
+        except (TypeError, ValueError):
+            score = 0.0
+
+        return {
+            "source": source,
+            "namespace": namespace,
+            "text": text_content,
+            "score": score,
+        }
+
+    def _dedupe_rank_hits(self, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        ranked = sorted(hits, key=lambda item: item.get("score", 0.0), reverse=True)
+        unique: List[Dict[str, Any]] = []
+        seen = set()
+        for hit in ranked:
+            key = (hit.get("source"), hit.get("text", "")[:160])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(hit)
+        return unique
 
     def _create_noop_task(self) -> asyncio.Task:
         async def _noop():
@@ -1163,115 +1239,158 @@ class AudioService:
                 or transcript_stage == "draft"
             )
 
-            # 1a. Store Transcript to DB
             if not is_draft_request:
                 self.save_transcript_to_db(meeting_id, user_id, text, "customer")
 
-            # RAG Lookup
-            embedding = await embedding_service.generate_embedding(text)
-            if not embedding:
-                 return
-            if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
-                print(f"Skipping stale AI task before context lookup for {meeting_id}/{user_id}")
-                return
+            context_mode = "none"
+            context_results: List[str] = []
+            citations: List[Dict[str, Any]] = []
 
-            # Determine Namespace based on Lead Product (Mock for now, should fetch from DB)
-            # In real app: fetch session -> lead -> productType
-            # For now, searching all relevant namespaces
-            namespaces = [
-                'training-reference',
-                'fl-state-authority', 
-                'cms-medicare'
-            ]
-            
-            context_results = []
-            citations = []
-            
-            for ns in namespaces:
-                matches = pinecone_service.query(embedding, ns, top_k=2)
-                for m in matches:
-                    raw_score = m.score if hasattr(m, 'score') else 0
+            embedding = await embedding_service.generate_embedding(text)
+            if embedding:
+                if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
+                    print(f"Skipping stale AI task before context lookup for {meeting_id}/{user_id}")
+                    return
+
+                namespaces = [
+                    ns.strip()
+                    for ns in (self.rag_namespaces or [])
+                    if isinstance(ns, str) and ns.strip()
+                ]
+                if not namespaces:
+                    namespaces = ["training-reference", "fl-state-authority", "cms-medicare"]
+
+                raw_hits: List[Dict[str, Any]] = []
+                for ns in namespaces:
                     try:
-                        score = float(raw_score)
-                    except (TypeError, ValueError):
-                        score = 0.0
-                    if score > 0.75: # Compliance Threshold
-                        text_content = m.metadata.get('text', '')
-                        source = m.metadata.get('filename', 'Unknown Source')
-                        context_results.append(f"[Source: {source} (Score: {score:.2f})]\n{text_content}")
-                        citations.append({"source": source, "score": score, "text": text_content[:100] + "..."})
+                        matches = pinecone_service.query(
+                            embedding,
+                            ns,
+                            top_k=self.rag_top_k_per_namespace,
+                        )
+                    except Exception as query_err:
+                        print(f"Pinecone query failed for namespace '{ns}': {query_err}")
+                        continue
+
+                    for match_obj in matches:
+                        parsed_hit = self._parse_match_hit(match_obj, ns)
+                        if parsed_hit:
+                            raw_hits.append(parsed_hit)
+
+                ranked_hits = self._dedupe_rank_hits(raw_hits)
+                verified_hits = [
+                    hit for hit in ranked_hits
+                    if float(hit.get("score", 0.0)) >= self.rag_min_score
+                ]
+                fallback_hits = [
+                    hit for hit in ranked_hits
+                    if float(hit.get("score", 0.0)) >= self.rag_fallback_min_score
+                ]
+
+                selected_hits = verified_hits if verified_hits else fallback_hits
+                if verified_hits:
+                    context_mode = "verified"
+                elif fallback_hits:
+                    context_mode = "fallback"
+
+                for hit in selected_hits[:4]:
+                    source = str(hit.get("source", "Unknown Source"))
+                    namespace = str(hit.get("namespace", "unknown"))
+                    score = float(hit.get("score", 0.0))
+                    source_text = str(hit.get("text", ""))
+
+                    context_results.append(
+                        f"[Source: {source} | Namespace: {namespace} | Score: {score:.2f}]\n{source_text}"
+                    )
+                    citations.append({
+                        "source": source,
+                        "namespace": namespace,
+                        "score": score,
+                        "text": (source_text[:120] + "...") if len(source_text) > 120 else source_text,
+                    })
+            else:
+                print(f"Embedding generation failed for AI suggestion in {meeting_id}/{user_id}")
 
             if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
                 print(f"Skipping stale AI task before response generation for {meeting_id}/{user_id}")
                 return
-            
-            # Compliance Gate: No Sources Found
+
             if not context_results:
-                if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
-                    print(f"Skipping stale AI warning for {meeting_id}/{user_id}")
+                if self.allow_unverified_ai_fallback:
+                    context_mode = "unverified"
+                    context_results = [
+                        "No verified vector source was retrieved for this turn. "
+                        "Provide cautious guidance and ask the admin to verify plan-specific details manually."
+                    ]
+                else:
+                    latency_fields = self._build_ai_latency_fields(metadata)
+                    self._record_ai_latency_metrics(latency_fields)
+                    warning_msg = "WARNING: NO VERIFIED SOURCES FOUND. ESCALATE OR VERIFY MANUAL."
+                    await manager.broadcast_to_admin(meeting_id, {
+                        "type": "ai-suggestion",
+                        "suggestion": warning_msg,
+                        "relatedTo": text,
+                        "citations": [],
+                        "contextSourceMode": "none",
+                        **latency_fields,
+                    })
+                    if not is_draft_request:
+                        self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
                     return
-                latency_fields = self._build_ai_latency_fields(metadata)
-                self._record_ai_latency_metrics(latency_fields)
-                warning_msg = "⚠️ NO VERIFIED SOURCES FOUND. ESCALATE OR VERIFY MANUAL."
-                await manager.broadcast_to_admin(meeting_id, {
-                    "type": "ai-suggestion",
-                    "suggestion": warning_msg,
-                    "relatedTo": text,
-                    "citations": [],
-                    **latency_fields,
-                })
-                # Save AI response (warning) to transcript
-                if not is_draft_request:
-                    self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
-                return
 
-            # Format Context
-            retrieved_context = "\n\n".join(context_results[:3]) 
+            retrieved_context = "\n\n".join(context_results[:3])
 
-            # System Prompt with Mandatory Disclaimers
             system_prompt = """
-            You are a compliance-first AI insurance assistant. 
+            You are a compliance-first AI insurance assistant.
             Your role is to guide the agent based on the provided context.
-            
+
             RULES:
             1. Suggest a SHORT, compliant response.
-            2. IF context is missing, admit you don't know.
+            2. IF context is missing, admit uncertainty and ask for verification.
             3. ALWAYS include a mandatory disclaimer if mentioning benefits.
-            4. Cite the source provided in context.
+            4. If context quality is fallback or unverified, ask the admin to verify details before quoting.
             """
-            
+
             user_prompt = f"""
             Context from Knowledge Base:
             {retrieved_context}
-            
+
+            Context quality mode: {context_mode}
+            - verified: strong retrieval matches
+            - fallback: weaker retrieval matches
+            - unverified: no vector matches (general guidance only)
+
             Customer just said: "{text}"
-            
+
             Provide a short suggestion for the agent:
             """
-            
+
             model = genai.GenerativeModel(self.ai_model_name)
             response = await model.generate_content_async(system_prompt + user_prompt)
-            
-            suggestion = response.text.strip()
+
+            suggestion = (response.text or "").strip()
+            if not suggestion:
+                suggestion = "I need a moment to verify the correct guidance before responding."
+
             if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
                 print(f"Skipping stale AI suggestion for {meeting_id}/{user_id}")
                 return
+
             latency_fields = self._build_ai_latency_fields(metadata)
             self._record_ai_latency_metrics(latency_fields)
-            
-            # Broadcast Suggestion WITH Citations
+
             await manager.broadcast_to_admin(meeting_id, {
                 "type": "ai-suggestion",
                 "suggestion": suggestion,
                 "relatedTo": text,
                 "citations": citations,
+                "contextSourceMode": context_mode,
                 **latency_fields,
             })
-            
-            # Save AI response to transcript
+
             if not is_draft_request:
                 self.save_transcript_to_db(meeting_id, "ai_assistant", suggestion, "ai")
-            
+
         except asyncio.CancelledError:
             print(f"AI suggestion task cancelled for {meeting_id}/{user_id}")
             return
@@ -1336,3 +1455,4 @@ class AudioService:
             return wav_io.getvalue()
 
 audio_service = AudioService()
+

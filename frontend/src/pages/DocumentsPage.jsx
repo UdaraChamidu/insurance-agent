@@ -113,6 +113,7 @@ export default function DocumentsPage() {
   // Status badge component
   const StatusBadge = ({ status }) => {
     const config = {
+      processing: { bg: 'bg-blue-500/20', text: 'text-blue-300', border: 'border-blue-500/30', icon: RefreshCw, label: 'Processing' },
       success: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30', icon: CheckCircle, label: 'Ingested' },
       no_vectors: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', icon: AlertCircle, label: 'No Vectors' },
       error: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: XCircle, label: 'Error' }
@@ -121,7 +122,7 @@ export default function DocumentsPage() {
     const Icon = c.icon;
     return (
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text} border ${c.border}`}>
-        <Icon className="h-3 w-3" />
+        <Icon className={`h-3 w-3 ${status === 'processing' ? 'animate-spin' : ''}`} />
         {c.label}
       </span>
     );
@@ -148,6 +149,7 @@ export default function DocumentsPage() {
   const ingestion = stats?.ingestion || {};
   const pinecone = stats?.pinecone || {};
   const errors = ingestion.errors || [];
+  const processingFiles = ingestion.processingFiles || [];
 
   return (
     <div className="space-y-6">
@@ -229,7 +231,9 @@ export default function DocumentsPage() {
               </div>
             </div>
             <p className="text-3xl font-bold text-white">{ingestion.processedFileCount || 0}</p>
-            <p className="text-xs text-gray-500 mt-2">Polls: {ingestion.totalChecks || 0}</p>
+            <p className="text-xs text-gray-500 mt-2">
+              Active now: {ingestion.processingFileCount || 0} • Polls: {ingestion.totalChecks || 0}
+            </p>
           </div>
 
           {/* Total Vectors */}
@@ -263,6 +267,34 @@ export default function DocumentsPage() {
           </div>
         </div>
 
+        {/* Active Processing List */}
+        {processingFiles.length > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5 mb-8">
+            <h3 className="text-sm font-semibold text-blue-200 mb-3 flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Processing Files ({processingFiles.length})
+            </h3>
+            <div className="space-y-2">
+              {processingFiles.map((file) => (
+                <div
+                  key={file.key}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-black/20 border border-blue-500/20 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white truncate">{file.fileName}</p>
+                    <p className="text-xs text-blue-200/70">
+                      Namespace: {file.namespace || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="text-xs text-blue-200/70 whitespace-nowrap">
+                    Started: {formatDate(file.startedAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Namespace Breakdown */}
         {Object.keys(pinecone.namespaces || {}).length > 0 && (
           <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 mb-8">
@@ -273,8 +305,19 @@ export default function DocumentsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {Object.entries(pinecone.namespaces).map(([ns, data]) => (
                 <div key={ns} className="bg-black/20 rounded-lg px-3 py-2 border border-white/5">
-                  <p className="text-xs text-gray-400 truncate">{ns || '(default)'}</p>
-                  <p className="text-sm font-bold text-white">{(data.recordCount || 0).toLocaleString()} vectors</p>
+                  {/*
+                    Backend normalizes to recordCount, but keep compatibility with
+                    old/new payloads that may use vector_count or vectorCount.
+                  */}
+                  {(() => {
+                    const namespaceVectors = data?.recordCount ?? data?.vector_count ?? data?.vectorCount ?? 0;
+                    return (
+                      <>
+                        <p className="text-xs text-gray-400 truncate">{ns || '(default)'}</p>
+                        <p className="text-sm font-bold text-white">{namespaceVectors.toLocaleString()} vectors</p>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

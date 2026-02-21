@@ -37,10 +37,8 @@ export default function AdminPage() {
     try {
       console.log('📅 Loading appointments from Local Database...');
       
-      // Fetch real appointments from the API
-      // Was: /api/bookings/appointments (MS Bookings)
-      // Now: /api/appointments (Local DB)
-      const response = await fetch(`${API_URL}/api/appointments`, {
+      // Fetch appointments from scheduling API
+      const response = await fetch(`${API_URL}/api/scheduling/appointments`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -68,6 +66,7 @@ export default function AdminPage() {
       const transformedMeetings = appointmentsList.map(apt => ({
         id: apt.id,
         meetingId: apt.meetingId, // Use the specific meeting room ID
+        leadId: apt.leadId || null,
         clientName: apt.customerName || 'Unknown',
         email: apt.customerEmail || 'N/A',
         // Local DB has separated date (YYYY-MM-DD) and startTime (HH:MM)
@@ -113,9 +112,17 @@ export default function AdminPage() {
     }
   };
 
-  const joinMeeting = (meetingId) => {
-    // Prefer the explicit meetingId UUID, fallback to appointment ID if missing
-    navigate(`/meeting?meetingId=${meetingId}&role=admin`);
+  const joinMeeting = (meetingId, leadId = null) => {
+    if (!meetingId) {
+      alert('Meeting ID is missing for this appointment.');
+      return;
+    }
+    const params = new URLSearchParams({
+      meetingId,
+      role: 'admin'
+    });
+    if (leadId) params.set('leadId', leadId);
+    navigate(`/meeting?${params.toString()}`);
   };
 
   if (!isAuthenticated) {
@@ -288,7 +295,7 @@ export default function AdminPage() {
                         {meeting.status}
                       </span>
                       <button
-                        onClick={() => joinMeeting(meeting.meetingId || meeting.id)}
+                        onClick={() => joinMeeting(meeting.meetingId || meeting.id, meeting.leadId)}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 flex-1 md:flex-none justify-center transition-all shadow-lg shadow-blue-600/20"
                       >
                         <Video className="h-4 w-4" />

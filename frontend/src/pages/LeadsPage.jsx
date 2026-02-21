@@ -15,6 +15,14 @@ const PIPELINE_STAGES = [
   { key: 'lost', label: 'Lost', color: 'red', icon: AlertCircle },
 ];
 
+const PIPELINE_STAGE_HELP = {
+  new: 'Fresh leads captured from intake. First outreach and qualification should start here.',
+  appointment_booked: 'Leads with an upcoming or confirmed appointment.',
+  quoted: 'Leads that already received a plan quote and are in decision stage.',
+  enrolled: 'Leads converted to customers (policy enrolled/sold).',
+  lost: 'Leads not moving forward or disqualified.',
+};
+
 const STAGE_COLORS = {
   new:          { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
   appointment_booked: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
@@ -105,6 +113,30 @@ export default function LeadsPage() {
           placeholder="Search leads..."
           className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
         />
+      </div>
+
+      {/* Category Guide */}
+      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+        <h2 className="text-sm font-semibold text-gray-300 mb-3">Lead Categories</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {PIPELINE_STAGES.map((stage) => {
+            const StageIcon = stage.icon;
+            const stageCount = getLeadsByStage(stage.key).length;
+            const colors = STAGE_COLORS[stage.key];
+            return (
+              <div key={stage.key} className={`rounded-lg border p-3 ${colors.bg} ${colors.border}`}>
+                <div className={`flex items-center justify-between text-xs font-semibold ${colors.text}`}>
+                  <span className="flex items-center gap-1.5">
+                    <StageIcon className="h-3.5 w-3.5" />
+                    {stage.label}
+                  </span>
+                  <span>{stageCount}</span>
+                </div>
+                <p className="mt-2 text-xs text-gray-300">{PIPELINE_STAGE_HELP[stage.key]}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {loading ? (

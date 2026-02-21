@@ -223,7 +223,7 @@ export default function MeetingPage() {
   };
 
   const getEffectiveLeadId = () => (
-    leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId')
+    leadContext?.id || leadIdFromQuery || null
   );
 
   const mapServerTimestamp = (rawTimestamp) => {
@@ -415,12 +415,7 @@ export default function MeetingPage() {
   // Fetch Lead Context (Phase 2)
   useEffect(() => {
     const fetchLead = async () => {
-      const storedLeadId = localStorage.getItem('currentLeadId');
-      const effectiveLeadId = leadIdFromQuery || storedLeadId;
-
-      if (leadIdFromQuery) {
-        localStorage.setItem('currentLeadId', leadIdFromQuery);
-      }
+      const effectiveLeadId = leadIdFromQuery;
 
       if (effectiveLeadId) {
         try {
@@ -437,6 +432,8 @@ export default function MeetingPage() {
         } catch (err) {
           console.error('Error fetching lead context:', err);
         }
+      } else {
+        setLeadContext(null);
       }
     };
     if (role === 'admin') fetchLead();
@@ -456,6 +453,35 @@ export default function MeetingPage() {
         meetingService.leaveMeeting();
       }
     };
+  }, [meetingId]);
+
+  // Reset meeting-scoped UI state when meeting ID changes, so data never leaks between meetings.
+  useEffect(() => {
+    setTranscriptions([]);
+    setAiSuggestions([]);
+    setConversationHistory([]);
+    setSummaryData(null);
+    setIsInlineSummaryVisible(true);
+    setShowWrapUp(false);
+    setShowLeaveConfirm(false);
+    setLeaveFlowStep('choice');
+    setIsLeaveSummaryGenerated(false);
+    setIsLeaveSummarySaved(false);
+    setMeetingNotices([]);
+    setLogs([]);
+    setError(null);
+    setIsJoined(false);
+    setIsConnected(false);
+    setLocalDisplayStream(null);
+    setRemoteDisplayStream(null);
+    setIsAIMonitoring(false);
+    setIsManualAIRequestPending(false);
+    isMonitoringRef.current = false;
+    lastDraftAIByTurnRef.current = {};
+    finalAIRequestedTurnRef.current = {};
+    latestAIRequestRef.current = { requestId: '', requestedAtMs: 0 };
+    seenAIResponseIdsRef.current = [];
+    pendingManualAIRequestRef.current = { requestId: '', timeoutId: null };
   }, [meetingId]);
 
   useEffect(() => {
@@ -777,11 +803,13 @@ export default function MeetingPage() {
   const toggleVideo = async () => {
     if (meetingService.localStream) {
       let videoTrack = meetingService.localStream.getVideoTracks()[0];
+      let restartedCamera = false;
 
       if (!videoTrack || videoTrack.readyState === 'ended') {
         try {
           const refreshedStream = await meetingService.restartCameraTrack();
           videoTrack = refreshedStream.getVideoTracks()[0];
+          restartedCamera = true;
           setLocalDisplayStream(isScreenSharing ? localDisplayStream : refreshedStream);
           setIsVideoOff(false);
           pushMeetingNotice('Camera restarted successfully.', 'success');
@@ -793,8 +821,18 @@ export default function MeetingPage() {
       }
 
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+        if (restartedCamera) {
+          videoTrack.enabled = true;
+          setIsVideoOff(false);
+          await meetingService.ensureVideoTrackBroadcast();
+          return;
+        }
+        const nextEnabled = !videoTrack.enabled;
+        videoTrack.enabled = nextEnabled;
+        setIsVideoOff(!nextEnabled);
+        if (nextEnabled) {
+          await meetingService.ensureVideoTrackBroadcast();
+        }
       }
     }
   };
@@ -1543,7 +1581,7 @@ export default function MeetingPage() {
           <WrapUpModal 
             isOpen={showWrapUp} 
             onClose={() => setShowWrapUp(false)}
-            leadId={leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId')}
+            leadId={leadContext?.id || leadIdFromQuery || null}
             initialSummary={summaryData}
             onSave={(data) => {
               addLog(`✅ Wrap-up saved: ${data.disposition}`);

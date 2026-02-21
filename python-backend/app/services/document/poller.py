@@ -103,6 +103,18 @@ class DocumentPoller:
         
         if should_process:
             try:
+                # Mark file as actively processing so UI can show live progress state.
+                ingestion_service.add_processed_file({
+                    "key": file_id,
+                    "fileName": file_name,
+                    "namespace": namespace,
+                    "status": "processing",
+                    "lastModified": last_modified,
+                    "processedAt": datetime.utcnow().isoformat(),
+                    "chunks": 0,
+                    "vectors": 0,
+                })
+
                 # 1. Download
                 logger.info(f"Downloading {file_name}...")
                 content = sharepoint_service.download_document(
@@ -115,11 +127,12 @@ class DocumentPoller:
                 chunks_count, vectors_count = await ingestion_orchestrator.process_file_content(content, file_name, folder_name, namespace)
                 
                 # 3. Update State
+                status = "success" if (vectors_count or 0) > 0 else "no_vectors"
                 ingestion_service.add_processed_file({
                     "key": file_id,
                     "fileName": file_name,
                     "namespace": namespace,
-                    "status": "success",
+                    "status": status,
                     "lastModified": last_modified,
                     "processedAt": datetime.utcnow().isoformat(),
                     "chunks": chunks_count,

@@ -197,7 +197,9 @@ async def get_leads(
                 "phone": lead.phone,
                 "productType": lead.productType,
                 "state": lead.state,
+                "pipelineStatus": lead.pipelineStatus or "new",
                 "createdAt": session.createdAt if session else None,
+                # Session lifecycle status (new, completed, etc.) kept for compatibility.
                 "status": session.status if session else "new",
                 "disposition": session.disposition if session else None
             })

@@ -23,13 +23,13 @@ class IngestionOrchestrator:
             text = await document_processor.process_docx(content)
         else:
             print(f"Unsupported file type: {filename}")
-            return
+            return 0, 0
 
         # 2. Chunk
         chunks = chunking_service.chunk_text(text, metadata={"filename": filename, "folder": folder_name})
         if not chunks:
             print("No text extracted to chunk.")
-            return
+            return 0, 0
 
         # 3. Embed & Upsert Batch
         # For simplicity, doing one by one or small batches
