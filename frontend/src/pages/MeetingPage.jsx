@@ -8,7 +8,7 @@ import WrapUpModal from '../components/WrapUpModal';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/i, 'ws');
 const WS_URL = `${WS_BASE_URL.replace(/\/$/, '')}/api/meetings/ws`;
-const AI_REQUEST_COOLDOWN_MS = 3000;
+const AI_DRAFT_REQUEST_COOLDOWN_MS = 1200;
 const AI_MANUAL_REQUEST_TIMEOUT_MS = 12000;
 const LATENCY_SAMPLE_WINDOW = 60;
 const LATENCY_LOG_INTERVAL = 5;
@@ -78,6 +78,9 @@ export default function MeetingPage() {
   const shouldDropAIResponse = (payload) => {
     const responseRequestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
     const responseRequestedAtMs = toPositiveNumber(payload?.requestedAtMs);
+    const responseStage = payload?.transcriptStage === 'draft' || payload?.requestOrigin === 'auto-draft-transcription'
+      ? 'draft'
+      : 'final';
     const latest = latestAIRequestRef.current;
 
     if (responseRequestId) {
@@ -89,6 +92,10 @@ export default function MeetingPage() {
       if (seen.length > 120) {
         seen.splice(0, seen.length - 120);
       }
+    }
+
+    if (responseStage === 'draft') {
+      return false;
     }
 
     if (responseRequestedAtMs && latest.requestedAtMs && responseRequestedAtMs < latest.requestedAtMs) {
@@ -126,6 +133,8 @@ export default function MeetingPage() {
   const isMonitoringRef = useRef(false);
   const lastAIRequestAtRef = useRef(0);
   const lastAIRequestTextRef = useRef('');
+  const lastDraftAIByTurnRef = useRef({});
+  const finalAIRequestedTurnRef = useRef({});
   const latestAIRequestRef = useRef({ requestId: '', requestedAtMs: 0 });
   const seenAIResponseIdsRef = useRef([]);
   const pendingManualAIRequestRef = useRef({ requestId: '', timeoutId: null });
@@ -194,6 +203,12 @@ export default function MeetingPage() {
     return Number.isNaN(dt.getTime()) ? new Date().toLocaleTimeString() : dt.toLocaleTimeString();
   };
 
+  const normalizeTurnId = (value, fallback) => {
+    return typeof value === 'string' && value.trim().length > 0 ? value : fallback;
+  };
+
+  const normalizeTranscriptStage = (value) => (value === 'draft' ? 'draft' : 'final');
+
   const hydratePersistedArtifacts = (payload) => {
     if (!payload || !payload.success) return;
 
@@ -206,22 +221,27 @@ export default function MeetingPage() {
     }
 
     const persistedTranscriptions = Array.isArray(payload.transcriptions)
-      ? payload.transcriptions.map((item) => ({
+      ? payload.transcriptions.map((item, index) => ({
           text: item.content || '',
           timestamp: mapServerTimestamp(item.timestamp),
           receivedAtMs: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
           clientAudioStartMs: null,
-          audioToTranscriptMs: null
+          audioToTranscriptMs: null,
+          transcriptStage: 'final',
+          turnId: `persisted-transcript-${item.id || item.timestamp || index}`
         }))
       : [];
 
     const persistedAISuggestions = Array.isArray(payload.aiResponses)
-      ? payload.aiResponses.map((item) => ({
+      ? payload.aiResponses.map((item, index) => ({
           suggestion: item.content || '',
           citations: [],
           timestamp: mapServerTimestamp(item.timestamp),
           requestToAiMs: null,
-          audioToAiMs: null
+          audioToAiMs: null,
+          transcriptStage: 'final',
+          turnId: `persisted-ai-${item.id || item.timestamp || index}`,
+          suggestionKey: `persisted-ai-${item.id || item.timestamp || index}:final`
         }))
       : [];
 
@@ -447,34 +467,90 @@ export default function MeetingPage() {
           const receivedAtMs = Date.now();
           const clientAudioStartMs = toPositiveNumber(data?.clientAudioStartMs);
           const audioToTranscriptMs = clientAudioStartMs ? receivedAtMs - clientAudioStartMs : null;
+          const transcriptStage = normalizeTranscriptStage(data?.transcriptStage);
+          const turnId = normalizeTurnId(data?.turnId, `turn-${receivedAtMs}`);
           recordLatencyMetric('audioToTranscriptMs', 'Audio -> Transcription', audioToTranscriptMs);
-          addLog('📝 Transcription received');
+          addLog(`📝 ${transcriptStage === 'draft' ? 'Draft' : 'Final'} transcription received`);
           const entry = {
             text: data.text,
             timestamp: new Date().toLocaleTimeString(),
             receivedAtMs,
             clientAudioStartMs,
-            audioToTranscriptMs
+            audioToTranscriptMs,
+            transcriptStage,
+            turnId
           };
-          setTranscriptions(prev => [...prev, entry]);
-          setConversationHistory(prev => [...prev, {
-            type: 'customer',
-            text: data.text,
-            timestamp: entry.timestamp
-          }]);
 
-          // Auto-trigger AI suggestion ONLY when monitoring toggle is ON
+          setTranscriptions(prev => {
+            const idx = prev.findIndex(item => item.turnId === turnId);
+            if (idx === -1) {
+              return [...prev, entry];
+            }
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...entry };
+            return next;
+          });
+
+          if (transcriptStage === 'final') {
+            setConversationHistory(prev => {
+              const idx = prev.findIndex(item => item.type === 'customer' && item.turnId === turnId);
+              const next = [...prev];
+              const historyEntry = {
+                type: 'customer',
+                text: data.text,
+                timestamp: entry.timestamp,
+                turnId
+              };
+              if (idx === -1) {
+                next.push(historyEntry);
+              } else {
+                next[idx] = historyEntry;
+              }
+              return next;
+            });
+          }
+
+          // Option B: Fast draft assist + canonical final assist
           if (isMonitoringRef.current && data.text && data.text.trim().length > 5) {
             const normalizedText = data.text.trim().toLowerCase();
             const now = Date.now();
-            const isDuplicate = normalizedText === lastAIRequestTextRef.current;
-            const isCoolingDown = (now - lastAIRequestAtRef.current) < AI_REQUEST_COOLDOWN_MS;
 
-            if (!isDuplicate && !isCoolingDown) {
-              addLog('Auto-requesting AI suggestion...');
-              lastAIRequestAtRef.current = now;
-              lastAIRequestTextRef.current = normalizedText;
-              const requestId = `auto-${now}-${Math.random().toString(36).slice(2, 8)}`;
+            if (transcriptStage === 'draft') {
+              const draftState = lastDraftAIByTurnRef.current[turnId] || { text: '', requestedAtMs: 0 };
+              const textGrowth = normalizedText.length - draftState.text.length;
+              const punctuationBoundary = /[?.!]$/.test(data.text.trim());
+              const meetsGrowthGate = textGrowth >= 10 || punctuationBoundary;
+              const coolingDown = (now - draftState.requestedAtMs) < AI_DRAFT_REQUEST_COOLDOWN_MS;
+
+              if (!coolingDown && normalizedText !== draftState.text && meetsGrowthGate) {
+                addLog('Auto-requesting AI draft assist...');
+                const requestId = `auto-draft-${turnId}-${now}`;
+                registerAIRequest(requestId, now);
+                meetingService.requestAISuggestion(
+                  meetingId,
+                  data.text,
+                  'customer',
+                  {
+                    requestId,
+                    requestOrigin: 'auto-draft-transcription',
+                    transcriptStage: 'draft',
+                    turnId,
+                    requestedAtMs: now,
+                    sourceAudioStartMs: clientAudioStartMs,
+                    sourceTranscriptionAtMs: receivedAtMs
+                  }
+                );
+                lastDraftAIByTurnRef.current[turnId] = {
+                  text: normalizedText,
+                  requestedAtMs: now
+                };
+              }
+              return;
+            }
+
+            if (!finalAIRequestedTurnRef.current[turnId]) {
+              addLog('Auto-requesting AI final assist...');
+              const requestId = `auto-final-${turnId}-${now}`;
               registerAIRequest(requestId, now);
               meetingService.requestAISuggestion(
                 meetingId,
@@ -482,12 +558,17 @@ export default function MeetingPage() {
                 'customer',
                 {
                   requestId,
-                  requestOrigin: 'auto-transcription',
+                  requestOrigin: 'auto-final-transcription',
+                  transcriptStage: 'final',
+                  turnId,
                   requestedAtMs: now,
                   sourceAudioStartMs: clientAudioStartMs,
                   sourceTranscriptionAtMs: receivedAtMs
                 }
               );
+              finalAIRequestedTurnRef.current[turnId] = true;
+              lastAIRequestAtRef.current = now;
+              lastAIRequestTextRef.current = normalizedText;
             }
           }
         };
@@ -501,7 +582,14 @@ export default function MeetingPage() {
             addLog('Dropped stale AI suggestion response');
             return;
           }
-          addLog('💡 AI Suggestion received');
+          const suggestionStage = normalizeTranscriptStage(
+            data?.transcriptStage || (
+              data?.requestOrigin === 'auto-draft-transcription' ? 'draft' : 'final'
+            )
+          );
+          const suggestionTurnId = normalizeTurnId(data?.turnId, `ai-${suggestionStage}-${Date.now()}`);
+          const suggestionKey = `${suggestionTurnId}:${suggestionStage}`;
+          addLog(`💡 ${suggestionStage === 'draft' ? 'Draft' : 'Final'} AI suggestion received`);
           // Format citations if present
           let suggestionText = data.suggestion;
           let citations = data.citations || [];
@@ -519,21 +607,45 @@ export default function MeetingPage() {
             citations: citations,
             timestamp: new Date().toLocaleTimeString(),
             requestToAiMs,
-            audioToAiMs
+            audioToAiMs,
+            transcriptStage: suggestionStage,
+            turnId: suggestionTurnId,
+            suggestionKey
           };
-          setAiSuggestions(prev => [...prev, entry]);
+          setAiSuggestions(prev => {
+            const idx = prev.findIndex(item => item.suggestionKey === suggestionKey);
+            if (idx === -1) {
+              return [...prev, entry];
+            }
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...entry };
+            return next;
+          });
           
-          // Add to conversation history with citations
-          let historyText = suggestionText;
-          if (citations.length > 0) {
-              historyText += `\n[Sources: ${citations.map(c => c.source).join(', ')}]`;
+          // Keep canonical full-chat tied to final assist only.
+          if (suggestionStage === 'final') {
+            let historyText = suggestionText;
+            if (citations.length > 0) {
+                historyText += `\n[Sources: ${citations.map(c => c.source).join(', ')}]`;
+            }
+            
+            setConversationHistory(prev => {
+              const idx = prev.findIndex(item => item.type === 'ai' && item.turnId === suggestionTurnId);
+              const next = [...prev];
+              const historyEntry = {
+                type: 'ai',
+                text: historyText,
+                timestamp: entry.timestamp,
+                turnId: suggestionTurnId
+              };
+              if (idx === -1) {
+                next.push(historyEntry);
+              } else {
+                next[idx] = historyEntry;
+              }
+              return next;
+            });
           }
-          
-          setConversationHistory(prev => [...prev, {
-            type: 'ai',
-            text: historyText,
-            timestamp: entry.timestamp
-          }]);
         };
       }
 
@@ -573,6 +685,8 @@ export default function MeetingPage() {
       const monitorEnabled = role === 'admin';
       setIsAIMonitoring(monitorEnabled);
       isMonitoringRef.current = monitorEnabled;
+      lastDraftAIByTurnRef.current = {};
+      finalAIRequestedTurnRef.current = {};
     } catch (error) {
       addLog(`❌ Error: ${error.message}`);
       setError(error.message);
@@ -942,7 +1056,10 @@ export default function MeetingPage() {
                       return;
                     }
                     if (transcriptions.length > 0) {
-                      const lastEntry = transcriptions[transcriptions.length - 1];
+                      const finalEntries = transcriptions.filter(item => normalizeTranscriptStage(item?.transcriptStage) === 'final');
+                      const lastEntry = finalEntries.length > 0
+                        ? finalEntries[finalEntries.length - 1]
+                        : transcriptions[transcriptions.length - 1];
                       const now = Date.now();
                       const requestId = `manual-${now}-${Math.random().toString(36).slice(2, 8)}`;
                       beginManualAIRequest(requestId);
@@ -956,6 +1073,8 @@ export default function MeetingPage() {
                         {
                           requestId,
                           requestOrigin: 'manual-button',
+                          transcriptStage: normalizeTranscriptStage(lastEntry?.transcriptStage),
+                          turnId: lastEntry?.turnId || null,
                           requestedAtMs: now,
                           sourceAudioStartMs: lastEntry.clientAudioStartMs || null,
                           sourceTranscriptionAtMs: lastEntry.receivedAtMs || null
@@ -982,8 +1101,17 @@ export default function MeetingPage() {
                   </div>
                 ) : (
                   transcriptions.map((item, index) => (
-                    <div key={index} className="bg-gray-800 rounded p-2">
-                      <div className="text-xs text-gray-400 mb-1">{item.timestamp}</div>
+                    <div key={`${item.turnId || 'transcript'}-${index}`} className="bg-gray-800 rounded p-2">
+                      <div className="text-xs text-gray-400 mb-1 flex items-center justify-between">
+                        <span>{item.timestamp}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          normalizeTranscriptStage(item?.transcriptStage) === 'draft'
+                            ? 'bg-amber-900 text-amber-300'
+                            : 'bg-green-900 text-green-300'
+                        }`}>
+                          {normalizeTranscriptStage(item?.transcriptStage) === 'draft' ? 'Draft' : 'Final'}
+                        </span>
+                      </div>
                       <div className="text-xs text-white">{item.text}</div>
                     </div>
                   ))
@@ -1009,8 +1137,17 @@ export default function MeetingPage() {
                   </div>
                 ) : (
                   aiSuggestions.map((item, index) => (
-                    <div key={index} className="bg-blue-900 bg-opacity-30 border border-blue-700 rounded p-2">
-                      <div className="text-xs text-blue-300 mb-1">{item.timestamp}</div>
+                    <div key={item.suggestionKey || `${item.turnId || 'ai'}-${index}`} className="bg-blue-900 bg-opacity-30 border border-blue-700 rounded p-2">
+                      <div className="text-xs text-blue-300 mb-1 flex items-center justify-between">
+                        <span>{item.timestamp}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          normalizeTranscriptStage(item?.transcriptStage) === 'draft'
+                            ? 'bg-amber-900 text-amber-300'
+                            : 'bg-green-900 text-green-300'
+                        }`}>
+                          {normalizeTranscriptStage(item?.transcriptStage) === 'draft' ? 'Draft Assist' : 'Final Assist'}
+                        </span>
+                      </div>
                       <div className="text-xs text-white">{item.suggestion}</div>
                       {item.citations && item.citations.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-blue-800">

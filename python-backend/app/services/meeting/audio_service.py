@@ -91,6 +91,14 @@ class AudioService:
             "MEETING_DEEPGRAM_MIN_CHARS",
             2,
         )
+        self.deepgram_draft_emit_interval_ms = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_DRAFT_EMIT_INTERVAL_MS",
+            280,
+        )
+        self.deepgram_draft_min_chars = self._read_non_negative_int_env(
+            "MEETING_DEEPGRAM_DRAFT_MIN_CHARS",
+            4,
+        )
         ignored_phrases_env = os.getenv("MEETING_DEEPGRAM_IGNORE_PHRASES", "").strip()
         self.deepgram_ignored_phrases = {
             self._normalize_request_text(phrase)
@@ -235,9 +243,24 @@ class AudioService:
                 "lastEmittedAtMs": 0,
                 "currentAudioStartMs": None,
                 "lastAudioAtMs": 0,
+                "turnCounter": 0,
+                "currentTurnId": "",
+                "lastDraftNorm": "",
+                "lastDraftAtMs": 0,
             }
             meeting_streams[user_id] = state
         return state
+
+    def _next_turn_id(self, state: Dict[str, Any]) -> str:
+        current_turn = state.get("currentTurnId")
+        if current_turn:
+            return str(current_turn)
+
+        next_counter = int(state.get("turnCounter", 0)) + 1
+        state["turnCounter"] = next_counter
+        generated_turn_id = f"turn-{next_counter}"
+        state["currentTurnId"] = generated_turn_id
+        return generated_turn_id
 
     def _build_deepgram_stream_url(self, sample_rate: int) -> str:
         params: List[tuple[str, str]] = [
@@ -295,6 +318,17 @@ class AudioService:
 
         return False
 
+    def _is_deepgram_draft_valid(self, transcript: str) -> bool:
+        text = transcript.strip()
+        if len(text) < self.deepgram_draft_min_chars:
+            return False
+        normalized = self._normalize_request_text(text)
+        if not normalized:
+            return False
+        if normalized in self.deepgram_ignored_phrases:
+            return False
+        return True
+
     async def _update_stream_audio_start(
         self,
         meeting_id: str,
@@ -327,6 +361,49 @@ class AudioService:
             state["lastFinalSegmentNorm"] = normalized
             state.setdefault("finalSegments", []).append(text)
 
+    async def _emit_deepgram_draft_transcript(self, meeting_id: str, user_id: str, transcript: str):
+        text = (transcript or "").strip()
+        if not self._is_deepgram_draft_valid(text):
+            return
+
+        turn_id = ""
+        client_audio_start_ms: Optional[int] = None
+        now_ms = int(time.time() * 1000)
+
+        state = self.deepgram_streams.get(meeting_id, {}).get(user_id)
+        if not state:
+            return
+
+        normalized = self._normalize_request_text(text)
+
+        async with state["lock"]:
+            last_draft_norm = state.get("lastDraftNorm") or ""
+            last_draft_at_ms = self._coerce_positive_int(state.get("lastDraftAtMs")) or 0
+
+            if normalized == last_draft_norm:
+                return
+            if (
+                last_draft_at_ms
+                and (now_ms - last_draft_at_ms) < self.deepgram_draft_emit_interval_ms
+                and len(normalized) <= len(last_draft_norm)
+            ):
+                return
+
+            state["lastDraftNorm"] = normalized
+            state["lastDraftAtMs"] = now_ms
+            turn_id = self._next_turn_id(state)
+            client_audio_start_ms = self._coerce_positive_int(state.get("currentAudioStartMs"))
+
+        await self._handle_transcription_result(
+            meeting_id,
+            user_id,
+            text,
+            client_audio_start_ms=client_audio_start_ms,
+            provider="deepgram-stream",
+            transcript_stage="draft",
+            turn_id=turn_id,
+        )
+
     async def _emit_deepgram_utterance(self, meeting_id: str, user_id: str):
         state = self.deepgram_streams.get(meeting_id, {}).get(user_id)
         if not state:
@@ -337,6 +414,7 @@ class AudioService:
         should_emit = False
         normalized = ""
         now_ms = int(time.time() * 1000)
+        turn_id = ""
 
         async with state["lock"]:
             segments = state.get("finalSegments", [])
@@ -347,6 +425,7 @@ class AudioService:
 
             text = " ".join(segments).strip()
             normalized = self._normalize_request_text(text)
+            turn_id = self._next_turn_id(state)
             last_emitted_norm = state.get("lastEmittedNorm")
             last_emitted_at_ms = self._coerce_positive_int(state.get("lastEmittedAtMs")) or 0
             dedup_window_active = (
@@ -361,10 +440,16 @@ class AudioService:
             state["currentAudioStartMs"] = None
 
             if not normalized or dedup_window_active:
+                state["currentTurnId"] = ""
+                state["lastDraftNorm"] = ""
+                state["lastDraftAtMs"] = 0
                 return
 
             state["lastEmittedNorm"] = normalized
             state["lastEmittedAtMs"] = now_ms
+            state["currentTurnId"] = ""
+            state["lastDraftNorm"] = ""
+            state["lastDraftAtMs"] = 0
             should_emit = True
 
         if should_emit:
@@ -374,6 +459,8 @@ class AudioService:
                 text,
                 client_audio_start_ms=client_audio_start_ms,
                 provider="deepgram-stream",
+                transcript_stage="final",
+                turn_id=turn_id,
             )
 
     async def _handle_deepgram_stream_message(
@@ -391,6 +478,9 @@ class AudioService:
             confidence = best_alternative.get("confidence")
             is_final = bool(payload.get("is_final"))
             speech_final = bool(payload.get("speech_final"))
+
+            if transcript and not is_final:
+                await self._emit_deepgram_draft_transcript(meeting_id, user_id, transcript)
 
             if is_final and transcript and self._is_deepgram_phrase_valid(transcript, confidence):
                 await self._append_deepgram_final_segment(meeting_id, user_id, transcript)
@@ -504,6 +594,9 @@ class AudioService:
         state["lastFinalSegmentNorm"] = ""
         state["currentAudioStartMs"] = None
         state["lastAudioAtMs"] = 0
+        state["currentTurnId"] = ""
+        state["lastDraftNorm"] = ""
+        state["lastDraftAtMs"] = 0
 
     async def _close_deepgram_stream(self, meeting_id: str, user_id: str, flush: bool = False):
         meeting_streams = self.deepgram_streams.get(meeting_id)
@@ -605,6 +698,8 @@ class AudioService:
         text: str,
         client_audio_start_ms: Optional[int] = None,
         provider: Optional[str] = None,
+        transcript_stage: str = "final",
+        turn_id: Optional[str] = None,
     ):
         clean_text = (text or "").strip()
         if not clean_text:
@@ -628,15 +723,24 @@ class AudioService:
             "transcribedAtMs": transcribed_at_ms,
             "transcriptionLatencyMs": transcription_latency_ms,
             "sttProvider": provider or self.stt_provider,
+            "transcriptStage": transcript_stage,
+            "isFinal": transcript_stage == "final",
+            "turnId": turn_id,
         })
 
-        if self.AUTO_AI_ON_TRANSCRIPTION and len(clean_text) > 10:
+        if (
+            transcript_stage == "final"
+            and self.AUTO_AI_ON_TRANSCRIPTION
+            and len(clean_text) > 10
+        ):
             self.enqueue_ai_suggestion(
                 meeting_id,
                 user_id,
                 clean_text,
                 metadata={
                     "requestOrigin": "auto-transcription",
+                    "transcriptStage": "final",
+                    "turnId": turn_id,
                     "requestedAtMs": transcribed_at_ms,
                     "sourceAudioStartMs": client_audio_start_ms,
                     "sourceTranscriptionAtMs": transcribed_at_ms,
@@ -778,6 +882,8 @@ class AudioService:
         safe_metadata = metadata if isinstance(metadata, dict) else {}
         request_id = safe_metadata.get("requestId")
         request_origin = safe_metadata.get("requestOrigin") or "manual"
+        transcript_stage = safe_metadata.get("transcriptStage")
+        turn_id = safe_metadata.get("turnId")
         requested_at_ms = self._coerce_positive_int(safe_metadata.get("requestedAtMs"))
         source_audio_start_ms = self._coerce_positive_int(safe_metadata.get("sourceAudioStartMs"))
         source_transcription_at_ms = self._coerce_positive_int(safe_metadata.get("sourceTranscriptionAtMs"))
@@ -786,6 +892,8 @@ class AudioService:
         return {
             "requestId": request_id,
             "requestOrigin": request_origin,
+            "transcriptStage": transcript_stage,
+            "turnId": turn_id,
             "requestedAtMs": requested_at_ms,
             "sourceAudioStartMs": source_audio_start_ms,
             "sourceTranscriptionAtMs": source_transcription_at_ms,
@@ -1048,9 +1156,16 @@ class AudioService:
             request_info = self._register_ai_request(meeting_id, user_id, metadata)
             request_sequence = request_info["sequence"]
             metadata = request_info["metadata"]
+            request_origin = str(metadata.get("requestOrigin") or "manual")
+            transcript_stage = str(metadata.get("transcriptStage") or "")
+            is_draft_request = (
+                request_origin == "auto-draft-transcription"
+                or transcript_stage == "draft"
+            )
 
             # 1a. Store Transcript to DB
-            self.save_transcript_to_db(meeting_id, user_id, text, "customer")
+            if not is_draft_request:
+                self.save_transcript_to_db(meeting_id, user_id, text, "customer")
 
             # RAG Lookup
             embedding = await embedding_service.generate_embedding(text)
@@ -1106,7 +1221,8 @@ class AudioService:
                     **latency_fields,
                 })
                 # Save AI response (warning) to transcript
-                self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
+                if not is_draft_request:
+                    self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
                 return
 
             # Format Context
@@ -1153,7 +1269,8 @@ class AudioService:
             })
             
             # Save AI response to transcript
-            self.save_transcript_to_db(meeting_id, "ai_assistant", suggestion, "ai")
+            if not is_draft_request:
+                self.save_transcript_to_db(meeting_id, "ai_assistant", suggestion, "ai")
             
         except asyncio.CancelledError:
             print(f"AI suggestion task cancelled for {meeting_id}/{user_id}")

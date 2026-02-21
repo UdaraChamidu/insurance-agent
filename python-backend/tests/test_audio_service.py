@@ -312,6 +312,8 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(payload["text"], "Hi there")
             self.assertEqual(payload["sttProvider"], "deepgram-stream")
             self.assertEqual(payload["clientAudioStartMs"], 1000)
+            self.assertEqual(payload["transcriptStage"], "final")
+            self.assertTrue(str(payload.get("turnId", "")).startswith("turn-"))
 
     async def test_deepgram_stream_drops_low_confidence_result(self):
         with patch('app.services.meeting.audio_service.manager') as mock_manager:
@@ -370,6 +372,39 @@ class TestAudioService(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(payload["type"], "transcription")
             self.assertEqual(payload["text"], "hello")
             self.assertEqual(payload["sttProvider"], "deepgram-stream")
+            self.assertEqual(payload["transcriptStage"], "final")
+
+    async def test_deepgram_stream_emits_draft_transcription(self):
+        with patch('app.services.meeting.audio_service.manager') as mock_manager:
+            mock_manager.broadcast_to_admin = AsyncMock()
+
+            service = AudioService()
+            service.AUTO_AI_ON_TRANSCRIPTION = False
+            state = service._get_deepgram_stream_state("m-draft", "u-draft")
+            state["currentAudioStartMs"] = 1500
+
+            await service._handle_deepgram_stream_message(
+                "m-draft",
+                "u-draft",
+                {
+                    "type": "Results",
+                    "is_final": False,
+                    "speech_final": False,
+                    "channel": {
+                        "alternatives": [
+                            {"transcript": "Can you check my policy", "confidence": 0.7}
+                        ]
+                    },
+                },
+            )
+
+            mock_manager.broadcast_to_admin.assert_awaited_once()
+            args, _ = mock_manager.broadcast_to_admin.call_args
+            payload = args[1]
+            self.assertEqual(payload["type"], "transcription")
+            self.assertEqual(payload["transcriptStage"], "draft")
+            self.assertEqual(payload["text"], "Can you check my policy")
+            self.assertTrue(str(payload.get("turnId", "")).startswith("turn-"))
 
     async def test_deepgram_phrase_allows_long_low_confidence_transcript(self):
         service = AudioService()

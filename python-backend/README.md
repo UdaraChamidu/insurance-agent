@@ -30,6 +30,7 @@ This is the migrated Python backend using **FastAPI** and **Supabase**.
       - `MEETING_DEEPGRAM_KEEPALIVE_SEC=4`
       - `MEETING_DEEPGRAM_ENDPOINTING_MS=300`
       - `MEETING_DEEPGRAM_UTTERANCE_END_MS=1000`
+      - `MEETING_DEEPGRAM_DRAFT_EMIT_INTERVAL_MS=280`
       - `MEETING_DEEPGRAM_MIN_CONFIDENCE=0.45`
 
 ## Running the Server
