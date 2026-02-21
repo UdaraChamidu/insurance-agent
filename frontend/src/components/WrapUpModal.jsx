@@ -18,6 +18,19 @@ export default function WrapUpModal({ isOpen, onClose, leadId, onSave, initialSu
   const [formData, setFormData] = useState(defaultFormData);
 
   useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEsc = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     setFormData((prev) => ({
@@ -113,7 +126,14 @@ export default function WrapUpModal({ isOpen, onClose, leadId, onSave, initialSu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 overflow-hidden animate-fadeIn">
         <div className="flex items-center justify-between p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Post-Call Wrap Up</h2>

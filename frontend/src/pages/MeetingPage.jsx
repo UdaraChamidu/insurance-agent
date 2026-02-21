@@ -12,6 +12,8 @@ const AI_DRAFT_REQUEST_COOLDOWN_MS = 1200;
 const AI_MANUAL_REQUEST_TIMEOUT_MS = 12000;
 const LATENCY_SAMPLE_WINDOW = 60;
 const LATENCY_LOG_INTERVAL = 5;
+const MIN_PANEL_WIDTH_PERCENT = 18;
+const DEFAULT_PANEL_WIDTHS = [34, 33, 33];
 
 export default function MeetingPage() {
   const navigate = useNavigate();
@@ -149,6 +151,21 @@ export default function MeetingPage() {
   const [summaryData, setSummaryData] = useState(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [isSavingArtifacts, setIsSavingArtifacts] = useState(false);
+  const [isInlineSummaryVisible, setIsInlineSummaryVisible] = useState(true);
+  const [panelWidths, setPanelWidths] = useState(DEFAULT_PANEL_WIDTHS);
+  const [isPanelResizing, setIsPanelResizing] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaveActionRunning, setIsLeaveActionRunning] = useState(false);
+  const [leaveOptions, setLeaveOptions] = useState({
+    generateSummary: true,
+    downloadReport: false
+  });
+  const panelContainerRef = useRef(null);
+  const panelResizeRef = useRef({
+    dividerIndex: -1,
+    startX: 0,
+    startWidths: DEFAULT_PANEL_WIDTHS
+  });
 
   const pushMeetingNotice = (message, level = 'info') => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -218,6 +235,7 @@ export default function MeetingPage() {
         complianceFlags: payload.summary.complianceFlags || null,
         actionItems: payload.summary.actionItems || null
       });
+      setIsInlineSummaryVisible(true);
     }
 
     const persistedTranscriptions = Array.isArray(payload.transcriptions)
@@ -281,7 +299,7 @@ export default function MeetingPage() {
     const effectiveLeadId = getEffectiveLeadId();
     if (!effectiveLeadId) {
       pushMeetingNotice('Lead context missing. Cannot generate summary.', 'warning');
-      return;
+      return null;
     }
 
     setIsSummaryLoading(true);
@@ -292,19 +310,23 @@ export default function MeetingPage() {
       const data = await res.json();
       if (!res.ok || !data?.success || !data?.data) {
         pushMeetingNotice('Summary generation failed.', 'warning');
-        return;
+        return null;
       }
 
-      setSummaryData({
+      const nextSummary = {
         callSummary: data.data.callSummary || '',
         complianceFlags: data.data.complianceFlags || null,
         actionItems: data.data.actionItems || null
-      });
+      };
+      setSummaryData(nextSummary);
+      setIsInlineSummaryVisible(true);
       addLog('Summary generated and saved to Supabase');
       pushMeetingNotice('Final summary generated.', 'success');
+      return nextSummary;
     } catch (err) {
       console.error('Summary generation failed:', err);
       pushMeetingNotice('Summary generation failed.', 'warning');
+      return null;
     } finally {
       setIsSummaryLoading(false);
     }
@@ -434,6 +456,19 @@ export default function MeetingPage() {
     if (role !== 'admin' || !isJoined) return;
     loadMeetingArtifacts();
   }, [role, isJoined, leadContext?.id, leadIdFromQuery]);
+
+  useEffect(() => {
+    if (!showLeaveConfirm) return undefined;
+    const onEsc = (event) => {
+      if (event.key === 'Escape' && !isLeaveActionRunning) {
+        setShowLeaveConfirm(false);
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [showLeaveConfirm, isLeaveActionRunning]);
 
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
@@ -736,26 +771,62 @@ export default function MeetingPage() {
     }
   };
 
-  const endCall = async () => {
-    if (confirm('Are you sure you want to leave the consultation?')) {
-      const effectiveLeadId = leadContext?.id || leadIdFromQuery || localStorage.getItem('currentLeadId');
-      // 1. Leave Meeting
-      settleManualAIRequest();
-      meetingService.leaveMeeting();
-      
-      // 2. Trigger AI Summary Generation (if admin and lead context exists)
-      if (role === 'admin' && effectiveLeadId) {
-          await generateFinalSummary();
-          // Show Wrap Up
-          setShowWrapUp(true);
-      } else {
-          navigate('/');
+  const leaveMeetingNow = () => {
+    settleManualAIRequest();
+    meetingService.leaveMeeting();
+    navigate('/');
+  };
+
+  const endCall = () => {
+    if (role !== 'admin') {
+      if (confirm('Are you sure you want to leave the consultation?')) {
+        leaveMeetingNow();
       }
+      return;
+    }
+    setLeaveOptions({
+      generateSummary: true,
+      downloadReport: false
+    });
+    setShowLeaveConfirm(true);
+  };
+
+  const confirmLeaveMeeting = async () => {
+    if (isLeaveActionRunning) return;
+    setIsLeaveActionRunning(true);
+
+    let generatedSummary = null;
+    try {
+      if (leaveOptions.generateSummary) {
+        generatedSummary = await generateFinalSummary();
+        if (!generatedSummary?.callSummary) {
+          const proceedWithoutSummary = window.confirm('Summary generation failed. Leave without summary?');
+          if (!proceedWithoutSummary) {
+            return;
+          }
+        }
+      }
+
+      if (leaveOptions.downloadReport) {
+        downloadConversation(generatedSummary || summaryData);
+      }
+
+      setShowLeaveConfirm(false);
+      leaveMeetingNow();
+    } finally {
+      setIsLeaveActionRunning(false);
     }
   };
 
-  const downloadConversation = () => {
-    if (conversationHistory.length === 0) {
+  const downloadConversation = (summaryOverride = null) => {
+    const effectiveSummary = summaryOverride || summaryData;
+    const hasAnyArtifacts = (
+      conversationHistory.length > 0
+      || transcriptions.length > 0
+      || aiSuggestions.length > 0
+      || Boolean(effectiveSummary?.callSummary)
+    );
+    if (!hasAnyArtifacts) {
       alert('No meeting data to download yet!');
       return;
     }
@@ -764,7 +835,7 @@ export default function MeetingPage() {
       generatedAt: new Date().toISOString(),
       meetingId,
       leadId: getEffectiveLeadId(),
-      summary: summaryData,
+      summary: effectiveSummary,
       transcriptions,
       aiResponses: aiSuggestions,
       fullChat: conversationHistory
@@ -809,6 +880,62 @@ export default function MeetingPage() {
       pushMeetingNotice('Failed to download CSV artifacts.', 'warning');
     }
   };
+
+  const startPanelResize = (dividerIndex, event) => {
+    if (!panelContainerRef.current) return;
+    panelResizeRef.current = {
+      dividerIndex,
+      startX: event.clientX,
+      startWidths: [...panelWidths]
+    };
+    setIsPanelResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isPanelResizing) return;
+
+    const onMouseMove = (event) => {
+      const container = panelContainerRef.current;
+      if (!container) return;
+      const width = container.getBoundingClientRect().width;
+      if (width <= 0) return;
+
+      const { dividerIndex, startX, startWidths } = panelResizeRef.current;
+      const deltaPercent = ((event.clientX - startX) / width) * 100;
+      const next = [...startWidths];
+
+      if (dividerIndex === 0) {
+        const leftBase = startWidths[0];
+        const rightBase = startWidths[1];
+        const minDelta = MIN_PANEL_WIDTH_PERCENT - leftBase;
+        const maxDelta = rightBase - MIN_PANEL_WIDTH_PERCENT;
+        const clampedDelta = Math.min(maxDelta, Math.max(minDelta, deltaPercent));
+        next[0] = leftBase + clampedDelta;
+        next[1] = rightBase - clampedDelta;
+      } else if (dividerIndex === 1) {
+        const leftBase = startWidths[1];
+        const rightBase = startWidths[2];
+        const minDelta = MIN_PANEL_WIDTH_PERCENT - leftBase;
+        const maxDelta = rightBase - MIN_PANEL_WIDTH_PERCENT;
+        const clampedDelta = Math.min(maxDelta, Math.max(minDelta, deltaPercent));
+        next[1] = leftBase + clampedDelta;
+        next[2] = rightBase - clampedDelta;
+      }
+
+      setPanelWidths(next);
+    };
+
+    const onMouseUp = () => {
+      setIsPanelResizing(false);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isPanelResizing]);
 
   if (!isJoined) {
     return (
@@ -986,7 +1113,7 @@ export default function MeetingPage() {
 
       {/* Admin Panel - 3 Columns (50% width for more space) */}
       {role === 'admin' && (
-        <div className="w-1/2 bg-gray-900 flex flex-col">
+        <div className="w-full md:w-1/2 bg-gray-900 flex flex-col">
           <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
             
             {/* Tabs */}
@@ -1042,9 +1169,15 @@ export default function MeetingPage() {
             
             {/* Tab Content: AI Assist */}
             {activeTab === 'ai' && (
-              <>
+              <div
+                ref={panelContainerRef}
+                className={`flex flex-1 overflow-hidden ${isPanelResizing ? 'select-none cursor-col-resize' : ''}`}
+              >
                 {/* Column 1: Live Transcription */}
-                <div className="flex-1 border-r border-gray-700 flex flex-col">
+                <div
+                  className="min-w-0 border-r border-gray-700 flex flex-col"
+                  style={{ flex: `0 0 ${panelWidths[0]}%` }}
+                >
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <span>Live Transcription</span>
@@ -1119,8 +1252,17 @@ export default function MeetingPage() {
               </div>
             </div>
 
+            <div
+              className="w-1 bg-gray-700/80 hover:bg-blue-500 cursor-col-resize shrink-0 transition-colors"
+              onMouseDown={(event) => startPanelResize(0, event)}
+              title="Resize panels"
+            />
+
             {/* Column 2: AI Suggestions */}
-            <div className="flex-1 border-r border-gray-700 flex flex-col">
+            <div
+              className="min-w-0 border-r border-gray-700 flex flex-col"
+              style={{ flex: `0 0 ${panelWidths[1]}%` }}
+            >
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <div className="flex items-center">
@@ -1164,9 +1306,18 @@ export default function MeetingPage() {
                 )}
               </div>
             </div>
-          
+
+            <div
+              className="w-1 bg-gray-700/80 hover:bg-blue-500 cursor-col-resize shrink-0 transition-colors"
+              onMouseDown={(event) => startPanelResize(1, event)}
+              title="Resize panels"
+            />
+           
             {/* Column 3: Full Conversation */}
-            <div className="flex-1 flex flex-col">
+            <div
+              className="min-w-0 flex flex-col"
+              style={{ flex: `0 0 ${panelWidths[2]}%` }}
+            >
               <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 space-y-2">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs font-semibold text-white">Full Chat + Final Summary</h3>
@@ -1211,11 +1362,28 @@ export default function MeetingPage() {
                     <Save className="w-3 h-3" />
                     {isSavingArtifacts ? 'Saving...' : 'Save to Supabase'}
                   </button>
+                  {summaryData?.callSummary && (
+                    <button
+                      onClick={() => setIsInlineSummaryVisible(prev => !prev)}
+                      className="px-2 py-1 rounded text-[10px] text-white bg-gray-700 hover:bg-gray-600"
+                    >
+                      {isInlineSummaryVisible ? 'Hide Summary' : 'Show Summary'}
+                    </button>
+                  )}
                 </div>
 
-                {summaryData?.callSummary ? (
+                {summaryData?.callSummary && isInlineSummaryVisible ? (
                   <div className="bg-gray-900/70 border border-gray-700 rounded p-2 space-y-1">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Summary</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Summary</p>
+                      <button
+                        onClick={() => setIsInlineSummaryVisible(false)}
+                        className="text-[10px] text-gray-300 hover:text-white"
+                        title="Hide summary"
+                      >
+                        Close
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-100">{summaryData.callSummary}</p>
                     {Array.isArray(summaryData.actionItems) && summaryData.actionItems.length > 0 && (
                       <div className="text-[10px] text-gray-300">
@@ -1231,7 +1399,11 @@ export default function MeetingPage() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-gray-400">No final summary yet. Generate one during or after the call.</p>
+                  <p className="text-[10px] text-gray-400">
+                    {summaryData?.callSummary
+                      ? 'Summary hidden. Click "Show Summary" to view.'
+                      : 'No final summary yet. Generate one during or after the call.'}
+                  </p>
                 )}
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
@@ -1263,7 +1435,7 @@ export default function MeetingPage() {
                 )}
               </div>
             </div>
-            </>
+            </div>
             )}
 
             {/* Tab Content: Scripts & Tools */}
@@ -1285,6 +1457,61 @@ export default function MeetingPage() {
               addLog(`✅ Wrap-up saved: ${data.disposition}`);
             }}
           />
+          {showLeaveConfirm && (
+            <div
+              className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={(event) => {
+                if (event.target === event.currentTarget && !isLeaveActionRunning) {
+                  setShowLeaveConfirm(false);
+                }
+              }}
+            >
+              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                <h3 className="text-base font-semibold text-white">Leave meeting?</h3>
+                <p className="mt-1 text-sm text-gray-300">
+                  Choose whether to generate details before leaving this call.
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  <label className="flex items-start gap-3 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={leaveOptions.generateSummary}
+                      onChange={(event) => setLeaveOptions(prev => ({ ...prev, generateSummary: event.target.checked }))}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
+                    />
+                    <span>Generate final summary before leaving</span>
+                  </label>
+                  <label className="flex items-start gap-3 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={leaveOptions.downloadReport}
+                      onChange={(event) => setLeaveOptions(prev => ({ ...prev, downloadReport: event.target.checked }))}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
+                    />
+                    <span>Download meeting report (JSON) before leaving</span>
+                  </label>
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowLeaveConfirm(false)}
+                    disabled={isLeaveActionRunning}
+                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:opacity-60"
+                  >
+                    Stay
+                  </button>
+                  <button
+                    onClick={confirmLeaveMeeting}
+                    disabled={isLeaveActionRunning}
+                    className="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {isLeaveActionRunning ? 'Leaving...' : 'Leave Meeting'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
