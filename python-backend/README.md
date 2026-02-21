@@ -39,6 +39,45 @@ This is the migrated Python backend using **FastAPI** and **Supabase**.
 uvicorn app.main:app --reload --port 8000
 ```
 
+## Deploy Backend To Railway
+
+Use this repo's `python-backend` folder as the Railway service root.
+
+1. Create a new Railway project and connect your GitHub repo.
+2. In the Railway service settings:
+   - Set **Root Directory** to `python-backend`
+   - Keep builder as **Nixpacks**
+   - Start command is already defined in `Procfile`/`railway.toml`
+3. Add environment variables in Railway (copy from your local `.env`):
+   - `DATABASE_URL`
+   - `SUPABASE_URL`
+   - `SUPABASE_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GEMINI_API_KEY`
+   - `PINECONE_API_KEY`
+   - `PINECONE_INDEX_NAME`
+   - `MICROSOFT_CLIENT_ID`
+   - `MICROSOFT_TENANT_ID`
+   - `MICROSOFT_CLIENT_SECRET`
+   - `SHAREPOINT_SITE_URL`
+   - `DEEPGRAM_API_KEY`
+   - Meeting/STT tuning vars from `.env.example` as needed
+   - `CORS_ORIGINS` as JSON array including your Vercel domain
+     - Example: `["https://your-frontend.vercel.app","http://localhost:5173"]`
+4. Deploy and wait for status = healthy.
+5. Verify backend:
+   - `https://<your-railway-domain>/health`
+   - `https://<your-railway-domain>/docs`
+
+### Connect Vercel Frontend To Railway Backend
+
+In Vercel project environment variables, set:
+
+- `VITE_API_URL=https://<your-railway-domain>`
+- `VITE_WS_URL=wss://<your-railway-domain>`
+
+Then redeploy frontend. This ensures REST + WebSocket meeting traffic both go to Railway.
+
 ## API Documentation
 
 Once running, visit:
