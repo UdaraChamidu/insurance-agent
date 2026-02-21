@@ -6,7 +6,7 @@ This platform streamlines the entire lifecycle of selling insurance—from the m
 
 ---
 
-## 🔄 How It Works (The User Journey)
+## 🔄 How It Works (The User Journey) 
 
 ### 1. The "Smart" Intake (`/intake`)
 Instead of a generic contact form, clients go through a **dynamic questionnaire**:
