@@ -14,6 +14,9 @@ const LATENCY_SAMPLE_WINDOW = 60;
 const LATENCY_LOG_INTERVAL = 5;
 const MIN_PANEL_WIDTH_PERCENT = 18;
 const DEFAULT_PANEL_WIDTHS = [34, 33, 33];
+const DEFAULT_VIDEO_WIDTH_PERCENT = 58;
+const MIN_VIDEO_WIDTH_PERCENT = 35;
+const MIN_ADMIN_WIDTH_PERCENT = 25;
 
 export default function MeetingPage() {
   const navigate = useNavigate();
@@ -154,17 +157,26 @@ export default function MeetingPage() {
   const [isInlineSummaryVisible, setIsInlineSummaryVisible] = useState(true);
   const [panelWidths, setPanelWidths] = useState(DEFAULT_PANEL_WIDTHS);
   const [isPanelResizing, setIsPanelResizing] = useState(false);
+  const [videoPanelWidth, setVideoPanelWidth] = useState(DEFAULT_VIDEO_WIDTH_PERCENT);
+  const [isMainLayoutResizing, setIsMainLayoutResizing] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  ));
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaveFlowStep, setLeaveFlowStep] = useState('choice');
   const [isLeaveActionRunning, setIsLeaveActionRunning] = useState(false);
-  const [leaveOptions, setLeaveOptions] = useState({
-    generateSummary: true,
-    downloadReport: false
-  });
+  const [isLeaveSummarySaved, setIsLeaveSummarySaved] = useState(false);
+  const [isLeaveSummaryGenerated, setIsLeaveSummaryGenerated] = useState(false);
   const panelContainerRef = useRef(null);
+  const mainLayoutContainerRef = useRef(null);
   const panelResizeRef = useRef({
     dividerIndex: -1,
     startX: 0,
     startWidths: DEFAULT_PANEL_WIDTHS
+  });
+  const mainLayoutResizeRef = useRef({
+    startX: 0,
+    startWidth: DEFAULT_VIDEO_WIDTH_PERCENT
   });
 
   const pushMeetingNotice = (message, level = 'info') => {
@@ -336,11 +348,11 @@ export default function MeetingPage() {
     const effectiveLeadId = getEffectiveLeadId();
     if (!effectiveLeadId) {
       pushMeetingNotice('Lead context missing. Cannot save summary.', 'warning');
-      return;
+      return false;
     }
     if (!summaryData?.callSummary) {
       pushMeetingNotice('Generate summary first.', 'warning');
-      return;
+      return false;
     }
 
     setIsSavingArtifacts(true);
@@ -356,14 +368,16 @@ export default function MeetingPage() {
       });
       if (!res.ok) {
         pushMeetingNotice('Failed to save summary.', 'warning');
-        return;
+        return false;
       }
       await loadMeetingArtifacts();
       addLog('Summary saved to Supabase session record');
       pushMeetingNotice('Summary saved to Supabase.', 'success');
+      return true;
     } catch (err) {
       console.error('Error saving summary:', err);
       pushMeetingNotice('Failed to save summary.', 'warning');
+      return false;
     } finally {
       setIsSavingArtifacts(false);
     }
@@ -458,9 +472,23 @@ export default function MeetingPage() {
   }, [role, isJoined, leadContext?.id, leadIdFromQuery]);
 
   useEffect(() => {
+    const onResize = () => {
+      setIsDesktopLayout(window.innerWidth >= 768);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!showLeaveConfirm) return undefined;
     const onEsc = (event) => {
       if (event.key === 'Escape' && !isLeaveActionRunning) {
+        if (leaveFlowStep === 'summary') {
+          setLeaveFlowStep('choice');
+          return;
+        }
         setShowLeaveConfirm(false);
       }
     };
@@ -468,7 +496,7 @@ export default function MeetingPage() {
     return () => {
       window.removeEventListener('keydown', onEsc);
     };
-  }, [showLeaveConfirm, isLeaveActionRunning]);
+  }, [showLeaveConfirm, isLeaveActionRunning, leaveFlowStep]);
 
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
@@ -784,38 +812,49 @@ export default function MeetingPage() {
       }
       return;
     }
-    setLeaveOptions({
-      generateSummary: true,
-      downloadReport: false
-    });
+    setLeaveFlowStep('choice');
+    setIsLeaveSummaryGenerated(Boolean(summaryData?.callSummary));
+    setIsLeaveSummarySaved(false);
     setShowLeaveConfirm(true);
   };
 
-  const confirmLeaveMeeting = async () => {
+  const openLeaveSummaryStep = async () => {
     if (isLeaveActionRunning) return;
     setIsLeaveActionRunning(true);
-
-    let generatedSummary = null;
     try {
-      if (leaveOptions.generateSummary) {
-        generatedSummary = await generateFinalSummary();
-        if (!generatedSummary?.callSummary) {
-          const proceedWithoutSummary = window.confirm('Summary generation failed. Leave without summary?');
-          if (!proceedWithoutSummary) {
-            return;
-          }
-        }
+      if (!summaryData?.callSummary) {
+        const generated = await generateFinalSummary();
+        setIsLeaveSummaryGenerated(Boolean(generated?.callSummary));
+      } else {
+        setIsLeaveSummaryGenerated(true);
       }
+    } finally {
+      setIsLeaveActionRunning(false);
+      setLeaveFlowStep('summary');
+    }
+  };
 
-      if (leaveOptions.downloadReport) {
-        downloadConversation(generatedSummary || summaryData);
+  const generateLeaveSummary = async () => {
+    if (isLeaveActionRunning) return;
+    setIsLeaveActionRunning(true);
+    try {
+      const generated = await generateFinalSummary();
+      setIsLeaveSummaryGenerated(Boolean(generated?.callSummary));
+      if (!generated?.callSummary) {
+        pushMeetingNotice('Could not generate summary. You can still leave or retry.', 'warning');
       }
-
-      setShowLeaveConfirm(false);
-      leaveMeetingNow();
     } finally {
       setIsLeaveActionRunning(false);
     }
+  };
+
+  const saveLeaveSummaryToSupabase = async () => {
+    if (!summaryData?.callSummary) {
+      pushMeetingNotice('Generate summary first.', 'warning');
+      return;
+    }
+    const saved = await saveSummaryToSupabase();
+    setIsLeaveSummarySaved(Boolean(saved));
   };
 
   const downloadConversation = (summaryOverride = null) => {
@@ -937,6 +976,42 @@ export default function MeetingPage() {
     };
   }, [isPanelResizing]);
 
+  const startMainLayoutResize = (event) => {
+    if (!isDesktopLayout || role !== 'admin') return;
+    if (!mainLayoutContainerRef.current) return;
+    mainLayoutResizeRef.current = {
+      startX: event.clientX,
+      startWidth: videoPanelWidth
+    };
+    setIsMainLayoutResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isMainLayoutResizing) return;
+
+    const onMouseMove = (event) => {
+      const container = mainLayoutContainerRef.current;
+      if (!container) return;
+      const width = container.getBoundingClientRect().width;
+      if (width <= 0) return;
+
+      const deltaPercent = ((event.clientX - mainLayoutResizeRef.current.startX) / width) * 100;
+      const tentative = mainLayoutResizeRef.current.startWidth + deltaPercent;
+      const maxVideo = 100 - MIN_ADMIN_WIDTH_PERCENT;
+      const clamped = Math.min(maxVideo, Math.max(MIN_VIDEO_WIDTH_PERCENT, tentative));
+      setVideoPanelWidth(clamped);
+    };
+
+    const onMouseUp = () => setIsMainLayoutResizing(false);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isMainLayoutResizing]);
+
   if (!isJoined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
@@ -987,9 +1062,15 @@ export default function MeetingPage() {
   }
 
   return (
-    <div className="h-screen bg-black flex flex-col md:flex-row">
+    <div
+      ref={mainLayoutContainerRef}
+      className={`h-screen bg-black flex flex-col md:flex-row ${isMainLayoutResizing ? 'select-none cursor-col-resize' : ''}`}
+    >
       {/* Main Video Area - Full height on mobile, flex-1 on desktop */}
-      <div className={`flex-1 flex flex-col relative ${role === 'admin' ? 'h-[50vh] md:h-full' : 'h-full'}`}>
+      <div
+        className={`flex-1 flex flex-col relative ${role === 'admin' ? 'h-[50vh] md:h-full' : 'h-full'}`}
+        style={role === 'admin' && isDesktopLayout ? { flex: `0 0 ${videoPanelWidth}%` } : undefined}
+      >
         {/* Header - Hidden on small mobile screens if needed, or compact */}
         <header className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3">
           <div className="flex items-center justify-between">
@@ -1111,9 +1192,20 @@ export default function MeetingPage() {
         </div>
       </div>
 
+      {role === 'admin' && isDesktopLayout && (
+        <div
+          className="w-1 bg-gray-700/80 hover:bg-blue-500 cursor-col-resize shrink-0 transition-colors"
+          onMouseDown={startMainLayoutResize}
+          title="Resize meeting and admin areas"
+        />
+      )}
+
       {/* Admin Panel - 3 Columns (50% width for more space) */}
       {role === 'admin' && (
-        <div className="w-full md:w-1/2 bg-gray-900 flex flex-col">
+        <div
+          className="w-full bg-gray-900 flex flex-col"
+          style={isDesktopLayout ? { flex: `0 0 ${100 - videoPanelWidth}%` } : undefined}
+        >
           <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
             
             {/* Tabs */}
@@ -1462,54 +1554,106 @@ export default function MeetingPage() {
               className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
               onClick={(event) => {
                 if (event.target === event.currentTarget && !isLeaveActionRunning) {
+                  if (leaveFlowStep === 'summary') {
+                    setLeaveFlowStep('choice');
+                    return;
+                  }
                   setShowLeaveConfirm(false);
                 }
               }}
             >
-              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
-                <h3 className="text-base font-semibold text-white">Leave meeting?</h3>
-                <p className="mt-1 text-sm text-gray-300">
-                  Choose whether to generate details before leaving this call.
-                </p>
+              {leaveFlowStep === 'choice' ? (
+                <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                  <h3 className="text-base font-semibold text-white">Leave meeting?</h3>
+                  <p className="mt-1 text-sm text-gray-300">
+                    You can leave immediately or review summary/download/save details first.
+                  </p>
 
-                <div className="mt-4 space-y-3">
-                  <label className="flex items-start gap-3 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={leaveOptions.generateSummary}
-                      onChange={(event) => setLeaveOptions(prev => ({ ...prev, generateSummary: event.target.checked }))}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
-                    />
-                    <span>Generate final summary before leaving</span>
-                  </label>
-                  <label className="flex items-start gap-3 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={leaveOptions.downloadReport}
-                      onChange={(event) => setLeaveOptions(prev => ({ ...prev, downloadReport: event.target.checked }))}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
-                    />
-                    <span>Download meeting report (JSON) before leaving</span>
-                  </label>
+                  <div className="mt-5 flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowLeaveConfirm(false)}
+                      className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600"
+                    >
+                      Stay
+                    </button>
+                    <button
+                      onClick={leaveMeetingNow}
+                      className="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                    >
+                      Direct Leave
+                    </button>
+                    <button
+                      onClick={openLeaveSummaryStep}
+                      disabled={isLeaveActionRunning}
+                      className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {isLeaveActionRunning ? 'Loading...' : 'Summary & Leave'}
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <div className="w-full max-w-2xl rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-white">Meeting Details Before Exit</h3>
+                    <button
+                      onClick={() => setLeaveFlowStep('choice')}
+                      className="text-xs text-gray-300 hover:text-white"
+                    >
+                      Back
+                    </button>
+                  </div>
 
-                <div className="mt-5 flex justify-end gap-2">
-                  <button
-                    onClick={() => setShowLeaveConfirm(false)}
-                    disabled={isLeaveActionRunning}
-                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:opacity-60"
-                  >
-                    Stay
-                  </button>
-                  <button
-                    onClick={confirmLeaveMeeting}
-                    disabled={isLeaveActionRunning}
-                    className="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-60"
-                  >
-                    {isLeaveActionRunning ? 'Leaving...' : 'Leave Meeting'}
-                  </button>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-300 md:grid-cols-4">
+                    <div className="rounded border border-gray-700 bg-gray-800/70 p-2">Transcriptions: {transcriptions.length}</div>
+                    <div className="rounded border border-gray-700 bg-gray-800/70 p-2">AI Responses: {aiSuggestions.length}</div>
+                    <div className="rounded border border-gray-700 bg-gray-800/70 p-2">Full Chat: {conversationHistory.length}</div>
+                    <div className="rounded border border-gray-700 bg-gray-800/70 p-2">Summary: {summaryData?.callSummary ? 'Ready' : 'Not ready'}</div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={generateLeaveSummary}
+                      disabled={isLeaveActionRunning}
+                      className="rounded bg-blue-600 px-3 py-2 text-xs text-white hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {isLeaveActionRunning ? 'Working...' : 'Generate / Refresh Summary'}
+                    </button>
+                    <button
+                      onClick={() => downloadConversation(summaryData)}
+                      className="rounded bg-indigo-600 px-3 py-2 text-xs text-white hover:bg-indigo-700"
+                    >
+                      Download All Details (JSON)
+                    </button>
+                    <button
+                      onClick={saveLeaveSummaryToSupabase}
+                      disabled={!summaryData?.callSummary || isSavingArtifacts}
+                      className="rounded bg-emerald-600 px-3 py-2 text-xs text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {isSavingArtifacts ? 'Saving...' : 'Save Summary to Supabase'}
+                    </button>
+                    <button
+                      onClick={leaveMeetingNow}
+                      className="rounded bg-red-600 px-3 py-2 text-xs text-white hover:bg-red-700"
+                    >
+                      Leave Meeting
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-[11px] text-gray-400">
+                    Note: Live transcription, AI responses, and full chat are persisted during the meeting. Saving summary stores wrap-up fields to Supabase.
+                  </p>
+                  {isLeaveSummaryGenerated && (
+                    <p className="mt-1 text-[11px] text-green-300">Summary generated for this meeting.</p>
+                  )}
+                  {isLeaveSummarySaved && (
+                    <p className="mt-1 text-[11px] text-emerald-300">Summary saved to Supabase.</p>
+                  )}
+
+                  <div className="mt-3 max-h-32 overflow-y-auto rounded border border-gray-700 bg-gray-800/70 p-2 text-xs text-gray-100">
+                    {summaryData?.callSummary || 'No summary available yet.'}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
