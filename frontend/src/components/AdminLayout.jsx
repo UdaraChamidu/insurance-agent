@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -49,9 +49,13 @@ export default function AdminLayout() {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-white/10">
-          <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <Link
+            to="/"
+            className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
+            title="Go to public homepage"
+          >
             Elite Deal Broker
-          </span>
+          </Link>
           <button 
             className="ml-auto lg:hidden"
             onClick={() => setSidebarOpen(false)}

@@ -2,6 +2,7 @@ from app.core.config import settings
 import google.generativeai as genai
 from app.core.database import SessionLocal
 from app.models import Session as DbSession, Transcript
+from app.services.llm.usage_tracker import gemini_usage_tracker
 import json
 
 # Configure Gemini
@@ -50,6 +51,11 @@ class SummaryService:
 
             model = genai.GenerativeModel(self.model_name)
             response = await model.generate_content_async(prompt)
+            gemini_usage_tracker.record_response(
+                operation="call_summary",
+                response_payload=response,
+                request_text=prompt,
+            )
             
             try:
                 # Clean code fences if present
@@ -73,6 +79,7 @@ class SummaryService:
                 return None
 
         except Exception as e:
+            gemini_usage_tracker.record_error("call_summary", e)
             print(f"Error generating call summary: {e}")
             return None
         finally:

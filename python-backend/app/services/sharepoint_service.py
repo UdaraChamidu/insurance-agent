@@ -1,5 +1,6 @@
 import requests
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from app.core.config import settings
@@ -12,6 +13,9 @@ class SharePointService:
         self.site_url = settings.SHAREPOINT_SITE_URL
         self.kb_dev_id = "KB-DEV" # Hardcoded default or env
         self.kb_prod_id = "KB-PROD"
+        self.connect_timeout_sec = self._read_positive_float_env("SHAREPOINT_CONNECT_TIMEOUT_SEC", 5.0)
+        self.read_timeout_sec = self._read_positive_float_env("SHAREPOINT_READ_TIMEOUT_SEC", 20.0)
+        self.download_read_timeout_sec = self._read_positive_float_env("SHAREPOINT_DOWNLOAD_READ_TIMEOUT_SEC", 60.0)
         
         # Folder mapping to regulatory universes
         self.folders = [
@@ -23,6 +27,36 @@ class SharePointService:
             { "name": "05_FL_Medicaid_Agency", "universe": "fl-medicaid-agency" },
             { "name": "06_Carrier_FMO_Policies", "universe": "carrier-fmo-policies" }
         ]
+
+    def _read_positive_float_env(self, key: str, default: float) -> float:
+        raw_value = os.getenv(key, "").strip()
+        if not raw_value:
+            return default
+        try:
+            parsed = float(raw_value)
+            if parsed <= 0:
+                return default
+            return parsed
+        except ValueError:
+            return default
+
+    def _timeout_tuple(self, read_timeout: Optional[float] = None) -> tuple[float, float]:
+        effective_read_timeout = self.read_timeout_sec if read_timeout is None else read_timeout
+        return (self.connect_timeout_sec, max(effective_read_timeout, 0.1))
+
+    def _request_get(
+        self,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        read_timeout: Optional[float] = None,
+    ):
+        return requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=self._timeout_tuple(read_timeout),
+        )
 
     def _get_headers(self) -> Dict[str, str]:
         token = microsoft_auth.get_access_token()
@@ -50,7 +84,7 @@ class SharePointService:
             url = f"https://graph.microsoft.com/v1.0/sites/root:{site_path}"
             logger.info(f"Connecting to SharePoint site: {url}")
             
-            response = requests.get(url, headers=headers)
+            response = self._request_get(url, headers=headers)
             response.raise_for_status()
             site = response.json()
             
@@ -70,7 +104,7 @@ class SharePointService:
             headers = self._get_headers()
             url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
             
-            response = requests.get(url, headers=headers)
+            response = self._request_get(url, headers=headers)
             response.raise_for_status()
             drives = response.json().get("value", [])
             
@@ -99,7 +133,7 @@ class SharePointService:
                 "$select": "id,name,folder,size,lastModifiedDateTime"
             }
             
-            response = requests.get(url, headers=headers, params=params)
+            response = self._request_get(url, headers=headers, params=params)
             response.raise_for_status()
             items = response.json().get("value", [])
             
@@ -125,7 +159,7 @@ class SharePointService:
                 "$expand": "listItem($expand=fields)"
             }
             
-            response = requests.get(url, headers=headers, params=params)
+            response = self._request_get(url, headers=headers, params=params)
             response.raise_for_status()
             items = response.json().get("value", [])
             
@@ -185,7 +219,10 @@ class SharePointService:
             if download_url:
                 for attempt in range(retries):
                     try:
-                        response = requests.get(download_url)
+                        response = self._request_get(
+                            download_url,
+                            read_timeout=self.download_read_timeout_sec,
+                        )
                         if response.status_code == 200:
                             return response.content
                         elif response.status_code == 503:
@@ -202,7 +239,11 @@ class SharePointService:
                 url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}/content"
                 for attempt in range(retries):
                     try:
-                        response = requests.get(url, headers=headers)
+                        response = self._request_get(
+                            url,
+                            headers=headers,
+                            read_timeout=self.download_read_timeout_sec,
+                        )
                         if response.status_code == 503:
                             logger.warning(f"Graph API 503 (Attempt {attempt+1}/{retries}). Retrying...")
                             time.sleep(2 * (attempt + 1))

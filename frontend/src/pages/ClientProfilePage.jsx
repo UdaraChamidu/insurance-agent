@@ -33,8 +33,15 @@ export default function ClientProfilePage() {
   const [session, setSession] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [transcripts, setTranscripts] = useState([]);
+  const [meetingArtifacts, setMeetingArtifacts] = useState({
+    transcriptions: [],
+    aiResponses: [],
+    fullChat: [],
+    summary: null,
+  });
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
@@ -45,15 +52,47 @@ export default function ClientProfilePage() {
 
   const fetchClientData = async () => {
     setLoading(true);
+    setError('');
     try {
       // Fetch lead
       const leadRes = await fetch(`${API_URL}/api/leads/${leadId}`);
-      if (leadRes.ok) {
-        const leadData = await leadRes.json();
-        setLead(leadData);
-        setNotes(leadData.session?.notes || '');
-        setSession(leadData.session || null);
-        setTranscripts(leadData.session?.transcripts || []);
+      if (!leadRes.ok) {
+        const detail = await leadRes.text();
+        throw new Error(detail || `Failed to load lead (${leadRes.status})`);
+      }
+      const leadData = await leadRes.json();
+      setLead(leadData);
+      setNotes(leadData.session?.notes || '');
+      setSession(leadData.session || null);
+
+      const embeddedArtifacts = leadData.meetingArtifacts || {};
+      const embeddedTranscripts = Array.isArray(embeddedArtifacts.fullChat) ? embeddedArtifacts.fullChat : [];
+      setTranscripts(embeddedTranscripts);
+      setMeetingArtifacts({
+        transcriptions: Array.isArray(embeddedArtifacts.transcriptions) ? embeddedArtifacts.transcriptions : [],
+        aiResponses: Array.isArray(embeddedArtifacts.aiResponses) ? embeddedArtifacts.aiResponses : [],
+        fullChat: embeddedTranscripts,
+        summary: embeddedArtifacts.summary || null,
+      });
+
+      // Refresh artifacts from dedicated endpoint (latest persisted view)
+      try {
+        const artifactsRes = await fetch(`${API_URL}/api/leads/${leadId}/meeting-artifacts`);
+        if (artifactsRes.ok) {
+          const artifactsData = await artifactsRes.json();
+          if (artifactsData?.success) {
+            const fullChat = Array.isArray(artifactsData.fullChat) ? artifactsData.fullChat : [];
+            setTranscripts(fullChat);
+            setMeetingArtifacts({
+              transcriptions: Array.isArray(artifactsData.transcriptions) ? artifactsData.transcriptions : [],
+              aiResponses: Array.isArray(artifactsData.aiResponses) ? artifactsData.aiResponses : [],
+              fullChat,
+              summary: artifactsData.summary || null,
+            });
+          }
+        }
+      } catch (artifactsErr) {
+        console.error('Error loading meeting artifacts:', artifactsErr);
       }
 
       // Fetch appointments for this lead
@@ -76,6 +115,7 @@ export default function ClientProfilePage() {
 
     } catch (err) {
       console.error('Error fetching client data:', err);
+      setError(err.message || 'Failed to load client profile.');
     } finally {
       setLoading(false);
     }
@@ -83,14 +123,18 @@ export default function ClientProfilePage() {
 
   const handleUpdatePipeline = async (newStatus) => {
     try {
-      await fetch(`${API_URL}/api/leads/${leadId}`, {
+      const response = await fetch(`${API_URL}/api/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipelineStatus: newStatus }),
       });
+      if (!response.ok) {
+        throw new Error(`Failed to update pipeline (${response.status})`);
+      }
       setLead(prev => ({ ...prev, pipelineStatus: newStatus }));
     } catch (err) {
       console.error('Failed to update pipeline status:', err);
+      setError(err.message || 'Failed to update pipeline status.');
     }
   };
 
@@ -98,16 +142,28 @@ export default function ClientProfilePage() {
     try {
       // Notes are on the session
       if (session) {
-        await fetch(`${API_URL}/api/leads/${leadId}/session`, {
+        const response = await fetch(`${API_URL}/api/leads/${leadId}/session`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes }),
         });
+        if (!response.ok) {
+          throw new Error(`Failed to save notes (${response.status})`);
+        }
+        const data = await response.json();
+        if (data?.session) {
+          setSession(data.session);
+        }
       }
       setEditingNotes(false);
     } catch (err) {
       console.error('Failed to save notes:', err);
+      setError(err.message || 'Failed to save notes.');
     }
+  };
+
+  const handleDownload = (docId) => {
+    window.open(`${API_URL}/api/client-docs/download/${docId}`, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -139,7 +195,7 @@ export default function ClientProfilePage() {
     { key: 'overview', label: 'Overview' },
     { key: 'appointments', label: `Appointments (${appointments.length})` },
     { key: 'documents', label: `Documents (${documents.length})` },
-    { key: 'transcripts', label: `Transcripts (${transcripts.length})` },
+    { key: 'transcripts', label: `Meeting AI (${transcripts.length})` },
     { key: 'notes', label: 'AI Notes' },
   ];
 
@@ -238,6 +294,12 @@ export default function ClientProfilePage() {
       </div>
 
       {/* Tab Content */}
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
       {activeTab === 'overview' && (
         <div className="grid md:grid-cols-2 gap-6">
           {/* Details Card */}
@@ -363,30 +425,31 @@ export default function ClientProfilePage() {
 
       {activeTab === 'transcripts' && (
         <div className="space-y-3">
-          {transcripts.length === 0 ? (
-            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
-              <MessageSquare className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No transcripts for this client.</p>
-            </div>
-          ) : (
-            transcripts.map(t => (
-              <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    t.role === 'agent' ? 'bg-blue-500/10 text-blue-400' :
-                    t.role === 'ai' ? 'bg-purple-500/10 text-purple-400' :
-                    'bg-gray-500/10 text-gray-400'
-                  }`}>
-                    {t.role}
-                  </span>
-                  <span className="text-xs text-gray-600">
-                    {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : ''}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300 whitespace-pre-wrap">{t.content}</p>
-              </div>
-            ))
-          )}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-white mb-2">Final Summary</h4>
+            <p className="text-sm text-gray-300 whitespace-pre-wrap">
+              {meetingArtifacts.summary?.callSummary || 'No summary saved yet.'}
+            </p>
+          </div>
+
+          <ArtifactSection
+            title="Client Transcriptions"
+            icon={MessageSquare}
+            items={meetingArtifacts.transcriptions}
+            emptyText="No client transcriptions."
+          />
+          <ArtifactSection
+            title="AI Responses"
+            icon={Shield}
+            items={meetingArtifacts.aiResponses}
+            emptyText="No AI responses."
+          />
+          <ArtifactSection
+            title="Full Chat"
+            icon={FileText}
+            items={meetingArtifacts.fullChat}
+            emptyText="No full chat entries."
+          />
         </div>
       )}
 
@@ -448,6 +511,37 @@ function InfoRow({ label, value }) {
     <div className="flex items-start justify-between">
       <span className="text-xs text-gray-500">{label}</span>
       <span className="text-sm text-white text-right">{value}</span>
+    </div>
+  );
+}
+
+function ArtifactSection({ title, icon: Icon, items, emptyText }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className="w-4 h-4 text-blue-400" />
+        <h4 className="text-sm font-semibold text-white">{title}</h4>
+      </div>
+
+      {!Array.isArray(items) || items.length === 0 ? (
+        <p className="text-sm text-gray-500">{emptyText}</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {items.map((item, idx) => {
+            const role = item.role || (item.type === 'ai' ? 'ai' : item.type || 'customer');
+            const content = item.content || item.text || '';
+            return (
+              <div key={item.id || `${title}-${idx}`} className="rounded-lg border border-white/10 bg-black/20 p-2.5">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-gray-400">
+                  <span className="uppercase">{role}</span>
+                  <span>{item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}</span>
+                </div>
+                <p className="text-sm text-gray-200 whitespace-pre-wrap">{content}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

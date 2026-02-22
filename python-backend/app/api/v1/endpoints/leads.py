@@ -3,15 +3,114 @@ import csv
 import io
 import json
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
 from app.models import Lead, Session as DbSession, Transcript
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
 from app.services.integrations.ghl import ghl_service
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class LeadPipelineUpdate(BaseModel):
+    pipelineStatus: str
+
+
+class LeadSessionPatch(BaseModel):
+    notes: Optional[str] = None
+    status: Optional[str] = None
+    disposition: Optional[str] = None
+    callSummary: Optional[str] = None
+    complianceFlags: Optional[Dict[str, Any]] = None
+    actionItems: Optional[Any] = None
+
+
+def _ensure_session_for_lead(db: Session, lead_id: str) -> DbSession | None:
+    session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+    if session:
+        return session
+
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        return None
+
+    session = DbSession(
+        id=str(uuid.uuid4()),
+        leadId=lead_id,
+        status="new",
+        createdAt=datetime.utcnow(),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def _serialize_transcript(row: Transcript) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "role": row.role,
+        "content": row.content,
+        "timestamp": row.timestamp.isoformat() if row.timestamp else None,
+        "createdAt": row.createdAt.isoformat() if row.createdAt else None,
+    }
+
+
+def _serialize_session(session: DbSession, include_transcripts: bool = False) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "id": session.id,
+        "leadId": session.leadId,
+        "status": session.status,
+        "startTime": session.startTime,
+        "endTime": session.endTime,
+        "disposition": session.disposition,
+        "notes": session.notes,
+        "planName": session.planName,
+        "premium": session.premium,
+        "ghlContactId": session.ghlContactId,
+        "callSummary": session.callSummary,
+        "recordingLink": session.recordingLink,
+        "transcriptLink": session.transcriptLink,
+        "citationsBundleLink": session.citationsBundleLink,
+        "complianceFlags": session.complianceFlags,
+        "actionItems": session.actionItems,
+        "createdAt": session.createdAt,
+        "updatedAt": session.updatedAt,
+    }
+
+    if include_transcripts:
+        transcript_rows = (
+            session.transcripts
+            if isinstance(session.transcripts, list)
+            else []
+        )
+        payload["transcripts"] = [_serialize_transcript(row) for row in transcript_rows]
+
+    return payload
+
+
+def _serialize_lead(lead: Lead) -> Dict[str, Any]:
+    return {
+        "id": lead.id,
+        "createdAt": lead.createdAt,
+        "updatedAt": lead.updatedAt,
+        "productType": lead.productType,
+        "state": lead.state,
+        "triggers": lead.triggers,
+        "firstName": lead.firstName,
+        "lastName": lead.lastName,
+        "email": lead.email,
+        "phone": lead.phone,
+        "utmSource": lead.utmSource,
+        "utmMedium": lead.utmMedium,
+        "utmCampaign": lead.utmCampaign,
+        "utmTerm": lead.utmTerm,
+        "utmContent": lead.utmContent,
+        "pipelineStatus": lead.pipelineStatus or "new",
+    }
+
 
 # Background Task Functions
 async def sync_lead_to_ghl(lead_id: str):
@@ -176,19 +275,17 @@ async def get_leads(
     Retrieve all leads (with latest session status)
     """
     try:
-        # data = db.query(Lead).offset(skip).limit(limit).all()
-        # Better: Join with Session to get status
-        results = (
-            db.query(Lead, DbSession)
-            .outerjoin(DbSession, Lead.id == DbSession.leadId)
-            .order_by(DbSession.createdAt.desc()) # Newest first
+        leads = (
+            db.query(Lead)
+            .order_by(Lead.createdAt.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
         
         leads_list = []
-        for lead, session in results:
+        for lead in leads:
+            session = lead.session
             leads_list.append({
                 "id": lead.id,
                 "firstName": lead.firstName,
@@ -198,7 +295,7 @@ async def get_leads(
                 "productType": lead.productType,
                 "state": lead.state,
                 "pipelineStatus": lead.pipelineStatus or "new",
-                "createdAt": session.createdAt if session else None,
+                "createdAt": lead.createdAt,
                 # Session lifecycle status (new, completed, etc.) kept for compatibility.
                 "status": session.status if session else "new",
                 "disposition": session.disposition if session else None
@@ -219,39 +316,149 @@ async def get_lead_session(
     Retrieve lead session context
     """
     try:
-        # Fetch Session with Lead relation
-        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
-        
-        if not session:
-             raise HTTPException(status_code=404, detail="Lead session not found")
-            
-        lead = session.lead
-        
-        # Flatten structure for frontend compatibility
-        flat_response = {
-            "id": session.leadId,
-            "startTime": session.startTime,
-            "status": session.status,
-            "ghlContactId": session.ghlContactId,
-            "callSummary": session.callSummary,
-            "complianceFlags": session.complianceFlags,
-            "actionItems": session.actionItems,
-            # Merge lead fields
-            "productType": lead.productType,
-            "state": lead.state,
-            "firstName": lead.firstName,
-            "lastName": lead.lastName,
-            "email": lead.email,
-            "phone": lead.phone
-        }
-        
-        return flat_response
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        session = _ensure_session_for_lead(db, lead_id)
+
+        transcript_rows: List[Transcript] = []
+        if session:
+            transcript_rows = (
+                db.query(Transcript)
+                .filter(Transcript.sessionId == session.id)
+                .order_by(Transcript.timestamp.asc())
+                .all()
+            )
+
+        transcriptions = []
+        ai_responses = []
+        full_chat = []
+        for row in transcript_rows:
+            item = _serialize_transcript(row)
+            if row.role == "customer":
+                transcriptions.append(item)
+            elif row.role == "ai":
+                ai_responses.append(item)
+            full_chat.append(item)
+
+        response = _serialize_lead(lead)
+        response.update({
+            # Flattened fields for existing frontend compatibility
+            "startTime": session.startTime if session else None,
+            "status": session.status if session else "new",
+            "ghlContactId": session.ghlContactId if session else None,
+            "callSummary": session.callSummary if session else None,
+            "complianceFlags": session.complianceFlags if session else None,
+            "actionItems": session.actionItems if session else None,
+            # Rich nested session payload for profile page
+            "session": _serialize_session(session, include_transcripts=False) if session else None,
+            # Persisted meeting artifacts to show in client profile
+            "meetingArtifacts": {
+                "sessionId": session.id if session else None,
+                "transcriptions": transcriptions,
+                "aiResponses": ai_responses,
+                "fullChat": full_chat,
+                "summary": {
+                    "callSummary": session.callSummary if session else None,
+                    "complianceFlags": session.complianceFlags if session else None,
+                    "actionItems": session.actionItems if session else None,
+                },
+            }
+        })
+
+        if response.get("session") is not None:
+            response["session"]["transcripts"] = full_chat
+
+        return response
         
     except HTTPException:
         raise
     except Exception as e:
          print(f"Error fetching lead: {str(e)}")
          raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{lead_id}", response_model=Dict[str, Any])
+async def update_lead_pipeline_status(
+    lead_id: str,
+    update: LeadPipelineUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    Update lead pipeline status (new, appointment_booked, quoted, enrolled, lost)
+    """
+    try:
+        allowed = {"new", "appointment_booked", "quoted", "enrolled", "lost"}
+        next_status = (update.pipelineStatus or "").strip().lower()
+        if next_status not in allowed:
+            raise HTTPException(status_code=400, detail="Invalid pipeline status")
+
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        lead.pipelineStatus = next_status
+        db.commit()
+        db.refresh(lead)
+
+        return {
+            "success": True,
+            "lead": {
+                "id": lead.id,
+                "pipelineStatus": lead.pipelineStatus or "new",
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating lead pipeline status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{lead_id}/session", response_model=Dict[str, Any])
+async def update_lead_session(
+    lead_id: str,
+    update: LeadSessionPatch,
+    db: Session = Depends(get_db),
+):
+    """
+    Patch lead session fields (notes/status/disposition/summary metadata).
+    Auto-creates a session for valid leads when missing.
+    """
+    try:
+        session = _ensure_session_for_lead(db, lead_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        if update.notes is not None:
+            session.notes = update.notes
+        if update.status is not None:
+            session.status = update.status
+        if update.disposition is not None:
+            session.disposition = update.disposition
+            if update.disposition:
+                session.endTime = session.endTime or datetime.utcnow()
+        if update.callSummary is not None:
+            session.callSummary = update.callSummary
+        if update.complianceFlags is not None:
+            session.complianceFlags = update.complianceFlags
+        if update.actionItems is not None:
+            session.actionItems = update.actionItems
+
+        db.commit()
+        db.refresh(session)
+        return {
+            "success": True,
+            "session": _serialize_session(session, include_transcripts=False),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating lead session: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{lead_id}/wrapup", response_model=Dict[str, Any])
 async def lead_wrapup(
@@ -264,9 +471,9 @@ async def lead_wrapup(
     Submit post-call disposition and notes
     """
     try:
-        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        session = _ensure_session_for_lead(db, lead_id)
         if not session:
-             raise HTTPException(status_code=404, detail="Session not found")
+             raise HTTPException(status_code=404, detail="Lead not found")
         
         # Update fields
         if update_in.disposition:
@@ -313,10 +520,10 @@ async def generate_summary(
     Trigger AI summarization for the session
     """
     try:
-        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        session = _ensure_session_for_lead(db, lead_id)
         if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-            
+            raise HTTPException(status_code=404, detail="Lead not found")
+             
         from app.services.meeting.summary_service import summary_service
         result = await summary_service.generate_call_summary(session.id)
         
@@ -342,9 +549,9 @@ async def get_meeting_artifacts(
     - latest summary/compliance/action items
     """
     try:
-        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        session = _ensure_session_for_lead(db, lead_id)
         if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+            raise HTTPException(status_code=404, detail="Lead not found")
 
         transcript_rows = (
             db.query(Transcript)
@@ -405,9 +612,9 @@ async def download_meeting_artifacts_csv(
     summary + compliance + full chat timeline.
     """
     try:
-        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+        session = _ensure_session_for_lead(db, lead_id)
         if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+            raise HTTPException(status_code=404, detail="Lead not found")
 
         transcript_rows = (
             db.query(Transcript)

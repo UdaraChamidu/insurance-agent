@@ -1,5 +1,44 @@
 // Frontend service for Custom Scheduling API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const REQUEST_TIMEOUT_MS = 20000;
+const REQUEST_MAX_RETRIES = 1;
+const REQUEST_RETRY_BASE_MS = 700;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchJsonWithRetry(url, options = {}) {
+  for (let attempt = 0; attempt <= REQUEST_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      if (!response.ok) {
+        if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < REQUEST_MAX_RETRIES) {
+          await sleep(REQUEST_RETRY_BASE_MS * (attempt + 1));
+          continue;
+        }
+        const detail = await response.text();
+        throw new Error(detail || `Request failed (${response.status})`);
+      }
+      return await response.json();
+    } catch (error) {
+      const isAbort = error?.name === 'AbortError';
+      const isNetwork = error instanceof TypeError;
+      if ((isAbort || isNetwork) && attempt < REQUEST_MAX_RETRIES) {
+        await sleep(REQUEST_RETRY_BASE_MS * (attempt + 1));
+        continue;
+      }
+      if (isAbort) {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw new Error('Request failed after retries');
+}
 
 class BookingsService {
   /**
@@ -7,11 +46,9 @@ class BookingsService {
    */
   async getAvailability(from, to) {
     try {
-      const response = await fetch(
+      return await fetchJsonWithRetry(
         `${API_URL}/api/scheduling/availability?from=${from}&to=${to}`
       );
-      if (!response.ok) throw new Error('Failed to fetch availability');
-      return await response.json();
     } catch (error) {
       console.error('Error fetching availability:', error);
       throw error;
@@ -50,21 +87,10 @@ class BookingsService {
       if (filters.to) queryParams.append('to', filters.to);
       if (filters.limit) queryParams.append('limit', filters.limit);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      try {
-        const response = await fetch(
-          `${API_URL}/api/scheduling/appointments?${queryParams}`,
-          { signal: controller.signal }
-        );
-        if (!response.ok) throw new Error('Failed to fetch appointments');
-        return await response.json();
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      return await fetchJsonWithRetry(
+        `${API_URL}/api/scheduling/appointments?${queryParams}`
+      );
     } catch (error) {
-      if (error.name === 'AbortError') throw new Error('Request timed out');
       console.error('Error fetching appointments:', error);
       throw error;
     }
@@ -75,9 +101,7 @@ class BookingsService {
    */
   async getAppointmentById(id) {
     try {
-      const response = await fetch(`${API_URL}/api/scheduling/appointments/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch appointment');
-      return await response.json();
+      return await fetchJsonWithRetry(`${API_URL}/api/scheduling/appointments/${id}`);
     } catch (error) {
       console.error('Error fetching appointment:', error);
       throw error;
@@ -123,9 +147,7 @@ class BookingsService {
    */
   async getAvailabilitySettings() {
     try {
-      const response = await fetch(`${API_URL}/api/scheduling/settings`);
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      return await response.json();
+      return await fetchJsonWithRetry(`${API_URL}/api/scheduling/settings`);
     } catch (error) {
       console.error('Error fetching settings:', error);
       throw error;

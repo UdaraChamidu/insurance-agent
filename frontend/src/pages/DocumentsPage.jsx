@@ -8,6 +8,46 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const REFRESH_INTERVAL = 30000; // 30 seconds
+const REQUEST_TIMEOUT_MS = 20000;
+const REQUEST_MAX_RETRIES = 1;
+const REQUEST_RETRY_BASE_MS = 900;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchJsonWithRetry(url, options = {}) {
+  for (let attempt = 0; attempt <= REQUEST_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      if (!response.ok) {
+        if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < REQUEST_MAX_RETRIES) {
+          await sleep(REQUEST_RETRY_BASE_MS * (attempt + 1));
+          continue;
+        }
+        const detail = await response.text();
+        throw new Error(detail || `Request failed (${response.status})`);
+      }
+      return await response.json();
+    } catch (err) {
+      const isAbort = err?.name === 'AbortError';
+      const isNetwork = err instanceof TypeError;
+      if ((isAbort || isNetwork) && attempt < REQUEST_MAX_RETRIES) {
+        await sleep(REQUEST_RETRY_BASE_MS * (attempt + 1));
+        continue;
+      }
+      if (isAbort) {
+        throw new Error('Request timed out');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw new Error('Request failed after retries');
+}
 
 export default function DocumentsPage() {
   const navigate = useNavigate();
@@ -24,20 +64,12 @@ export default function DocumentsPage() {
   // Fetch stats and files
   const fetchData = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     try {
-      const [statsRes, filesRes] = await Promise.all([
-        fetch(`${API_URL}/api/documents/stats`, { signal: controller.signal }),
-        fetch(`${API_URL}/api/documents/files`, { signal: controller.signal })
+      const [statsData, filesData] = await Promise.all([
+        fetchJsonWithRetry(`${API_URL}/api/documents/stats`),
+        fetchJsonWithRetry(`${API_URL}/api/documents/files`)
       ]);
-
-      if (!statsRes.ok || !filesRes.ok) throw new Error('Failed to fetch data');
-
-      const statsData = await statsRes.json();
-      const filesData = await filesRes.json();
 
       // Detect new files for notification
       const newCount = filesData.files?.length || 0;
@@ -52,13 +84,8 @@ export default function DocumentsPage() {
       setFiles(filesData.files || []);
       setError(null);
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Request timed out. Backend might be down.');
-      } else {
-        setError(err.message);
-      }
+      setError(err.message || 'Failed to fetch data');
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
       setRefreshing(false);
     }

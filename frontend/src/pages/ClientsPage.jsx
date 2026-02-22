@@ -8,15 +8,18 @@ export default function ClientsPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
 
   const fetchClients = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await leadsService.getLeads();
       setClients(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
       setClients([]);
+      setError(error.message || 'Failed to fetch clients');
     } finally {
       setLoading(false);
     }
@@ -76,6 +79,12 @@ export default function ClientsPage() {
           className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
         />
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20">

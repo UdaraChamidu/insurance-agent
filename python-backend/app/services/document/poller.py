@@ -13,6 +13,7 @@ class DocumentPoller:
     def __init__(self):
         self.is_running = False
         self._task = None
+        self.processing_stale_minutes = 20
 
     async def start(self):
         if self.is_running:
@@ -64,7 +65,11 @@ class DocumentPoller:
             
             try:
                 # 1. List files in folder
-                files = sharepoint_service.list_documents_in_folder(folder_name)
+                # SharePoint calls are sync/requests-based; run them in a worker thread.
+                files = await asyncio.to_thread(
+                    sharepoint_service.list_documents_in_folder,
+                    folder_name,
+                )
                 
                 for file in files:
                     await self._process_file_if_needed(file, folder_name, namespace)
@@ -75,6 +80,21 @@ class DocumentPoller:
         # Update check count
         ingestion_service.state["totalChecks"] = ingestion_service.state.get("totalChecks", 0) + 1
         ingestion_service._save_state()
+
+    def _is_processing_stale(self, processed_at: str | None) -> bool:
+        if not processed_at:
+            return True
+        try:
+            normalized = str(processed_at).replace("Z", "+00:00")
+            started_at = datetime.fromisoformat(normalized)
+        except Exception:
+            return True
+
+        now = datetime.utcnow()
+        if started_at.tzinfo is not None:
+            now = datetime.now(started_at.tzinfo)
+
+        return (now - started_at) > timedelta(minutes=self.processing_stale_minutes)
 
     async def _process_file_if_needed(self, file_info: dict, folder_name: str, namespace: str):
         file_id = file_info["id"]
@@ -100,6 +120,9 @@ class DocumentPoller:
             elif existing.get("status") == "error":
                 logger.info(f"Retrying failed file: {file_name}")
                 should_process = True
+            elif existing.get("status") == "processing" and self._is_processing_stale(existing.get("processedAt")):
+                logger.warning(f"Stale processing state detected for {file_name}; retrying ingestion")
+                should_process = True
         
         if should_process:
             try:
@@ -117,10 +140,12 @@ class DocumentPoller:
 
                 # 1. Download
                 logger.info(f"Downloading {file_name}...")
-                content = sharepoint_service.download_document(
-                    file_info.get("downloadUrl"), 
-                    file_info.get("driveId"), 
-                    file_id
+                # Download uses blocking requests; keep event loop responsive via to_thread.
+                content = await asyncio.to_thread(
+                    sharepoint_service.download_document,
+                    file_info.get("downloadUrl"),
+                    file_info.get("driveId"),
+                    file_id,
                 )
                 
                 # 2. Ingest

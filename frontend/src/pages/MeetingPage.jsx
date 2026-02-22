@@ -1102,7 +1102,7 @@ export default function MeetingPage() {
   return (
     <div
       ref={mainLayoutContainerRef}
-      className={`h-screen bg-black flex flex-col md:flex-row ${isMainLayoutResizing ? 'select-none cursor-col-resize' : ''}`}
+      className={`min-h-[100dvh] bg-black flex flex-col md:flex-row ${isMainLayoutResizing ? 'select-none cursor-col-resize' : ''}`}
     >
       {/* Main Video Area - Full height on mobile, flex-1 on desktop */}
       <div
@@ -1142,7 +1142,7 @@ export default function MeetingPage() {
           )}
 
           {/* Local Video - PiP */}
-          <div className="absolute bottom-20 right-4 w-32 h-24 md:bottom-24 md:right-6 md:w-64 md:h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700 z-10">
+          <div className="absolute bottom-24 right-3 w-24 h-16 sm:w-28 sm:h-20 md:bottom-24 md:right-6 md:w-64 md:h-48 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700 z-10">
             <video
               ref={localVideoRef}
               autoPlay
@@ -1153,7 +1153,7 @@ export default function MeetingPage() {
           </div>
 
           {meetingNotices.length > 0 && (
-            <div className="absolute top-16 right-4 z-20 space-y-2 max-w-xs">
+            <div className="absolute top-16 right-2 left-2 md:left-auto md:right-4 z-20 space-y-2 max-w-[calc(100%-1rem)] md:max-w-xs">
               {meetingNotices.map((notice) => (
                 <div
                   key={notice.id}
@@ -1171,21 +1171,21 @@ export default function MeetingPage() {
 
           {/* Controls - Floating Bar */}
           <div className="absolute bottom-6 left-0 right-0 flex justify-center z-20 pointer-events-none">
-            <div className="flex items-center space-x-4 bg-black/50 backdrop-blur-sm px-6 py-2 rounded-full pointer-events-auto">
+            <div className="flex items-center space-x-2 md:space-x-4 bg-black/50 backdrop-blur-sm px-3 md:px-6 py-2 rounded-full pointer-events-auto">
               <button
                 onClick={toggleMute}
-                className={`p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                className={`p-3 md:p-4 rounded-full ${isMuted ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
-                {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
+                {isMuted ? <MicOff className="h-5 w-5 md:h-6 md:w-6 text-white" /> : <Mic className="h-5 w-5 md:h-6 md:w-6 text-white" />}
               </button>
               
               <button
                 onClick={toggleVideo}
-                className={`p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                className={`p-3 md:p-4 rounded-full ${isVideoOff ? 'bg-red-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
                 title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
               >
-                {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
+                {isVideoOff ? <VideoOff className="h-5 w-5 md:h-6 md:w-6 text-white" /> : <Video className="h-5 w-5 md:h-6 md:w-6 text-white" />}
               </button>
 
               {role === 'admin' && (
@@ -1211,19 +1211,19 @@ export default function MeetingPage() {
                       console.error('Screen share error:', err);
                     }
                   }}
-                  className={`p-4 rounded-full ${isScreenSharing ? 'bg-blue-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
+                  className={`p-3 md:p-4 rounded-full ${isScreenSharing ? 'bg-blue-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
                   title={isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
                 >
-                  <MonitorUp className="h-6 w-6 text-white" />
+                  <MonitorUp className="h-5 w-5 md:h-6 md:w-6 text-white" />
                 </button>
               )}
               
               <button
                 onClick={endCall}
-                className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
+                className="p-3 md:p-4 rounded-full bg-red-600 hover:bg-red-700 transition-all shadow-lg"
                 title="Leave meeting"
               >
-                <Phone className="h-6 w-6 text-white transform rotate-135" />
+                <Phone className="h-5 w-5 md:h-6 md:w-6 text-white transform rotate-135" />
               </button>
             </div>
           </div>
@@ -1241,7 +1241,7 @@ export default function MeetingPage() {
       {/* Admin Panel - 3 Columns (50% width for more space) */}
       {role === 'admin' && (
         <div
-          className="w-full bg-gray-900 flex flex-col"
+          className="w-full bg-gray-900 flex flex-col min-h-[45dvh] md:min-h-0"
           style={isDesktopLayout ? { flex: `0 0 ${100 - videoPanelWidth}%` } : undefined}
         >
           <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center">

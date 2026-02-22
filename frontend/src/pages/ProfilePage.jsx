@@ -4,12 +4,16 @@ import { ArrowLeft, User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar
 import { useTheme } from '../context/ThemeContext';
 import bookingsService from '../services/bookingsService';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notifications, setNotifications] = useState(true);
+  const [integrationStatus, setIntegrationStatus] = useState(null);
+  const [integrationError, setIntegrationError] = useState('');
   const [stats, setStats] = useState([
     { label: 'Total Bookings', value: '0', icon: Calendar, color: 'blue' },
     { label: 'Completed', value: '0', icon: CheckCircle, color: 'green' },
@@ -24,6 +28,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadStats();
+    loadIntegrationStatus();
   }, []);
 
   const loadStats = async () => {
@@ -47,6 +52,21 @@ export default function ProfilePage() {
       console.error('Error loading stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadIntegrationStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/settings`);
+      if (!res.ok) {
+        throw new Error(`Failed to load admin settings (${res.status})`);
+      }
+      const data = await res.json();
+      setIntegrationStatus(data);
+      setIntegrationError('');
+    } catch (error) {
+      console.error('Error loading integration status:', error);
+      setIntegrationError(error.message || 'Failed to load API integration settings');
     }
   };
 
@@ -78,6 +98,19 @@ export default function ProfilePage() {
     setTimeout(() => setPasswordMessage({ type: '', text: '' }), 3000);
   };
 
+  const geminiUsage = integrationStatus?.geminiUsage;
+  const geminiTotalTokens = geminiUsage?.sinceStart?.effectiveTokens ?? geminiUsage?.sinceStart?.totalTokens ?? 0;
+  const geminiTodayTokens = geminiUsage?.today?.effectiveTokens ?? geminiUsage?.today?.totalTokens ?? 0;
+  const geminiRequests = geminiUsage?.sinceStart?.requests || 0;
+  const geminiErrors = geminiUsage?.sinceStart?.errors || 0;
+  const geminiTokenSource = geminiUsage?.sinceStart?.tokenSource || 'none';
+  const geminiReportedTotalTokens = geminiUsage?.sinceStart?.totalTokens || 0;
+  const geminiEstimatedTotalTokens = geminiUsage?.sinceStart?.estimatedTokens || 0;
+  const geminiEstimatedCost = geminiUsage?.utilization?.estimatedCostUsd;
+  const geminiTotalLimitPct = geminiUsage?.utilization?.softTotalTokenLimitPct;
+  const geminiDailyLimitPct = geminiUsage?.utilization?.softDailyTokenLimitPct;
+  const geminiBudgetPct = geminiUsage?.utilization?.softBudgetPct;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -87,10 +120,13 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage your account settings and preferences</p>
         </div>
         <button
-          onClick={loadStats}
+          onClick={() => {
+            loadStats();
+            loadIntegrationStatus();
+          }}
           disabled={loading}
           className="p-2 bg-blue-50 dark:bg-blue-600/10 hover:bg-blue-100 dark:hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all flex items-center gap-2"
-          title="Refresh Analytics"
+          title="Refresh Analytics & API Status"
         >
           <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
           <span className="hidden md:inline font-medium">Refresh Data</span>
@@ -233,6 +269,81 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <div className="bg-white dark:bg-slate-800 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm transition-colors duration-300">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Shield className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+          API Integrations
+        </h3>
+        {integrationError ? (
+          <p className="text-sm text-red-500 dark:text-red-400">{integrationError}</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <ProviderCard
+                name="Gemini"
+                configured={Boolean(integrationStatus?.providers?.gemini?.configured)}
+                detail={integrationStatus?.providers?.gemini?.maskedKey || 'Not configured'}
+              />
+              <ProviderCard
+                name="Pinecone"
+                configured={Boolean(integrationStatus?.providers?.pinecone?.configured)}
+                detail={
+                  integrationStatus?.providers?.pinecone?.configured
+                    ? `${integrationStatus?.providers?.pinecone?.maskedKey} | vectors: ${integrationStatus?.providers?.pinecone?.totalVectors || 0} | namespaces: ${integrationStatus?.providers?.pinecone?.namespaceCount || 0}`
+                    : 'Not configured'
+                }
+              />
+              <ProviderCard
+                name="Deepgram"
+                configured={Boolean(integrationStatus?.providers?.deepgram?.configured)}
+                detail={
+                  integrationStatus?.providers?.deepgram?.configured
+                    ? `${integrationStatus?.providers?.deepgram?.maskedKey} | model: ${integrationStatus?.providers?.deepgram?.model || 'n/a'}`
+                    : 'Not configured'
+                }
+              />
+            </div>
+
+            <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-900/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">Gemini Usage (Observed)</p>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {geminiUsage?.trackingMode === 'process_observed' ? 'Process Local' : 'Unknown'}
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard label="Total Tokens" value={formatNumber(geminiTotalTokens)} />
+                <MetricCard label="Today Tokens" value={formatNumber(geminiTodayTokens)} />
+                <MetricCard label="Requests" value={formatNumber(geminiRequests)} />
+                <MetricCard label="Errors" value={formatNumber(geminiErrors)} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                <UsageRow label="Total Token Limit" pct={geminiTotalLimitPct} />
+                <UsageRow label="Daily Token Limit" pct={geminiDailyLimitPct} />
+                <UsageRow label="Budget Limit" pct={geminiBudgetPct} />
+              </div>
+
+              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <p>Estimated Cost: {geminiEstimatedCost != null ? `$${geminiEstimatedCost}` : 'Not configured'}</p>
+                <p>
+                  Token Source:{' '}
+                  {geminiTokenSource === 'api_reported'
+                    ? 'API reported'
+                    : geminiTokenSource === 'estimated'
+                      ? 'Estimated fallback'
+                      : 'No Gemini usage observed yet'}
+                </p>
+                <p>Reported Tokens: {formatNumber(geminiReportedTotalTokens)} | Estimated Tokens: {formatNumber(geminiEstimatedTotalTokens)}</p>
+                <p>Today (UTC): {geminiUsage?.todayUtcDate || 'N/A'}</p>
+                <p>{geminiUsage?.limitations || 'Usage tracking limitation details unavailable.'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -260,4 +371,51 @@ export default function ProfilePage() {
       )}
     </div>
   );
+}
+
+function ProviderCard({ name, configured, detail }) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-900/50 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">{name}</p>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${configured ? 'bg-emerald-500/15 text-emerald-500' : 'bg-red-500/15 text-red-500'}`}>
+          {configured ? 'Configured' : 'Missing'}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">{detail}</p>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }) {
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 p-3">
+      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function UsageRow({ label, pct }) {
+  const numeric = Number.isFinite(Number(pct)) ? Number(pct) : null;
+  const clamped = numeric == null ? 0 : Math.min(100, Math.max(0, numeric));
+  const color = numeric != null && numeric >= 90 ? 'bg-red-500' : numeric != null && numeric >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 p-2.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-gray-600 dark:text-gray-300">{label}</span>
+        <span className="font-semibold text-gray-800 dark:text-gray-100">{numeric == null ? 'N/A' : `${numeric.toFixed(1)}%`}</span>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
+        <div className={`h-2 ${color}`} style={{ width: `${clamped}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
 }

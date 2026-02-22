@@ -35,6 +35,7 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' or 'table'
 
@@ -45,10 +46,12 @@ export default function LeadsPage() {
   const fetchLeads = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await leadsService.getLeads();
       setLeads(data);
     } catch (error) {
       console.error('Failed to fetch leads:', error);
+      setError(error.message || 'Failed to fetch leads');
     } finally {
       setLoading(false);
     }
@@ -114,6 +117,12 @@ export default function LeadsPage() {
           className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
         />
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
 
       {/* Category Guide */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-4">

@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.services.meeting.websocket_manager import manager
 from app.services.integrations.pinecone import pinecone_service
 from app.services.llm.embeddings import embedding_service
+from app.services.llm.usage_tracker import gemini_usage_tracker
 
 # Configure Gemini
 if settings.GEMINI_API_KEY:
@@ -824,15 +825,24 @@ class AudioService:
             )
 
     async def _transcribe_with_gemini(self, wav_data: bytes) -> str:
-        model = genai.GenerativeModel(self.ai_model_name)
-        response = await model.generate_content_async([
-            {
-                "mime_type": "audio/wav",
-                "data": wav_data
-            },
-            "Transcribe this audio exactly. Return ONLY the spoken words. If silence, return empty string."
-        ])
-        return (response.text or "").strip()
+        try:
+            model = genai.GenerativeModel(self.ai_model_name)
+            response = await model.generate_content_async([
+                {
+                    "mime_type": "audio/wav",
+                    "data": wav_data
+                },
+                "Transcribe this audio exactly. Return ONLY the spoken words. If silence, return empty string."
+            ])
+            gemini_usage_tracker.record_response(
+                operation="meeting_transcription",
+                response_payload=response,
+                request_text="Transcribe this audio exactly. Return ONLY the spoken words. If silence, return empty string.",
+            )
+            return (response.text or "").strip()
+        except Exception as e:
+            gemini_usage_tracker.record_error("meeting_transcription", e)
+            raise
 
     def _transcribe_with_deepgram_sync(self, wav_data: bytes) -> str:
         if not self.deepgram_api_key:
@@ -1367,6 +1377,11 @@ class AudioService:
 
             model = genai.GenerativeModel(self.ai_model_name)
             response = await model.generate_content_async(system_prompt + user_prompt)
+            gemini_usage_tracker.record_response(
+                operation="meeting_ai_suggestion",
+                response_payload=response,
+                request_text=system_prompt + user_prompt,
+            )
 
             suggestion = (response.text or "").strip()
             if not suggestion:
@@ -1395,6 +1410,7 @@ class AudioService:
             print(f"AI suggestion task cancelled for {meeting_id}/{user_id}")
             return
         except Exception as e:
+            gemini_usage_tracker.record_error("meeting_ai_suggestion", e)
             print(f"AI Suggestion error: {e}")
 
     def _resolve_session_id(self, db, meeting_id: str):
