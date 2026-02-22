@@ -1,19 +1,19 @@
 {
   "isRunning": true,
   "processedFileCount": 1,
-  "totalChecks": 413,
-  "lastCheck": "2026-02-22T04:44:29.071818",
+  "totalChecks": 423,
+  "lastCheck": "2026-02-22T05:59:41.268576",
   "pollingIntervalMinutes": 5,
   "files": [
     {
       "key": "01WKFFU5BV3UNVOIYGCZHLTUWI2MKHZB5G",
       "fileName": "Health Insurance Master File.docx",
       "namespace": "training-reference",
-      "status": "processing",
+      "status": "success",
       "lastModified": "2026-01-21T19:41:00Z",
-      "processedAt": "2026-02-22T04:33:43.697984",
-      "chunks": 0,
-      "vectors": 0
+      "processedAt": "2026-02-22T05:15:34.973354",
+      "chunks": 584,
+      "vectors": 584
     }
   ]
 }
