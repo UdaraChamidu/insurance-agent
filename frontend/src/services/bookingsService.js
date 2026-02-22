@@ -1,5 +1,7 @@
 // Frontend service for Custom Scheduling API
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { getApiBaseUrl } from '../utils/network';
+
+const API_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 20000;
 const REQUEST_MAX_RETRIES = 1;
 const REQUEST_RETRY_BASE_MS = 700;

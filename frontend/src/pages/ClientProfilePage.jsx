@@ -6,8 +6,9 @@ import {
   Loader, Edit2, Save, X, Video, ChevronDown, Download
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 const PIPELINE_STAGES = ['new', 'appointment_booked', 'quoted', 'enrolled', 'lost'];
 const PIPELINE_LABELS = {

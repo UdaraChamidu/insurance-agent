@@ -6,8 +6,9 @@ import {
   Loader, ChevronLeft, ChevronRight, Shield, Globe, RefreshCw, AlertCircle, ArrowLeft
 } from 'lucide-react';
 import { sendCancellationEmail, sendRescheduleEmail } from '../services/frontendEmailService';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },

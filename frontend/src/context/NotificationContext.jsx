@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { getApiBaseUrl } from '../utils/network';
 
 const NotificationContext = createContext();
+const API_URL = getApiBaseUrl();
 
 export const useNotifications = () => useContext(NotificationContext);
 
@@ -13,7 +15,7 @@ export const NotificationProvider = ({ children }) => {
   // Fetch initial notifications
   const fetchNotifications = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/notifications/?limit=50`);
+      const response = await fetch(`${API_URL}/api/v1/notifications/?limit=50`);
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
@@ -31,7 +33,7 @@ export const NotificationProvider = ({ children }) => {
 
   const markAsRead = async (id) => {
     try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/v1/notifications/${id}/read`, {
+        await fetch(`${API_URL}/api/v1/notifications/${id}/read`, {
             method: 'PATCH'
         });
         
@@ -46,7 +48,7 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllAsRead = async () => {
     try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/v1/notifications/mark-all-read`, {
+        await fetch(`${API_URL}/api/v1/notifications/mark-all-read`, {
             method: 'POST'
         });
         
@@ -59,7 +61,7 @@ export const NotificationProvider = ({ children }) => {
 
   const clearAll = async () => {
       try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/v1/notifications/`, {
+        await fetch(`${API_URL}/api/v1/notifications/`, {
             method: 'DELETE'
         });
         setNotifications([]);

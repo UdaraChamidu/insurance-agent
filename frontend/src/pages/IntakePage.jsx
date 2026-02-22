@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Shield, MapPin, AlertCircle, ArrowRight, Check, User, Mail, Phone, Loader, Upload, X, FileText } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 export default function IntakePage() {
   const navigate = useNavigate();

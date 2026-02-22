@@ -1,27 +1,6 @@
-const resolveApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { getApiBaseUrl } from '../utils/network';
 
-  // Prevent mixed-content failures when frontend is served over HTTPS.
-  // Keep localhost and private network hosts on HTTP for local development.
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && configured.startsWith('http://')) {
-    try {
-      const parsed = new URL(configured);
-      const host = parsed.hostname.toLowerCase();
-      const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
-      const isPrivateIp = /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
-      if (!isLocalHost && !isPrivateIp) {
-        parsed.protocol = 'https:';
-        return parsed.toString().replace(/\/$/, '');
-      }
-    } catch {
-      // Fall back to configured value if URL parsing fails.
-    }
-  }
-
-  return configured.replace(/\/$/, '');
-};
-
-const API_URL = resolveApiBaseUrl();
+const API_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 20000;
 const REQUEST_MAX_RETRIES = 2;
 const REQUEST_RETRY_BASE_MS = 700;

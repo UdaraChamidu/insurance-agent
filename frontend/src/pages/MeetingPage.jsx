@@ -4,9 +4,10 @@ import { Video, Mic, MicOff, VideoOff, Phone, Download, Sparkles, MonitorUp, Che
 import meetingService from '../services/meetingService';
 import ScriptPanel from '../components/ScriptPanel';
 import WrapUpModal from '../components/WrapUpModal';
+import { getApiBaseUrl, getWsBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/i, 'ws');
+const API_URL = getApiBaseUrl();
+const WS_BASE_URL = getWsBaseUrl();
 const WS_URL = `${WS_BASE_URL.replace(/\/$/, '')}/api/meetings/ws`;
 const AI_DRAFT_REQUEST_COOLDOWN_MS = 1200;
 const AI_MANUAL_REQUEST_TIMEOUT_MS = 12000;
@@ -1102,11 +1103,11 @@ export default function MeetingPage() {
   return (
     <div
       ref={mainLayoutContainerRef}
-      className={`min-h-[100dvh] bg-black flex flex-col md:flex-row ${isMainLayoutResizing ? 'select-none cursor-col-resize' : ''}`}
+      className={`h-[100dvh] bg-black flex flex-col md:flex-row ${isMainLayoutResizing ? 'select-none cursor-col-resize' : ''}`}
     >
       {/* Main Video Area - Full height on mobile, flex-1 on desktop */}
       <div
-        className={`flex-1 flex flex-col relative ${role === 'admin' ? 'h-[50vh] md:h-full' : 'h-full'}`}
+        className={`flex-1 flex flex-col relative min-h-0 ${role === 'admin' ? 'h-[50vh] md:h-full' : 'h-full'}`}
         style={role === 'admin' && isDesktopLayout ? { flex: `0 0 ${videoPanelWidth}%` } : undefined}
       >
         {/* Header - Hidden on small mobile screens if needed, or compact */}
@@ -1123,7 +1124,7 @@ export default function MeetingPage() {
         </header>
 
         {/* Video Section */}
-        <div className="flex-1 relative bg-gray-900 overflow-hidden">
+        <div className="flex-1 min-h-0 relative bg-gray-900 overflow-hidden">
           {/* Remote Video */}
           <video
             ref={remoteVideoRef}

@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar, CheckCircle, Clock, Sun, Loader } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import bookingsService from '../services/bookingsService';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 export default function ProfilePage() {
   const navigate = useNavigate();

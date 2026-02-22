@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Loader, CheckCircle, Globe, MapPin, AlertCircle } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
+import { getApiBaseUrl } from '../utils/network';
 import { sendBookingConfirmation } from '../services/frontendEmailService';
+
+const API_URL = getApiBaseUrl();
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },

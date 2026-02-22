@@ -5,8 +5,9 @@ import {
   CheckCircle, AlertCircle, Clock, Zap, HardDrive,
   RotateCcw, XCircle, ChevronDown, ChevronUp, Bell
 } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 const REFRESH_INTERVAL = 30000; // 30 seconds
 const REQUEST_TIMEOUT_MS = 20000;
 const REQUEST_MAX_RETRIES = 1;

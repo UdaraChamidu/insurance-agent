@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, Save, Loader, Sparkles } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/network';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = getApiBaseUrl();
 
 const defaultFormData = {
   disposition: 'interested',
