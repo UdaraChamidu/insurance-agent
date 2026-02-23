@@ -49,7 +49,9 @@ class LeadsService {
       const queryParams = new URLSearchParams();
       if (filters.skip) queryParams.append('skip', filters.skip);
       if (filters.limit) queryParams.append('limit', filters.limit);
-      return await fetchJsonWithRetry(`${API_URL}/api/leads?${queryParams}`);
+      const query = queryParams.toString();
+      const url = `${API_URL}/api/leads/${query ? `?${query}` : ''}`;
+      return await fetchJsonWithRetry(url);
     } catch (error) {
       console.error('Error fetching leads:', error);
       throw error;

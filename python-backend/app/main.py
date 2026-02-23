@@ -1,6 +1,7 @@
 # Trigger reload
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
@@ -10,6 +11,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Honor X-Forwarded-* headers from Railway so generated redirect URLs keep https.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # Set all CORS enabled origins
 if settings.CORS_ORIGINS:
