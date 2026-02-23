@@ -182,6 +182,32 @@ async def cancel_appointment(appointment_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/appointments/{appointment_id}/permanent")
+async def delete_appointment_permanently(appointment_id: str, background_tasks: BackgroundTasks):
+    """Permanently delete an appointment (admin action)"""
+    try:
+        deleted = scheduling_service.delete_appointment(appointment_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
+        background_tasks.add_task(
+            notification_service.create_notification,
+            type="booking",
+            title="Appointment Deleted",
+            message=(
+                f"{deleted.get('customerName', 'A client')} appointment "
+                f"{deleted.get('bookingRef', '')} was deleted by admin"
+            ).strip(),
+            metadata={"appointmentId": deleted["id"], "bookingRef": deleted.get("bookingRef")}
+        )
+
+        return {"success": True, "deleted": deleted}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ===================== PUBLIC MANAGE (Token-Based) =====================
 
 @router.get("/manage/{token}")

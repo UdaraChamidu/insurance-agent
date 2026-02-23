@@ -3,9 +3,18 @@ import { Bell, Check, Trash2, X } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 
 const NotificationCenter = () => {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteOneRead,
+    deleteReadAll,
+    clearAll
+  } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const readCount = Math.max(0, notifications.length - unreadCount);
 
   // Close when clicking outside
   useEffect(() => {
@@ -59,6 +68,15 @@ const NotificationCenter = () => {
                         <Check className="w-4 h-4" />
                     </button>
                 )}
+                {readCount > 0 && (
+                    <button
+                        onClick={deleteReadAll}
+                        title="Delete all read"
+                        className="p-1.5 rounded-lg hover:bg-orange-100 hover:text-orange-600 dark:hover:bg-orange-500/20 dark:text-gray-400 dark:hover:text-orange-300 transition-colors"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
                 <button 
                     onClick={clearAll}
                     title="Clear all"
@@ -96,15 +114,25 @@ const NotificationCenter = () => {
                                 </p>
                             </div>
                             {/* Individual Action */}
-                            {!notif.isRead && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
-                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full transition-opacity self-start"
-                                    title="Mark as read"
-                                >
-                                    <Check className="w-3 h-3 text-blue-500" />
-                                </button>
-                            )}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity self-start flex items-center gap-1">
+                                {!notif.isRead ? (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
+                                        className="p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full"
+                                        title="Mark as read"
+                                    >
+                                        <Check className="w-3 h-3 text-blue-500" />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); deleteOneRead(notif.id); }}
+                                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-full"
+                                        title="Delete read notification"
+                                    >
+                                        <Trash2 className="w-3 h-3 text-red-500" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ))

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, Filter, Plus, MoreVertical, Phone, Mail, Calendar,
   CheckCircle, Clock, AlertCircle, ChevronDown, User, ArrowRight,
-  Loader, RefreshCw, LayoutGrid, List, Eye
+  Loader, RefreshCw, LayoutGrid, List, Eye, Trash2
 } from 'lucide-react';
 import leadsService from '../services/leadsService';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 const PIPELINE_STAGES = [
   { key: 'new', label: 'New Leads', color: 'blue', icon: Plus },
@@ -35,8 +36,11 @@ export default function LeadsPage() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' or 'table'
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingLeadId, setDeletingLeadId] = useState(null);
 
   useEffect(() => {
     fetchLeads();
@@ -45,12 +49,35 @@ export default function LeadsPage() {
   const fetchLeads = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await leadsService.getLeads();
       setLeads(data);
     } catch (error) {
       console.error('Failed to fetch leads:', error);
+      setError(error.message || 'Failed to fetch leads');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteLead = (lead) => {
+    if (!lead?.id) return;
+    setDeleteTarget(lead);
+  };
+
+  const handleConfirmDeleteLead = async () => {
+    if (!deleteTarget?.id) return;
+    try {
+      setDeletingLeadId(deleteTarget.id);
+      setError('');
+      await leadsService.deleteLead(deleteTarget.id);
+      setLeads((prev) => prev.filter((row) => row.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (deleteError) {
+      console.error('Failed to delete lead:', deleteError);
+      setError(deleteError.message || 'Failed to delete lead');
+    } finally {
+      setDeletingLeadId(null);
     }
   };
 
@@ -115,6 +142,12 @@ export default function LeadsPage() {
         />
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
       {/* Category Guide */}
       <div className="bg-white/5 border border-white/10 rounded-xl p-4">
         <h2 className="text-sm font-semibold text-gray-300 mb-3">Lead Categories</h2>
@@ -144,16 +177,44 @@ export default function LeadsPage() {
           <Loader className="w-8 h-8 text-blue-400 animate-spin" />
         </div>
       ) : viewMode === 'pipeline' ? (
-        <PipelineView leads={filteredLeads} getLeadsByStage={getLeadsByStage} navigate={navigate} />
+        <PipelineView
+          leads={filteredLeads}
+          getLeadsByStage={getLeadsByStage}
+          navigate={navigate}
+          onDelete={handleDeleteLead}
+          deletingLeadId={deletingLeadId}
+        />
       ) : (
-        <TableView leads={filteredLeads} navigate={navigate} />
+        <TableView
+          leads={filteredLeads}
+          navigate={navigate}
+          onDelete={handleDeleteLead}
+          deletingLeadId={deletingLeadId}
+        />
       )}
+
+      <DeleteConfirmModal
+        open={!!deleteTarget}
+        title="Delete Lead"
+        message={
+          deleteTarget
+            ? `Delete ${(deleteTarget.firstName || '')} ${(deleteTarget.lastName || '')}`.trim() +
+              '?\n\nThis permanently removes the lead and related records.'
+            : ''
+        }
+        confirmLabel="Delete Lead"
+        loading={deletingLeadId === deleteTarget?.id}
+        onCancel={() => {
+          if (deletingLeadId !== deleteTarget?.id) setDeleteTarget(null);
+        }}
+        onConfirm={handleConfirmDeleteLead}
+      />
     </div>
   );
 }
 
 /* ===== PIPELINE / KANBAN VIEW ===== */
-function PipelineView({ leads, getLeadsByStage, navigate }) {
+function PipelineView({ leads, getLeadsByStage, navigate, onDelete, deletingLeadId }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 min-h-[500px]">
       {PIPELINE_STAGES.map(stage => {
@@ -182,7 +243,13 @@ function PipelineView({ leads, getLeadsByStage, navigate }) {
                 </div>
               ) : (
                 stageLeads.map(lead => (
-                  <LeadCard key={lead.id} lead={lead} navigate={navigate} />
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    navigate={navigate}
+                    onDelete={onDelete}
+                    deletingLeadId={deletingLeadId}
+                  />
                 ))
               )}
             </div>
@@ -193,7 +260,7 @@ function PipelineView({ leads, getLeadsByStage, navigate }) {
   );
 }
 
-function LeadCard({ lead, navigate }) {
+function LeadCard({ lead, navigate, onDelete, deletingLeadId }) {
   const name = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unknown';
   const initials = `${(lead.firstName || '?')[0]}${(lead.lastName || '?')[0]}`.toUpperCase();
 
@@ -212,7 +279,24 @@ function LeadCard({ lead, navigate }) {
             <p className="text-xs text-gray-500 truncate">{lead.productType.toUpperCase()}</p>
           )}
         </div>
-        <Eye className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 transition-colors" />
+        <div className="flex items-center gap-1">
+          <Eye className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 transition-colors" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(lead);
+            }}
+            disabled={deletingLeadId === lead.id}
+            className="p-1 rounded text-red-400/80 hover:text-red-300 hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Delete lead"
+          >
+            {deletingLeadId === lead.id ? (
+              <Loader className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -241,7 +325,7 @@ function LeadCard({ lead, navigate }) {
 }
 
 /* ===== TABLE VIEW ===== */
-function TableView({ leads, navigate }) {
+function TableView({ leads, navigate, onDelete, deletingLeadId }) {
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -313,9 +397,33 @@ function TableView({ leads, navigate }) {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="p-1 text-gray-500 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/leads/${lead.id}`);
+                          }}
+                          className="p-1 text-gray-500 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                          title="Open lead"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete?.(lead);
+                          }}
+                          disabled={deletingLeadId === lead.id}
+                          className="p-1 text-red-400/80 hover:text-red-300 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                          title="Delete lead"
+                        >
+                          {deletingLeadId === lead.id ? (
+                            <Loader className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

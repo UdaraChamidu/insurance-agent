@@ -4,8 +4,9 @@ import bookingsService from '../services/bookingsService';
 import {
   Calendar, Clock, User, Mail, Phone, MapPin,
   Video, CheckCircle, XCircle, Loader, RefreshCw,
-  ChevronDown, Search, Filter, ArrowRight, AlertCircle
+  ChevronDown, Search, Filter, ArrowRight, AlertCircle, Trash2
 } from 'lucide-react';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 const STATUS_COLORS = {
   confirmed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: 'Confirmed' },
@@ -23,6 +24,8 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -60,6 +63,32 @@ export default function BookingsPage() {
       fetchAppointments();
     } catch {
       setError('Failed to cancel appointment.');
+    }
+  };
+
+  const handleDelete = async (apt) => {
+    if (!apt?.id) return;
+    setDeleteTarget(apt);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget?.id) return;
+    const targetId = deleteTarget.id;
+    const previousAppointments = appointments;
+
+    try {
+      setIsDeleting(true);
+      setError('');
+      setDeleteTarget(null);
+      setExpandedId((prev) => (prev === targetId ? null : prev));
+      setAppointments((prev) => prev.filter((apt) => apt.id !== targetId));
+
+      await bookingsService.deleteAppointment(targetId);
+    } catch {
+      setAppointments(previousAppointments);
+      setError('Failed to delete appointment. Restored previous list.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -185,6 +214,7 @@ export default function BookingsPage() {
                     onToggle={() => setExpandedId(expandedId === apt.id ? null : apt.id)}
                     onStatusChange={handleStatusChange}
                     onCancel={handleCancel}
+                    onDelete={handleDelete}
                     onJoin={handleJoinMeeting}
                   />
                 ))}
@@ -207,6 +237,7 @@ export default function BookingsPage() {
                     onToggle={() => setExpandedId(expandedId === apt.id ? null : apt.id)}
                     onStatusChange={handleStatusChange}
                     onCancel={handleCancel}
+                    onDelete={handleDelete}
                     onJoin={handleJoinMeeting}
                   />
                 ))}
@@ -223,11 +254,27 @@ export default function BookingsPage() {
           )}
         </>
       )}
+
+      <DeleteConfirmModal
+        open={!!deleteTarget}
+        title="Delete Appointment"
+        message={
+          deleteTarget
+            ? `Delete appointment for ${deleteTarget.customerName || 'this client'}${deleteTarget.bookingRef ? ` (${deleteTarget.bookingRef})` : ''}?\n\nThe appointment will be removed permanently.`
+            : ''
+        }
+        confirmLabel="Delete Appointment"
+        loading={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) setDeleteTarget(null);
+        }}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
 
-function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, onJoin }) {
+function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, onDelete, onJoin }) {
   const status = STATUS_COLORS[apt.status] || STATUS_COLORS.pending;
   const isUpcoming = apt.status === 'confirmed' || apt.status === 'pending';
 
@@ -351,6 +398,13 @@ function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, on
                 Cancel
               </button>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(apt); }}
+              className="flex items-center gap-2 px-4 py-2 bg-red-700/20 text-red-300 border border-red-700/30 rounded-lg text-sm font-medium hover:bg-red-700/30 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
           </div>
         </div>
       )}

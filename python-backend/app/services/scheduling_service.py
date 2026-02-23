@@ -370,6 +370,25 @@ class SchedulingService:
         finally:
             db.close()
 
+    def delete_appointment(self, appointment_id: str) -> Optional[Dict[str, Any]]:
+        """Permanently delete an appointment by ID"""
+        db = SessionLocal()
+        try:
+            apt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+            if not apt:
+                return None
+
+            result = self._map_appointment(apt, apt.lead)
+            db.delete(apt)
+            db.commit()
+            return result
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting appointment: {e}")
+            raise
+        finally:
+            db.close()
+
     # ===== TOKEN-BASED METHODS (for user self-service) =====
 
     def get_appointment_by_token(self, token: str) -> Optional[Dict[str, Any]]:

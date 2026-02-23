@@ -1,24 +1,51 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, RefreshCw, Mail, Phone, ArrowRight, Loader } from 'lucide-react';
+import { Users, Search, RefreshCw, Mail, Phone, ArrowRight, Loader, Trash2 } from 'lucide-react';
 import leadsService from '../services/leadsService';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export default function ClientsPage() {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
+  const [deletingClientId, setDeletingClientId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fetchClients = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await leadsService.getLeads();
       setClients(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
       setClients([]);
+      setError(error.message || 'Failed to fetch clients');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteClient = async (client) => {
+    if (!client?.id) return;
+    setDeleteTarget(client);
+  };
+
+  const handleConfirmDeleteClient = async () => {
+    if (!deleteTarget?.id) return;
+    try {
+      setDeletingClientId(deleteTarget.id);
+      setError('');
+      await leadsService.deleteLead(deleteTarget.id);
+      setClients((prev) => prev.filter((row) => row.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (deleteError) {
+      console.error('Failed to delete client:', deleteError);
+      setError(deleteError.message || 'Failed to delete client');
+    } finally {
+      setDeletingClientId(null);
     }
   };
 
@@ -77,6 +104,12 @@ export default function ClientsPage() {
         />
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader className="w-8 h-8 text-blue-400 animate-spin" />
@@ -117,13 +150,27 @@ export default function ClientsPage() {
                           <span>Pipeline: {client.pipelineStatus || 'new'}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => navigate(`/admin/clients/${client.id}`)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-500 text-white text-sm"
-                      >
-                        Open Profile
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => navigate(`/admin/clients/${client.id}`)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-500 text-white text-sm"
+                        >
+                          Open Profile
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClient(client)}
+                          disabled={deletingClientId === client.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/20 text-red-300 hover:bg-red-600/30 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {deletingClientId === client.id ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -132,6 +179,23 @@ export default function ClientsPage() {
           )}
         </div>
       )}
+
+      <DeleteConfirmModal
+        open={!!deleteTarget}
+        title="Delete Client"
+        message={
+          deleteTarget
+            ? `Delete ${(deleteTarget.firstName || '')} ${(deleteTarget.lastName || '')}`.trim() +
+              '?\n\nThis permanently removes the client and related records.'
+            : ''
+        }
+        confirmLabel="Delete Client"
+        loading={deletingClientId === deleteTarget?.id}
+        onCancel={() => {
+          if (deletingClientId !== deleteTarget?.id) setDeleteTarget(null);
+        }}
+        onConfirm={handleConfirmDeleteClient}
+      />
     </div>
   );
 }

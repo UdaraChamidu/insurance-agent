@@ -66,6 +66,22 @@ class LeadsService {
       throw error;
     }
   }
+
+  async deleteLead(id) {
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `Failed to delete lead (${response.status})`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LeadsService();

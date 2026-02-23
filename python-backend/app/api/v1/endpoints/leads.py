@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
-from app.models import Lead, Session as DbSession, Transcript
+from app.models import Lead, Session as DbSession, Transcript, Appointment, Document
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
 from app.services.integrations.ghl import ghl_service
 from pydantic import BaseModel
@@ -377,6 +377,78 @@ async def get_lead_session(
     except Exception as e:
          print(f"Error fetching lead: {str(e)}")
          raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{lead_id}", response_model=Dict[str, Any])
+async def delete_lead(
+    lead_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete a lead (client) and related records:
+    - transcripts
+    - session
+    - appointments
+    - documents (DB metadata)
+    """
+    try:
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        lead_name = f"{lead.firstName or ''} {lead.lastName or ''}".strip() or "Unknown client"
+        session = db.query(DbSession).filter(DbSession.leadId == lead_id).first()
+
+        deleted_transcripts = 0
+        if session:
+            deleted_transcripts = (
+                db.query(Transcript)
+                .filter(Transcript.sessionId == session.id)
+                .delete(synchronize_session=False)
+            )
+            db.delete(session)
+
+        deleted_appointments = (
+            db.query(Appointment)
+            .filter(Appointment.leadId == lead_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_documents = (
+            db.query(Document)
+            .filter(Document.leadId == lead_id)
+            .delete(synchronize_session=False)
+        )
+
+        db.delete(lead)
+        db.commit()
+
+        from app.services.notification_service import notification_service
+        background_tasks.add_task(
+            notification_service.create_notification,
+            type="lead",
+            title="Client Deleted",
+            message=f"{lead_name} was deleted by admin",
+            metadata={"leadId": lead_id},
+        )
+
+        return {
+            "success": True,
+            "deleted": {
+                "leadId": lead_id,
+                "leadName": lead_name,
+                "appointments": deleted_appointments,
+                "documents": deleted_documents,
+                "transcripts": deleted_transcripts,
+                "session": 1 if session else 0,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting lead: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/{lead_id}", response_model=Dict[str, Any])

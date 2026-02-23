@@ -52,8 +52,37 @@ async def mark_all_read():
     Mark all notifications as read
     """
     try:
-        notification_service.mark_all_as_read()
-        return {"success": True}
+        updated = notification_service.mark_all_as_read()
+        return {"success": True, "updated": updated}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/read", response_model=Dict[str, Any])
+async def delete_read_notifications():
+    """
+    Delete all read notifications
+    """
+    try:
+        deleted = notification_service.delete_read()
+        return {"success": True, "deleted": deleted}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{notification_id}", response_model=Dict[str, Any])
+async def delete_notification(notification_id: str, readOnly: bool = True):
+    """
+    Delete a specific notification.
+    By default only deletes if already read (`readOnly=true`).
+    """
+    try:
+        deleted = notification_service.delete_notification(notification_id, read_only=readOnly)
+        if not deleted:
+            if readOnly:
+                raise HTTPException(status_code=404, detail="Read notification not found")
+            raise HTTPException(status_code=404, detail="Notification not found")
+        return {"success": True, "id": notification_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -63,8 +92,8 @@ async def clear_notifications():
     Clear all notifications
     """
     try:
-        notification_service.clear_all()
-        return {"success": True}
+        deleted = notification_service.clear_all()
+        return {"success": True, "deleted": deleted}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

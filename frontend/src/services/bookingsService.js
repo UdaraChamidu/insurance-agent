@@ -157,6 +157,25 @@ class BookingsService {
   }
 
   /**
+   * Permanently delete an appointment (admin action)
+   */
+  async deleteAppointment(id) {
+    try {
+      const response = await fetch(`${API_URL}/api/scheduling/appointments/${id}/permanent`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || 'Failed to delete appointment');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Save availability settings
    */
   async saveAvailabilitySettings(slots) {

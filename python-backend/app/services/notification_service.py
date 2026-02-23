@@ -79,18 +79,52 @@ class NotificationService:
         db = SessionLocal()
         try:
             # Update all unread
-            db.query(Notification).filter(Notification.isRead == False).update({Notification.isRead: True})
+            updated_count = (
+                db.query(Notification)
+                .filter(Notification.isRead == False)
+                .update({Notification.isRead: True})
+            )
+            db.commit()
+            return updated_count
+        finally:
+            db.close()
+
+    def delete_notification(self, notification_id: str, read_only: bool = False) -> bool:
+        db = SessionLocal()
+        try:
+            query = db.query(Notification).filter(Notification.id == notification_id)
+            if read_only:
+                query = query.filter(Notification.isRead == True)
+
+            notification = query.first()
+            if not notification:
+                return False
+
+            db.delete(notification)
             db.commit()
             return True
         finally:
             db.close()
-            
+
+    def delete_read(self) -> int:
+        db = SessionLocal()
+        try:
+            deleted_count = (
+                db.query(Notification)
+                .filter(Notification.isRead == True)
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+            return deleted_count
+        finally:
+            db.close()
+             
     def clear_all(self):
         db = SessionLocal()
         try:
-            db.query(Notification).delete()
+            deleted_count = db.query(Notification).delete(synchronize_session=False)
             db.commit()
-            return True
+            return deleted_count
         finally:
             db.close()
 
