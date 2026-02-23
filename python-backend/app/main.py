@@ -62,12 +62,16 @@ async def startup_event():
     print("✅ Database tables synced")
 
     from app.services.document.poller import document_poller
+    from app.services.appointment_reminder_poller import appointment_reminder_poller
     await document_poller.start()
+    await appointment_reminder_poller.start()
 
 @app.on_event("shutdown")
 async def shutdown_event():
     from app.services.document.poller import document_poller
+    from app.services.appointment_reminder_poller import appointment_reminder_poller
     await document_poller.stop()
+    await appointment_reminder_poller.stop()
 
 @app.get("/health")
 def health_check():

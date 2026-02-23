@@ -78,7 +78,7 @@ class CommunicationService:
         return results
 
     def send_booking_reminder(self, appointment: Dict[str, Any]) -> Dict[str, bool]:
-        """Send booking reminder via email and SMS"""
+        """Send booking reminder via email and SMS."""
         results = {"email": False, "sms": False}
 
         customer_name = appointment.get("customerName", "Customer")
@@ -93,11 +93,11 @@ class CommunicationService:
         try:
             self.email_service.send_email(
                 customer_email,
-                f"Reminder: {service_name} Tomorrow",
+                f"Reminder: {service_name} starts in 15 minutes",
                 (
                     f"Hi {customer_name},\n\n"
                     f"This is a reminder that your {service_name} is scheduled for "
-                    f"tomorrow, {date} at {start_time}.\n\n"
+                    f"{date} at {start_time}, which starts in about 15 minutes.\n\n"
                     f"Meeting Link: {meeting_link}\n\n"
                     f"See you soon!\nElite Deal Broker Team"
                 ),
@@ -110,7 +110,7 @@ class CommunicationService:
         if customer_phone:
             try:
                 sms_body = (
-                    f"Reminder: Your {service_name} is tomorrow at {start_time}. "
+                    f"Reminder: Your {service_name} starts in 15 min at {start_time}. "
                     f"Join: {meeting_link}"
                 )
                 self.twilio_service.send_sms(customer_phone, sms_body)

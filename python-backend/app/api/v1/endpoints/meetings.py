@@ -70,6 +70,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 meeting_id = data.get("meetingId")
                 user_id = data.get("userId") or f"anon-{connection_id[:8]}"
                 role = data.get("role", "customer")
+                normalized_role = str(role or "").strip().lower()
 
                 if not meeting_id:
                     await websocket.send_json({
@@ -77,7 +78,21 @@ async def websocket_endpoint(websocket: WebSocket):
                         "message": "meetingId is required",
                     })
                     continue
-                
+
+                participants_before_join = manager.get_participants(meeting_id)
+                host_present = any(
+                    str(p.get("role", "")).strip().lower() in {"admin", "host"}
+                    for p in participants_before_join
+                )
+                is_host_join = normalized_role in {"admin", "host"}
+                if not is_host_join and not host_present:
+                    await websocket.send_json({
+                        "type": "error",
+                        "code": "host-not-ready",
+                        "message": "wait for host start the meeting...",
+                    })
+                    continue
+                 
                 # Register with manager
                 await manager.connect(websocket, meeting_id, connection_id, user_id, role)
                 participants = manager.get_participants(meeting_id)

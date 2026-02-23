@@ -310,6 +310,8 @@ class SchedulingService:
                 start_dt = datetime(2000, 1, 1, start_h, start_m)
                 end_dt = start_dt + timedelta(minutes=apt.durationMinutes)
                 apt.endTime = end_dt.strftime("%H:%M")
+            if ("date" in data and data["date"]) or ("startTime" in data and data["startTime"]):
+                apt.reminderSentAt = None
 
             apt.updatedAt = datetime.utcnow()
             db.commit()
@@ -441,6 +443,7 @@ class SchedulingService:
             apt.endTime = end_dt.strftime("%H:%M")
             if new_timezone:
                 apt.timezone = new_timezone
+            apt.reminderSentAt = None
             apt.updatedAt = datetime.utcnow()
 
             db.commit()

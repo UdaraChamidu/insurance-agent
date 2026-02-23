@@ -123,6 +123,7 @@ export default function MeetingPage() {
   };
 
   const [isConnected, setIsConnected] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [userName, setUserName] = useState('');
@@ -133,6 +134,7 @@ export default function MeetingPage() {
   const [isAIMonitoring, setIsAIMonitoring] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [meetingNotices, setMeetingNotices] = useState([]);
+  const [showHostLeftPrompt, setShowHostLeftPrompt] = useState(false);
   const [localDisplayStream, setLocalDisplayStream] = useState(null);
   const [remoteDisplayStream, setRemoteDisplayStream] = useState(null);
   const [isManualAIRequestPending, setIsManualAIRequestPending] = useState(false);
@@ -469,6 +471,7 @@ export default function MeetingPage() {
     setIsLeaveSummaryGenerated(false);
     setIsLeaveSummarySaved(false);
     setMeetingNotices([]);
+    setShowHostLeftPrompt(false);
     setLogs([]);
     setError(null);
     setIsJoined(false);
@@ -531,6 +534,8 @@ export default function MeetingPage() {
       return;
     }
 
+    setIsJoining(true);
+    setError(null);
     try {
       // Connect to WebSocket
       addLog(`Connecting to WS: ${WS_URL}`);
@@ -744,6 +749,19 @@ export default function MeetingPage() {
           addLog(`👋 Participant ${data.userId} left`);
           setRemoteDisplayStream(null);
           if (data?.userId && data.userId !== meetingService.userId) {
+            const participantRole = String(data?.role || '').toLowerCase();
+            const participantId = String(data?.userId || '').toLowerCase();
+            const adminLeft = participantRole === 'admin' || participantId.startsWith('admin-');
+
+            if (adminLeft) {
+              pushMeetingNotice('admin left....', 'warning');
+              if (role === 'client') {
+                setIsConnected(false);
+                setShowHostLeftPrompt(true);
+              }
+              return;
+            }
+
             pushMeetingNotice(`Participant left: ${data.userId}`, 'warning');
           }
       };
@@ -780,7 +798,15 @@ export default function MeetingPage() {
     } catch (error) {
       addLog(`❌ Error: ${error.message}`);
       setError(error.message);
-      alert('Failed to join meeting. Please check your camera and microphone permissions.');
+      const normalizedMessage = String(error?.message || '').toLowerCase();
+      const isHostNotReady = normalizedMessage.includes('wait for host start the meeting');
+      if (isHostNotReady) {
+        pushMeetingNotice('wait for host start the meeting...', 'warning');
+      } else {
+        alert('Failed to join meeting. Please check your camera and microphone permissions.');
+      }
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -1090,11 +1116,14 @@ export default function MeetingPage() {
 
           <button
             onClick={handleJoinMeeting}
-            disabled={isJoined || error} // Simple disable, ideally add isJoining state
-            className={`w-full btn-primary text-lg py-3 ${isJoined ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isJoined || isJoining}
+            className={`w-full btn-primary text-lg py-3 ${(isJoined || isJoining) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {isJoined ? 'Joining...' : 'Join Meeting'}
+            {(isJoined || isJoining) ? 'Joining...' : 'Join Meeting'}
           </button>
+          {error && (
+            <p className="mt-3 text-sm text-red-600 text-center">{error}</p>
+          )}
         </div>
       </div>
     );
@@ -1167,6 +1196,31 @@ export default function MeetingPage() {
                   {notice.message}
                 </div>
               ))}
+            </div>
+          )}
+
+          {role === 'client' && showHostLeftPrompt && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4">
+              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 text-center shadow-2xl">
+                <h3 className="text-lg font-semibold text-white">Host has left the meeting</h3>
+                <p className="mt-2 text-sm text-gray-300">
+                  admin left.... Please leave this meeting and come again in a few minutes.
+                </p>
+                <div className="mt-5 flex justify-center gap-2">
+                  <button
+                    onClick={leaveMeetingNow}
+                    className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+                  >
+                    Leave Meeting
+                  </button>
+                  <button
+                    onClick={leaveMeetingNow}
+                    className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                  >
+                    Come Again Later
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

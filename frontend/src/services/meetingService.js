@@ -31,6 +31,7 @@ class MeetingService {
     this.targetUserId = null;
     this.makingOffer = false;
     this.ignoreOffer = false;
+    this.pendingJoin = null;
     
     // Callbacks
     this.onTranscription = null;
@@ -76,6 +77,12 @@ class MeetingService {
     switch (data.type) {
       case 'joined-meeting':
         console.log('✅ Joined meeting:', data);
+        if (this.pendingJoin) {
+          const { resolve, timeoutId } = this.pendingJoin;
+          clearTimeout(timeoutId);
+          this.pendingJoin = null;
+          resolve(this.localStream);
+        }
         
         // If there are existing participants, WE are the newcomer - we should initiate
         if (data.participants && data.participants.length > 1) {
@@ -147,6 +154,13 @@ class MeetingService {
       
       case 'error':
         console.error('❌ Server error:', data.message);
+        if (this.pendingJoin) {
+          const { reject, timeoutId } = this.pendingJoin;
+          clearTimeout(timeoutId);
+          this.pendingJoin = null;
+          reject(new Error(data.message || 'Failed to join meeting'));
+          this.cleanup();
+        }
         break;
     }
   }
@@ -190,17 +204,32 @@ class MeetingService {
       // Start audio processing for transcription
       await this.startAudioProcessing();
       
-      // Send join message
-      this.send({
-        type: 'join-meeting',
-        meetingId,
-        userId,
-        role
+      // Send join message and wait for server acknowledgement
+      return await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          if (!this.pendingJoin) {
+            return;
+          }
+          this.pendingJoin = null;
+          reject(new Error('Timed out while joining meeting'));
+          this.cleanup();
+        }, 12000);
+
+        this.pendingJoin = { resolve, reject, timeoutId };
+
+        this.send({
+          type: 'join-meeting',
+          meetingId,
+          userId,
+          role
+        });
       });
-      
-      return this.localStream;
     } catch (error) {
       console.error('❌ Error getting user media:', error);
+      if (this.pendingJoin) {
+        clearTimeout(this.pendingJoin.timeoutId);
+        this.pendingJoin = null;
+      }
       throw error;
     }
   }
@@ -793,6 +822,11 @@ class MeetingService {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+    }
+
+    if (this.pendingJoin) {
+      clearTimeout(this.pendingJoin.timeoutId);
+      this.pendingJoin = null;
     }
   }
 }
