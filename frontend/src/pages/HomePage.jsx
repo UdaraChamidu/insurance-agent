@@ -1,9 +1,43 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, Calendar, Phone, ArrowRight, CheckCircle } from 'lucide-react';
+import { Shield, Users, Calendar, ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const helpTopics = [
+    'Individual & family health insurance',
+    'Medicare guidance',
+    'Small business coverage',
+    'Life & supplemental insurance',
+  ];
+
+  const howItWorksSteps = [
+    {
+      title: 'Share Your Needs',
+      icon: Users,
+      description:
+        'Designed for ease, this solution offers reliable performance and effortless usability for everyday needs.',
+    },
+    {
+      title: 'Review Your Options',
+      icon: Calendar,
+      description:
+        'Designed for ease, this solution offers reliable performance and effortless usability for everyday needs.',
+    },
+    {
+      title: 'Get Personalized Guidance',
+      icon: Shield,
+      description:
+        'Designed for ease, this solution offers reliable performance and effortless usability for everyday needs.',
+    },
+  ];
+
+  const trustPoints = [
+    'Licensed professionals',
+    'Compliance-first approach',
+    'Personalized, human guidance',
+    'No-obligation consultation',
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -53,11 +87,11 @@ export default function HomePage() {
             </div>
             
             <h2 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-tight tracking-tight">
-              Protect What <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Matters Most</span>
+              Clear, Human Guidance for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Health Insurance Decisions</span>
             </h2>
             
             <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Experience personalized insurance solutions with expert guidance. Schedule a consultation and discover the perfect coverage for your future.
+              We help individuals, families, and small businesses navigate health insurance options with clarity, compliance, and personal attention.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -84,50 +118,66 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Services */}
       <section id="services" className="py-24 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-white mb-4">Why Choose Elite Deal Broker?</h3>
-            <p className="text-gray-400">Comprehensive protection tailored to your unique lifestyle.</p>
+          <div className="grid lg:grid-cols-2 gap-10 mb-20">
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl">
+              <h3 className="text-3xl font-bold text-white mb-6">WHAT WE HELP WITH</h3>
+              <ul className="space-y-4">
+                {helpTopics.map((topic) => (
+                  <li key={topic} className="flex items-start gap-3 text-gray-200">
+                    <CheckCircle className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+                    <span>{topic}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl">
+              <h3 className="text-3xl font-bold text-white mb-6">Why Choose Elite Deal Broker</h3>
+              <ul className="space-y-4 mb-8">
+                {trustPoints.map((point) => (
+                  <li key={point} className="flex items-start gap-3 text-gray-200">
+                    <CheckCircle className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-gray-300 italic border-l-2 border-cyan-400/60 pl-4">
+                Our role is to help you understand - not to pressure you.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-center mb-12">
+            <h3 className="text-3xl font-bold text-white mb-4">HOW IT WORKS</h3>
+            <p className="text-gray-400">Three simple steps to move from uncertainty to confidence.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl hover:bg-white/10 transition-all group">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
-                <Shield className="h-7 w-7 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Comprehensive Coverage</h3>
-              <p className="text-gray-400 leading-relaxed">
-                Life, health, auto, and home insurance plans designed to provide maximum security for you and your family.
-              </p>
-            </div>
-            
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl hover:bg-white/10 transition-all group">
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform">
-                <Users className="h-7 w-7 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Expert Advisors</h3>
-              <p className="text-gray-400 leading-relaxed">
-                Access to licensed professionals dedicated to finding the best rates and coverage options available.
-              </p>
-            </div>
-            
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl hover:bg-white/10 transition-all group">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-purple-500/20 group-hover:scale-110 transition-transform">
-                <Phone className="h-7 w-7 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">24/7 Support</h3>
-              <p className="text-gray-400 leading-relaxed">
-                Round-the-clock assistance for claims, questions, and emergency support whenever you need it most.
-              </p>
-            </div>
+            {howItWorksSteps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div
+                  key={step.title}
+                  className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-2xl hover:bg-white/10 transition-all group"
+                >
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
+                    <Icon className="h-7 w-7 text-white" />
+                  </div>
+                  <p className="text-sm font-semibold text-cyan-300 mb-2">Step {index + 1}</p>
+                  <h4 className="text-xl font-bold text-white mb-3">{step.title}</h4>
+                  <p className="text-gray-300 leading-relaxed">{step.description}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 relative overflow-hidden">
+      <section id="contact" className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-blue-600/10"></div>
         <div className="max-w-4xl mx-auto px-6 relative z-10 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Secure Your Future?</h2>
