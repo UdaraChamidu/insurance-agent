@@ -36,7 +36,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-slate-900 flex">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/50 dark:bg-slate-900 flex">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -47,7 +47,7 @@ export default function AdminLayout() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-white/10 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
+        fixed inset-y-0 left-0 z-30 w-64 bg-white/95 dark:bg-slate-800 border-r border-gray-200/80 dark:border-white/10 shadow-xl shadow-slate-200/60 dark:shadow-none transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-white/10">
@@ -100,7 +100,7 @@ export default function AdminLayout() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
-        <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-white/10 h-16 flex items-center justify-between px-4 lg:px-8">
+        <header className="bg-white/85 dark:bg-slate-800 backdrop-blur border-b border-gray-200/80 dark:border-white/10 h-16 flex items-center justify-between px-4 lg:px-8">
           <button 
             className="lg:hidden p-2 -ml-2 text-gray-600 dark:text-gray-300"
             onClick={() => setSidebarOpen(true)}
@@ -114,7 +114,7 @@ export default function AdminLayout() {
               <input 
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-slate-900/50 border border-transparent focus:border-blue-500 rounded-lg focus:outline-none dark:text-white transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-transparent focus:border-blue-500 rounded-lg focus:outline-none text-gray-900 dark:text-white shadow-sm dark:shadow-none transition-all"
               />
             </div>
           </div>
