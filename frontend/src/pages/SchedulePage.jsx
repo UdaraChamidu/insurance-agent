@@ -14,6 +14,7 @@ const TIMEZONE_OPTIONS = [
   { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
   { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
 ];
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 
 export default function SchedulePage() {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ export default function SchedulePage() {
   const [booking, setBooking] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
   const [error, setError] = useState('');
+  const hasValidLeadEmail = isValidEmail(leadEmail);
 
   // Fetch lead context
   useEffect(() => {
@@ -147,6 +149,10 @@ export default function SchedulePage() {
   const handleBooking = async () => {
     if (!selectedDate || !selectedSlot || !leadId) {
       setError('Missing booking information. Please complete the intake form first.');
+      return;
+    }
+    if (!hasValidLeadEmail) {
+      setError('Please provide a valid email in intake before booking.');
       return;
     }
 
@@ -478,7 +484,7 @@ export default function SchedulePage() {
                       )}
                       <button
                         onClick={handleBooking}
-                        disabled={booking}
+                        disabled={booking || !hasValidLeadEmail}
                         className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
                         {booking ? (

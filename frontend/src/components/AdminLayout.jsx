@@ -29,8 +29,8 @@ export default function AdminLayout() {
   ];
 
   const handleLogout = () => {
-    // Clear any auth tokens if implemented later
-    navigate('/');
+    sessionStorage.removeItem('adminAuth');
+    navigate('/admin/login');
   };
 
   return (

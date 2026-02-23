@@ -73,7 +73,7 @@ export default function ProfilePage() {
 
   const confirmLogout = () => {
       sessionStorage.removeItem('adminAuth');
-      navigate('/'); 
+      navigate('/admin/login'); 
   };
 
   const handlePasswordChange = (e) => {

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from email_validator import EmailNotValidError, validate_email
 from app.core.database import SessionLocal
 from app.core.database import SessionLocal
 from app.models import Appointment, AvailabilitySlot, Lead
@@ -22,6 +23,16 @@ class SchedulingService:
     Manages availability slots, computes open time slots, and creates
     appointments with internal WebRTC meeting links.
     """
+
+    def _is_valid_email(self, email: Optional[str]) -> bool:
+        candidate = (email or "").strip()
+        if not candidate:
+            return False
+        try:
+            validate_email(candidate, check_deliverability=False)
+            return True
+        except EmailNotValidError:
+            return False
 
     def get_availability_settings(self) -> List[Dict[str, Any]]:
         """Get all configured availability slots"""
@@ -180,6 +191,8 @@ class SchedulingService:
             lead = db.query(Lead).filter(Lead.id == lead_id).first()
             if not lead:
                 raise ValueError(f"Lead {lead_id} not found")
+            if not self._is_valid_email(lead.email):
+                raise ValueError("Valid email is required before booking an appointment")
 
             # Check if slot is already booked
             existing = db.query(Appointment).filter(

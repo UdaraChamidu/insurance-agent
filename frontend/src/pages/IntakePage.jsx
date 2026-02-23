@@ -10,6 +10,7 @@ export default function IntakePage() {
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -24,6 +25,13 @@ export default function IntakePage() {
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
 
+  const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+
+  useEffect(() => {
+    // Prevent stale lead IDs from prior sessions being reused accidentally.
+    localStorage.removeItem('currentLeadId');
+  }, []);
+
   // Capture UTMs on mount
   const utms = {
     utm_source: searchParams.get('utm_source'),
@@ -35,14 +43,22 @@ export default function IntakePage() {
   const handleBack = () => setStep(prev => prev - 1);
 
   const handleSubmit = async () => {
+    const normalizedEmail = String(formData.email || '').trim();
+    if (!isValidEmail(normalizedEmail)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+    setEmailError('');
+    localStorage.removeItem('currentLeadId');
     setLoading(true);
     try {
       const payload = {
         ...formData,
+        email: normalizedEmail,
         contactInfo: {
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email,
+          email: normalizedEmail,
           phone: formData.phone
         },
         ...utms
@@ -54,9 +70,9 @@ export default function IntakePage() {
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.success) {
+      if (res.ok && data.success) {
         // Save leadId and redirect to Schedule (which is the Microsoft Bookings page)
         localStorage.setItem('currentLeadId', data.leadId);
 
@@ -101,7 +117,10 @@ export default function IntakePage() {
         // You could route to different booking pages here if needed
         navigate('/schedule'); 
       } else {
-        alert('Something went wrong. Please try again.');
+        const details = Array.isArray(data?.detail)
+          ? data.detail.map((d) => d?.msg || '').filter(Boolean).join(', ')
+          : (data?.detail || '');
+        alert(details || 'Something went wrong. Please try again.');
       }
     } catch (error) {
       console.error('Intake error:', error);
@@ -370,11 +389,17 @@ export default function IntakePage() {
                   <input 
                     type="email" 
                     value={formData.email}
-                    onChange={e => setFormData({...formData, email: e.target.value})}
+                    onChange={e => {
+                      setFormData({...formData, email: e.target.value});
+                      if (emailError) setEmailError('');
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-black/20 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-white"
                     placeholder="john@example.com"
                   />
                 </div>
+                {emailError && (
+                  <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                )}
               </div>
 
               <div>

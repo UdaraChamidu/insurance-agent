@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import SchedulePage from './pages/SchedulePage';
 import BookingsPage from './pages/BookingsPage';
@@ -12,6 +12,7 @@ import LeadsPage from './pages/LeadsPage';
 import ClientProfilePage from './pages/ClientProfilePage';
 import ClientsPage from './pages/ClientsPage';
 import ManageAppointmentPage from './pages/ManageAppointmentPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -33,6 +34,24 @@ function LegacyAdminDashboardRedirect() {
   return <Navigate to={`/meeting?${nextParams.toString()}`} replace />;
 }
 
+function RequireAdminAuth({ children }) {
+  const location = useLocation();
+  const isAuthenticated = sessionStorage.getItem('adminAuth') === 'true';
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace state={{ from: location }} />;
+  }
+  return children;
+}
+
+function AdminLoginRedirectIfAuth() {
+  const isAuthenticated = sessionStorage.getItem('adminAuth') === 'true';
+  if (isAuthenticated) {
+    return <Navigate to="/admin/bookings" replace />;
+  }
+  return <AdminLoginPage />;
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -44,9 +63,17 @@ function App() {
             <Route path="/intake" element={<IntakePage />} />
             <Route path="/meeting" element={<MeetingPage />} />
             <Route path="/appointment/manage/:token" element={<ManageAppointmentPage />} />
+            <Route path="/admin/login" element={<AdminLoginRedirectIfAuth />} />
             
             {/* Admin Routes with Layout */}
-            <Route path="/admin" element={<AdminLayout />}>
+            <Route
+              path="/admin"
+              element={(
+                <RequireAdminAuth>
+                  <AdminLayout />
+                </RequireAdminAuth>
+              )}
+            >
               <Route index element={<Navigate to="/admin/bookings" replace />} />
               <Route path="bookings" element={<BookingsPage />} />
               <Route path="clients" element={<ClientsPage />} />
