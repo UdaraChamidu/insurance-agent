@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Users, 
   User,
   FileText, 
@@ -9,16 +8,19 @@ import {
   LogOut, 
   Menu, 
   X,
-  Bell,
   Search,
-  Calendar
+  Calendar,
+  Sun,
+  Moon
 } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
+import { useTheme } from '../context/ThemeContext';
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   const menuItems = [
     { path: '/admin/bookings', label: 'Appointments', icon: Calendar },
@@ -119,9 +121,22 @@ export default function AdminLayout() {
 
           <div className="flex items-center space-x-4">
             <NotificationCenter />
-            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold">
+            <button
+              onClick={toggleTheme}
+              className="h-8 w-8 rounded-full bg-gray-100 dark:bg-slate-900/60 border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={() => navigate('/admin/profile')}
+              className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold hover:opacity-90 transition-opacity"
+              title="Open profile settings"
+              aria-label="Open profile"
+            >
               A
-            </div>
+            </button>
           </div>
         </header>
 
