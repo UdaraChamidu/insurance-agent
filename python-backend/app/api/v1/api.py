@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     scheduling,
     communications,
     client_docs,
+    public_chat,
 )
 
 api_router = APIRouter()
@@ -24,4 +25,5 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(scheduling.router, prefix="/scheduling", tags=["scheduling"])
 api_router.include_router(communications.router, prefix="/communications", tags=["communications"])
 api_router.include_router(client_docs.router, prefix="/client-docs", tags=["client_docs"])
+api_router.include_router(public_chat.router, prefix="/public", tags=["public"])
 

@@ -1,101 +1,373 @@
-# 🏥 Insurance AI Consultant Platform
+# Insurance AI Consultant Platform
 
-**A "Smart" Video Consultation & Intake System for Insurance Agents.**
+A full-stack meeting and sales-assist platform for insurance teams.
 
-This platform streamlines the entire lifecycle of selling insurance—from the moment a lead clicks an ad, to the final policy binding—ensuring compliance and efficiency at every step.
+It combines:
+- lead intake and appointment booking,
+- real-time client meetings (video + audio),
+- live transcription,
+- AI assist with RAG (Gemini + Pinecone),
+- meeting artifact storage (transcript, AI responses, summary),
+- admin workflows for leads, clients, and knowledge-base management.
 
----
+## What This Project Solves
 
-## 🔄 How It Works (The User Journey) 
+Insurance consultations are time-sensitive and compliance-sensitive.  
+This platform helps an admin/agent:
+- understand client needs in real time,
+- get fast AI-assisted responses grounded in internal documents,
+- keep a structured record of calls,
+- move leads through a clear pipeline,
+- reduce manual note-taking and follow-up overhead.
 
-### 1. The "Smart" Intake (`/intake`)
-Instead of a generic contact form, clients go through a **dynamic questionnaire**:
-- **Product Filtering**: Accurately buckets leads into *Medicare*, *ACA (Obamacare)*, or *Life Insurance*.
-- **State Validity**: Checks if the agent is licensed in the client's state (default: FL).
-- **Trigger Capture**: Identifies high-intent signals (e.g., "Turning 65 soon", "Just moved").
-- **Result**: Creates a **Lead Session** in Supabase and syncs a "New Lead" contact to **GoHighLevel (CRM)**.
+## Core Features
 
-### 2. Intelligent Scheduling
-Once a lead is qualified, they don't just see a generic calendar. The system routes them to the **specific Microsoft Booking calendar** for their product type (e.g., a "Medicare Specialist" calendar vs. a "Family Plan" calendar).
+### 1. Public Client Flow
+- `Home` page for public entry.
+- `Intake` form to collect product type, contact details, and context.
+- `Schedule` page for appointment booking with timezone support.
+- Public appointment management links (cancel/reschedule by token).
+- Client meeting join via secure meeting link.
 
-### 3. The Consultation Room (`/meeting`)
-The agent and client meet in a custom video room (WebRTC) that gives the agent **Superpowers**:
-- **Script Panel**: Automatically loads the *exact* compliance script required for the client's product (e.g., CMS Disclaimer for Medicare).
-- **Compliance Checklist**: Interactive checklist to ensure no required disclosures are missed.
-- **Agent Tools**: Quick access to carrier-specific lookups and cheat sheets.
-- *(Future)* **AI Copilot**: Live transcription and RAG-based answer suggestions.
+### 2. Admin Workspace
+- Admin layout with dedicated sections:
+  - Appointments
+  - Clients
+  - Lead Pipeline
+  - Knowledge Base
+  - Settings
+- Client profile page with:
+  - profile details,
+  - meeting artifacts,
+  - AI notes,
+  - uploaded documents.
 
-### 4. The Wrap-Up & Sync
-When the call ends, the agent fills out a **Wrap-Up Form** directly in the dashboard:
-- **Disposition**: What happened? (Sold, Quoted, Not Interested).
-- **Notes**: Key details from the call.
-- **Sync**: One click saves everything to:
-    1.  **Supabase** (Permanent Database).
-    2.  **GoHighLevel** (Updates the contact tags, notes, and pipeline stage).
+### 3. Real-Time Meeting Experience
+- WebRTC for audio/video between client and admin.
+- WebSocket signaling and event transport.
+- Real-time client speech transcription.
+- AI suggestions shown in admin meeting panel.
+- Split panel meeting UI with resizable sections.
+- Wrap-up flow with:
+  - summary generation,
+  - download options (JSON/CSV),
+  - save-to-database actions.
 
----
+### 4. AI + RAG Assist
+- Speech-to-text pipeline (Deepgram configurable).
+- Gemini response generation with retrieval context.
+- Pinecone-backed knowledge retrieval across namespaces.
+- Draft/final response modes for low-latency assist.
+- Verification warning when no strong sources are found.
 
-## 🧠 System Architecture
+### 5. Knowledge Base and Document Pipeline
+- SharePoint document polling and ingestion.
+- Auto extract/chunk/embed/upsert pipeline to Pinecone.
+- Tracks processed/processing/error/no-vector states.
+- Admin visibility for ingestion status and vector counts.
+- Reprocess endpoint for targeted re-ingestion.
 
-### 📂 The "Brain" (Knowledge Base)
-- **SharePoint Integration**: The system watches specific SharePoint folders (e.g., `02_CMS_Medicare_Authority`).
-- **Auto-Ingestion**: When a new PDF/Doc is uploaded to SharePoint, the backend automatically downloads, chunks, and embeds it into **Pinecone**.
-- **Result**: The agent (and future AI) has instant access to the latest carrier policies and state regulations.
+### 6. Persistence and Integrations
+- PostgreSQL (Supabase) for core app data.
+- Optional integrations for:
+  - SharePoint (Microsoft Graph),
+  - Pinecone,
+  - Deepgram,
+  - Gemini,
+  - Twilio,
+  - GoHighLevel.
 
-### 🗄️ The Database (Supabase + Prisma)
-We moved away from temporary memory to a robust PostgreSQL setup:
-- **Leads**: Stores intake data and UTM parameters.
-- **Sessions**: Tracks call start/end times and status.
-- **Transcripts**: (Prepared) Stores conversation history for AI analysis.
+## High-Level Architecture
 
----
+Client/Admin Browser
+-> React app (Vite)
+-> FastAPI backend (`/api`, `/api/meetings/ws`)
+-> External services:
+- Deepgram (STT),
+- Gemini (LLM/embeddings),
+- Pinecone (vector search),
+- Supabase Postgres + Storage,
+- SharePoint (document source),
+- Optional CRM/communications providers.
 
-## 🚀 Developer Setup
+### Meeting Data Path (Simplified)
+1. Client speaks in browser.
+2. Audio is captured and streamed to backend over WebSocket.
+3. Backend runs STT and emits transcription to admin.
+4. Transcription triggers AI assist pipeline with RAG retrieval.
+5. AI suggestions stream to admin panel.
+6. Transcription + AI + full chat + summary can be persisted and exported.
 
-### Prerequisites
-- Node.js v18+
-- Supabase Project (PostgreSQL)
-- *(Optional)*: OpenAI API Key, GoHighLevel API Key, Microsoft Graph Credentials
+## Tech Stack
 
-### 1. Installation
+### Frontend
+- React 18
+- Vite
+- Tailwind CSS
+- React Router
+- WebRTC + WebSocket client logic
+
+### Backend
+- FastAPI
+- SQLAlchemy
+- Uvicorn
+- Pydantic / pydantic-settings
+
+### Data / AI / Integrations
+- Supabase (Postgres + Storage)
+- Gemini (LLM + embeddings)
+- Pinecone (vector DB)
+- Deepgram (speech-to-text)
+- Microsoft Graph / SharePoint
+- Twilio (optional)
+- GoHighLevel (optional)
+
+## Repository Structure
+
+```text
+.
+|-- frontend/
+|   |-- src/
+|   |   |-- pages/
+|   |   |-- components/
+|   |   |-- services/
+|   |   `-- utils/
+|   `-- package.json
+|-- python-backend/
+|   |-- app/
+|   |   |-- api/v1/endpoints/
+|   |   |-- services/
+|   |   |-- models.py
+|   |   `-- main.py
+|   |-- tests/
+|   |-- requirements.txt
+|   |-- railway.toml
+|   `-- Procfile
+`-- README.md
+```
+
+## Local Development Setup
+
+## Prerequisites
+- Node.js 18+
+- Python 3.10+
+- A Postgres/Supabase database
+- API keys for the services you plan to use
+
+## 1) Backend Setup
+
 ```bash
-# Backend
-cd backend
-npm install
-npx prisma generate  # Generate DB client
+cd python-backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-# Frontend
+Create env file:
+
+```bash
+copy .env.example .env
+```
+
+Start backend:
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+Health checks:
+- `http://localhost:8000/health`
+- `http://localhost:8000/docs`
+
+## 2) Frontend Setup
+
+```bash
 cd frontend
 npm install
 ```
 
-### 2. Environment Variables (`.env`)
-You need a `.env` file in `backend/` with at least:
-```env
-PORT=3001
-DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres"
-# Add OpenAI/GHL keys for full features
+Create env file:
+
+```bash
+copy .env.example .env
 ```
 
-### 3. Running Locally
-```bash
-# Terminal 1 (Backend)
-cd backend
-npm start
+Start frontend:
 
-# Terminal 2 (Frontend)
-cd frontend
+```bash
 npm run dev
 ```
-Visit `http://localhost:5173` to start.
 
----
+App URL:
+- `http://localhost:3000` (Vite config in this repo)
 
-## 🗺️ Roadmap
+## Environment Variables
 
-- [x] **Phase 1**: Core Intake & CRM Sync
-- [x] **Phase 2**: Agent Dashboard & Scripts
-- [x] **Phase 3**: RAG / Document Ingestion
-- [x] **Phase 4**: Database Persistence (Supabase)
-- [ ] **Phase 5**: AI Intelligence (Live Transcription & Suggestions)
-- [ ] **Phase 6**: Twilio Voice Integration (Phone Calls)
+### Frontend (`frontend/.env`)
+- `VITE_API_URL` -> backend base URL (HTTP local, HTTPS production)
+- `VITE_WS_URL` -> backend WS base URL (WS local, WSS production)
+
+### Backend (`python-backend/.env`) important keys
+- App/core:
+  - `PORT`
+  - `ENVIRONMENT`
+  - `CORS_ORIGINS`
+- Database:
+  - `DATABASE_URL`
+  - `SUPABASE_URL`
+  - `SUPABASE_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- AI/RAG:
+  - `GEMINI_API_KEY`
+  - `PINECONE_API_KEY`
+  - `PINECONE_INDEX_NAME`
+- STT:
+  - `DEEPGRAM_API_KEY`
+  - `MEETING_STT_PROVIDER`
+  - `MEETING_DEEPGRAM_*` tuning values
+- SharePoint:
+  - `MICROSOFT_CLIENT_ID`
+  - `MICROSOFT_TENANT_ID`
+  - `MICROSOFT_CLIENT_SECRET`
+  - `SHAREPOINT_SITE_URL`
+
+Use `python-backend/.env.example` as the canonical reference.
+
+## Deployment
+
+## Backend (Railway)
+
+Use `python-backend` as Railway root directory.
+
+This repo already includes:
+- `python-backend/Procfile`
+- `python-backend/railway.toml`
+
+Expected start command:
+- `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
+
+## Frontend (Vercel)
+
+Use `frontend` as project root.
+
+Recommended settings:
+- Framework: Vite
+- Build command: `npm run build`
+- Output directory: `dist`
+- Production branch: `main`
+
+Production env vars:
+- `VITE_API_URL=https://<your-railway-domain>`
+- `VITE_WS_URL=wss://<your-railway-domain>`
+
+## API Surface (Summary)
+
+Base prefix: `/api`
+
+Main groups:
+- `/api/leads`
+- `/api/meetings` + `/api/meetings/ws`
+- `/api/scheduling`
+- `/api/documents`
+- `/api/admin/settings`
+- `/api/notifications`
+- `/api/client-docs`
+- `/api/communications`
+- `/api/health`
+
+Interactive docs:
+- `/docs`
+- `/redoc`
+
+## Data Model Overview
+
+Main entities:
+- `Lead`
+- `Session`
+- `Transcript`
+- `Appointment`
+- `AvailabilitySlot`
+- `Document`
+- `Notification`
+
+These are defined in `python-backend/app/models.py`.
+
+## Latency and Quality Tuning
+
+Meeting responsiveness is controlled by:
+- frontend audio buffering and send intervals,
+- STT provider settings (`MEETING_DEEPGRAM_*`),
+- AI trigger cadence (`MEETING_AI_*`),
+- RAG thresholds (`MEETING_RAG_*`).
+
+For lower latency:
+- keep WS endpoint on `wss://` in production,
+- avoid mixed-content redirects,
+- tune STT endpointing/utterance settings carefully,
+- monitor `/health/latency`.
+
+## Troubleshooting
+
+### 1) Mixed Content / Failed to fetch on leads or clients
+Symptom:
+- Browser blocks `http://...` API call from `https://` frontend.
+
+Actions:
+- Ensure frontend uses `https://` + `wss://` env vars in production.
+- Ensure backend honors proxy headers (already configured in `app/main.py`).
+- Verify deployed frontend bundle is latest (not stale hashed JS).
+
+### 2) `/api/leads` redirect issues in production
+Symptom:
+- Redirect to non-secure URL can break browser requests.
+
+Actions:
+- Use trailing-slash endpoint call pattern where required.
+- Keep proxy header middleware enabled so generated redirects use HTTPS.
+
+### 3) Railway "No start command found"
+Actions:
+- Confirm root directory is `python-backend`.
+- Keep `Procfile` / `railway.toml` committed.
+
+### 4) Slow or missing live transcription
+Actions:
+- Verify `DEEPGRAM_API_KEY`.
+- Check `MEETING_STT_PROVIDER=deepgram`.
+- Tune endpointing/utterance/keepalive env values.
+- Watch backend logs for Deepgram timeout errors.
+
+## Testing
+
+Backend tests:
+
+```bash
+cd python-backend
+python -m pytest tests/test_audio_service.py -q
+```
+
+Frontend build check:
+
+```bash
+npm --prefix frontend run build
+```
+
+## Security and Compliance Notes
+
+- Do not commit real API keys or secrets.
+- Replace demo/simple admin auth with proper auth for production.
+- Follow regional compliance requirements for call transcription and data retention.
+- Obtain appropriate consent before recording/transcribing user conversations.
+
+## Useful File References
+
+- `frontend/src/pages/MeetingPage.jsx`
+- `frontend/src/services/meetingService.js`
+- `frontend/src/services/leadsService.js`
+- `python-backend/app/main.py`
+- `python-backend/app/api/v1/endpoints/meetings.py`
+- `python-backend/app/services/meeting/audio_service.py`
+- `python-backend/app/services/document/poller.py`
+- `python-backend/app/services/rag/orchestrator.py`
+- `python-backend/.env.example`
+

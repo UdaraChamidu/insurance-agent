@@ -1,9 +1,58 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, Calendar, ArrowRight, CheckCircle } from 'lucide-react';
+import { Shield, Users, Calendar, ArrowRight, CheckCircle, MessageCircle, Send, X, Bot } from 'lucide-react';
+import publicChatService from '../services/publicChatService';
+
+const HOMEPAGE_FAQ_ITEMS = [
+  {
+    question: 'What services do you offer?',
+    answer:
+      'We help with individual and family health insurance, Medicare guidance, small business coverage, and life or supplemental insurance consultations.',
+  },
+  {
+    question: 'How do I book a consultation?',
+    answer:
+      'Click "Schedule Consultation", complete intake, select an available slot, and confirm your appointment.',
+  },
+  {
+    question: 'How does the meeting work?',
+    answer:
+      'You join a secure meeting link and speak with an agent. The process is designed for clear guidance and fast follow-up.',
+  },
+  {
+    question: 'How long is a consultation?',
+    answer:
+      'Most consultations are around 30 minutes, depending on your needs and questions.',
+  },
+  {
+    question: 'Can I cancel or reschedule?',
+    answer:
+      'Yes. You can use your appointment management link to cancel or reschedule easily.',
+  },
+  {
+    question: 'Is there any obligation to buy?',
+    answer:
+      'No. The consultation is guidance-first and no-obligation in positioning.',
+  },
+];
+
+const INITIAL_CHAT_MESSAGE = {
+  id: 'welcome-chat',
+  role: 'assistant',
+  content:
+    "Hi! I’m here to answer your questions about the platform and services. If you need personal plan advice, please book a consultation.",
+};
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatSending, setIsChatSending] = useState(false);
+  const [chatMessages, setChatMessages] = useState([INITIAL_CHAT_MESSAGE]);
+  const messagesEndRef = useRef(null);
+  const chatSessionIdRef = useRef(`public-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const chatMessagesRef = useRef([INITIAL_CHAT_MESSAGE]);
+
   const helpTopics = [
     'Individual & family health insurance',
     'Medicare guidance',
@@ -39,8 +88,62 @@ export default function HomePage() {
     'No-obligation consultation',
   ];
 
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
+
+  useEffect(() => {
+    if (isChatOpen && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [chatMessages, isChatOpen]);
+
+  const addChatMessage = (message) => {
+    const payload = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      ...message
+    };
+    setChatMessages((prev) => [...prev, payload]);
+  };
+
+  const sendChatMessage = async (rawText = null) => {
+    const text = (rawText ?? chatInput).trim();
+    if (!text || isChatSending) return;
+
+    addChatMessage({ role: 'user', content: text });
+    setChatInput('');
+    setIsChatSending(true);
+
+    const history = chatMessagesRef.current
+      .slice(-8)
+      .map((item) => ({ role: item.role, content: item.content }));
+
+    try {
+      const response = await publicChatService.askQuestion({
+        message: text,
+        sessionId: chatSessionIdRef.current,
+        mode: 'chat',
+        history
+      });
+
+      addChatMessage({
+        role: 'assistant',
+        content: response?.answer || 'I can help with booking and platform questions.'
+      });
+    } catch (error) {
+      console.error('Public chat error:', error);
+      addChatMessage({
+        role: 'assistant',
+        content:
+          'I could not respond right now. You can still book a consultation and speak with an agent directly.'
+      });
+    } finally {
+      setIsChatSending(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative">
       {/* Header */}
       <header className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -60,6 +163,7 @@ export default function HomePage() {
                   Book Consultation
                 </button>
                 <a href="#services" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">Services</a>
+                <a href="#faq" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">Q&A</a>
                 <a href="#contact" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">Contact</a>
               </div>
               <button
@@ -176,6 +280,25 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Q&A Section */}
+      <section id="faq" className="py-20 bg-black/10">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h3 className="text-3xl font-bold text-white mb-3">Common Questions</h3>
+            <p className="text-gray-400">Quick answers before you schedule your consultation.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {HOMEPAGE_FAQ_ITEMS.map((item) => (
+              <div key={item.question} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <h4 className="text-white font-semibold text-base mb-2">{item.question}</h4>
+                <p className="text-gray-300 text-sm leading-relaxed">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section id="contact" className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-blue-600/10"></div>
@@ -205,6 +328,92 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      {!isChatOpen && (
+        <button
+          type="button"
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-white shadow-xl shadow-blue-600/30 hover:bg-blue-500 transition-colors"
+          aria-label="Open chatbot"
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="text-sm font-semibold">Ask Us</span>
+        </button>
+      )}
+
+      {isChatOpen && (
+        <div className="fixed bottom-4 right-3 z-50 w-[calc(100vw-1.5rem)] sm:w-[390px] h-[560px] max-h-[78vh] rounded-2xl border border-white/15 bg-slate-900/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-blue-600/20 border border-blue-500/30 p-1.5">
+                  <Bot className="h-4 w-4 text-blue-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Platform Assistant</p>
+                  <p className="text-[11px] text-gray-400">General info, services, booking flow</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(false)}
+                className="rounded-md p-1.5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close chatbot"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
+            {chatMessages.map((message) => (
+              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[88%] rounded-2xl px-3 py-2 ${
+                  message.role === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/8 border border-white/10 text-gray-100'
+                }`}>
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                </div>
+              </div>
+            ))}
+
+            {isChatSending && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl bg-white/8 border border-white/10 px-3 py-2 text-xs text-gray-300">
+                  Thinking...
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form
+            className="shrink-0 border-t border-white/10 px-3 py-2 flex items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendChatMessage();
+            }}
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="Ask anything about the platform or services..."
+              className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              maxLength={350}
+            />
+            <button
+              type="submit"
+              disabled={isChatSending || !chatInput.trim()}
+              className="rounded-xl bg-blue-600 p-2.5 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500 transition-colors"
+              aria-label="Send"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
