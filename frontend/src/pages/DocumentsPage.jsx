@@ -9,6 +9,7 @@ import { getApiBaseUrl } from '../utils/network';
 
 const API_URL = getApiBaseUrl();
 const REFRESH_INTERVAL = 30000; // 30 seconds
+const SHAREPOINT_URL = 'https://helmygenesis.sharepoint.com/sites/EliteDealBroker/SitePages/CollabHome.aspx?ga=1';
 
 export default function DocumentsPage() {
   const navigate = useNavigate();
@@ -181,6 +182,14 @@ export default function DocumentsPage() {
           <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
             Auto-refreshes every 30s
           </span>
+          <a
+            href={SHAREPOINT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
+          >
+            Open SharePoint
+          </a>
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
