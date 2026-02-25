@@ -1638,8 +1638,18 @@ export default function MeetingPage() {
             onClose={() => setShowWrapUp(false)}
             leadId={leadContext?.id || leadIdFromQuery || null}
             initialSummary={summaryData}
-            onSave={(data) => {
+            onSave={async (data) => {
+              if (data?.callSummary) {
+                setSummaryData({
+                  callSummary: data.callSummary || '',
+                  complianceFlags: data.complianceFlags || null,
+                  actionItems: data.actionItems || null
+                });
+                setIsInlineSummaryVisible(true);
+              }
+              await loadMeetingArtifacts();
               addLog(`✅ Wrap-up saved: ${data.disposition}`);
+              pushMeetingNotice('Wrap-up saved successfully.', 'success');
             }}
           />
           {showLeaveConfirm && (

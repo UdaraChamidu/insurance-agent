@@ -56,11 +56,15 @@ export default function ClientsPage() {
   const filteredClients = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return clients;
+    const qCompact = q.replace(/-/g, '');
     return clients.filter((client) => (
       `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase().includes(q)
       || (client.email || '').toLowerCase().includes(q)
       || (client.phone || '').toLowerCase().includes(q)
       || (client.productType || '').toLowerCase().includes(q)
+      || (client.pipelineStatus || '').toLowerCase().includes(q)
+      || (client.id || '').toLowerCase().includes(q)
+      || (client.id || '').toLowerCase().replace(/-/g, '').includes(qCompact)
     ));
   }, [clients, searchTerm]);
 
@@ -99,7 +103,7 @@ export default function ClientsPage() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search clients by name, email, phone, product..."
+          placeholder="Search by name, email, phone, product, or client ID..."
           className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
         />
       </div>
@@ -146,6 +150,7 @@ export default function ClientsPage() {
                               {client.phone}
                             </span>
                           )}
+                          <span>Client ID: {client.id}</span>
                           <span>Product: {client.productType || 'N/A'}</span>
                           <span>Pipeline: {client.pipelineStatus || 'new'}</span>
                         </div>

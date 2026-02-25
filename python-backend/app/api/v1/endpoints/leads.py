@@ -300,7 +300,6 @@ async def get_leads(
                 "status": session.status if session else "new",
                 "disposition": session.disposition if session else None
             })
-            
         return leads_list
 
     except Exception as e:
