@@ -201,8 +201,14 @@ class MeetingService {
       
       console.log('✅ Got local media stream');
       
-      // Start audio processing for transcription
-      await this.startAudioProcessing();
+      // Only client/customer audio should be transcribed and sent to AI.
+      const normalizedRole = String(role || '').trim().toLowerCase();
+      const shouldCaptureForTranscription = normalizedRole !== 'admin' && normalizedRole !== 'host';
+      if (shouldCaptureForTranscription) {
+        await this.startAudioProcessing();
+      } else {
+        this.isRecording = false;
+      }
       
       // Send join message and wait for server acknowledgement
       return await new Promise((resolve, reject) => {
@@ -671,6 +677,11 @@ class MeetingService {
   }
 
   sendAudioChunk(audioChunks, sampleRate = 16000) {
+    const normalizedRole = String(this.role || '').trim().toLowerCase();
+    if (normalizedRole === 'admin' || normalizedRole === 'host') {
+      return;
+    }
+
     const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
     const combined = new Float32Array(totalLength);
     let offset = 0;

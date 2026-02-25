@@ -135,6 +135,10 @@ async def websocket_endpoint(websocket: WebSocket):
             
             elif message_type == "audio-chunk":
                 # Real-time audio processing
+                normalized_role = str(role or "").strip().lower()
+                if normalized_role in {"admin", "host"}:
+                    # Admin microphone audio must never enter transcription/AI pipeline.
+                    continue
                 current_meeting_id = meeting_id or data.get("meetingId")
                 current_user_id = data.get("userId") or user_id
                 audio_data = data.get("audioData")
