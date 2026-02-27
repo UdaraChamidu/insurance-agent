@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar, CheckCircle, Clock, Sun, Loader } from 'lucide-react';
+import { ArrowLeft, User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar, CheckCircle, Clock, Sun, Loader, RefreshCw, Search } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import bookingsService from '../services/bookingsService';
 import { getApiBaseUrl } from '../utils/network';
@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [integrationStatus, setIntegrationStatus] = useState(null);
@@ -112,26 +113,49 @@ export default function ProfilePage() {
   const geminiDailyLimitPct = geminiUsage?.utilization?.softDailyTokenLimitPct;
   const geminiBudgetPct = geminiUsage?.utilization?.softBudgetPct;
 
+  const handleRefresh = () => {
+    loadStats();
+    loadIntegrationStatus();
+  };
+
+  const filteredProviders = (integrationStatus?.providers && searchTerm.trim())
+    ? Object.entries(integrationStatus.providers).filter(([name, data]) => {
+        const q = searchTerm.toLowerCase();
+        const configured = data?.configured ? 'configured' : 'missing';
+        const detail = data?.maskedKey || '';
+        return name.toLowerCase().includes(q) || configured.includes(q) || detail.toLowerCase().includes(q);
+      })
+    : Object.entries(integrationStatus?.providers || {});
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Profile</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage your account settings and preferences</p>
         </div>
-        <button
-          onClick={() => {
-            loadStats();
-            loadIntegrationStatus();
-          }}
-          disabled={loading}
-          className="p-2 bg-blue-50 dark:bg-blue-600/10 hover:bg-blue-100 dark:hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all flex items-center gap-2"
-          title="Refresh Analytics & API Status"
-        >
-          <Loader className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden md:inline font-medium">Refresh Data</span>
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="relative sm:w-72 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search providers/status..."
+              className="w-full pl-10 pr-3 py-2.5 bg-slate-900/40 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+            />
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold"
+            title="Refresh Analytics & API Status"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Profile Card */}
@@ -280,29 +304,18 @@ export default function ProfilePage() {
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <ProviderCard
-                name="Gemini"
-                configured={Boolean(integrationStatus?.providers?.gemini?.configured)}
-                detail={integrationStatus?.providers?.gemini?.maskedKey || 'Not configured'}
-              />
-              <ProviderCard
-                name="Pinecone"
-                configured={Boolean(integrationStatus?.providers?.pinecone?.configured)}
-                detail={
-                  integrationStatus?.providers?.pinecone?.configured
-                    ? `${integrationStatus?.providers?.pinecone?.maskedKey} | vectors: ${integrationStatus?.providers?.pinecone?.totalVectors || 0} | namespaces: ${integrationStatus?.providers?.pinecone?.namespaceCount || 0}`
-                    : 'Not configured'
-                }
-              />
-              <ProviderCard
-                name="Deepgram"
-                configured={Boolean(integrationStatus?.providers?.deepgram?.configured)}
-                detail={
-                  integrationStatus?.providers?.deepgram?.configured
-                    ? `${integrationStatus?.providers?.deepgram?.maskedKey} | model: ${integrationStatus?.providers?.deepgram?.model || 'n/a'}`
-                    : 'Not configured'
-                }
-              />
+              {filteredProviders.map(([name, data]) => (
+                <ProviderCard
+                  key={name}
+                  name={name.charAt(0).toUpperCase() + name.slice(1)}
+                  configured={Boolean(data?.configured)}
+                  detail={
+                    data?.configured
+                      ? data?.maskedKey || 'Configured'
+                      : 'Not configured'
+                  }
+                />
+              ))}
             </div>
 
             <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-900/50 p-4">

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Users, 
-  User,
   FileText, 
   Settings, 
   LogOut, 
@@ -24,8 +23,7 @@ export default function AdminLayout() {
 
   const menuItems = [
     { path: '/admin/bookings', label: 'Appointments', icon: Calendar },
-    { path: '/admin/clients', label: 'Clients', icon: User },
-    { path: '/admin/leads', label: 'Lead Pipeline', icon: Users },
+    { path: '/admin/leads', label: 'Clients', icon: Users },
     { path: '/admin/documents', label: 'Knowledge Base', icon: FileText },
     { path: '/admin/profile', label: 'Settings', icon: Settings },
   ];

@@ -1,28 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Search, Filter, Plus, MoreVertical, Phone, Mail, Calendar,
-  CheckCircle, Clock, AlertCircle, ChevronDown, User, ArrowRight,
-  Loader, RefreshCw, LayoutGrid, List, Eye, Trash2
+  Search, Phone, Mail, Clock, ArrowRight,
+  Loader, RefreshCw, Trash2
 } from 'lucide-react';
 import leadsService from '../services/leadsService';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
-const PIPELINE_STAGES = [
-  { key: 'new', label: 'New Leads', color: 'blue', icon: Plus },
-  { key: 'appointment_booked', label: 'Appointment Booked', color: 'amber', icon: Calendar },
-  { key: 'quoted', label: 'Quoted', color: 'purple', icon: CheckCircle },
-  { key: 'enrolled', label: 'Enrolled', color: 'emerald', icon: CheckCircle },
-  { key: 'lost', label: 'Lost', color: 'red', icon: AlertCircle },
-];
+// In-memory cache to keep list between page navigations
+let leadsCache = null;
 
-const PIPELINE_STAGE_HELP = {
-  new: 'Fresh leads captured from intake. First outreach and qualification should start here.',
-  appointment_booked: 'Leads with an upcoming or confirmed appointment.',
-  quoted: 'Leads that already received a plan quote and are in decision stage.',
-  enrolled: 'Leads converted to customers (policy enrolled/sold).',
-  lost: 'Leads not moving forward or disqualified.',
-};
+const PIPELINE_STAGES = [
+  { key: 'new', label: 'New', color: 'blue' },
+  { key: 'appointment_booked', label: 'Appt booked', color: 'amber' },
+  { key: 'quoted', label: 'Quoted', color: 'purple' },
+  { key: 'enrolled', label: 'Enrolled', color: 'emerald' },
+  { key: 'lost', label: 'Lost', color: 'red' },
+];
 
 const STAGE_COLORS = {
   new:          { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
@@ -38,20 +32,27 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' or 'table'
+  const [stageFilter, setStageFilter] = useState('all');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingLeadId, setDeletingLeadId] = useState(null);
 
   useEffect(() => {
+    if (Array.isArray(leadsCache)) {
+      setLeads(leadsCache);
+      setLoading(false);
+    }
     fetchLeads();
   }, []);
 
   const fetchLeads = async () => {
     try {
-      setLoading(true);
+      if (!leadsCache || leadsCache.length === 0) {
+        setLoading(true);
+      }
       setError('');
       const data = await leadsService.getLeads();
       setLeads(data);
+      leadsCache = data;
     } catch (error) {
       console.error('Failed to fetch leads:', error);
       setError(error.message || 'Failed to fetch leads');
@@ -81,48 +82,57 @@ export default function LeadsPage() {
     }
   };
 
-  const filteredLeads = leads.filter(lead => {
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      lead.firstName?.toLowerCase().includes(q) ||
-      lead.lastName?.toLowerCase().includes(q) ||
-      lead.email?.toLowerCase().includes(q) ||
-      lead.phone?.includes(q)
-    );
-  });
+  const filteredLeads = leads
+    .filter(lead => {
+      if (!searchTerm) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        lead.firstName?.toLowerCase().includes(q) ||
+        lead.lastName?.toLowerCase().includes(q) ||
+        lead.email?.toLowerCase().includes(q) ||
+        lead.phone?.includes(q)
+      );
+    })
+    .filter(lead => (stageFilter === 'all' ? true : (lead.pipelineStatus || 'new') === stageFilter));
 
-  const getLeadsByStage = (stage) => {
-    return filteredLeads.filter(lead => (lead.pipelineStatus || 'new') === stage);
-  };
+  const stageCounts = PIPELINE_STAGES.reduce((acc, stage) => {
+    acc[stage.key] = leads.filter(lead => (lead.pipelineStatus || 'new') === stage.key).length;
+    return acc;
+  }, {});
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center p-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading clients...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Header / Controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Lead Pipeline</h1>
-          <p className="text-gray-400 text-sm mt-1">{leads.length} total leads</p>
+          <h1 className="text-2xl font-bold text-white">Clients</h1>
+          <p className="text-gray-400 text-sm mt-1">{leads.length} total clients</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setViewMode('pipeline')}
-              className={`p-2.5 transition-all ${viewMode === 'pipeline' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2.5 transition-all ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative sm:w-80 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name, email, phone..."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/40 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+            />
           </div>
           <button
             onClick={fetchLeads}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 rounded-xl hover:bg-white/10 transition-all text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -130,16 +140,24 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search leads..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-        />
+      {/* Stage Filter */}
+      <div className="flex flex-wrap gap-2">
+        {['all', ...PIPELINE_STAGES.map(s => s.key)].map(stage => {
+          const isActive = stageFilter === stage;
+          const label = stage === 'all' ? 'All' : PIPELINE_STAGES.find(s => s.key === stage)?.label || stage;
+          const count = stage === 'all' ? leads.length : stageCounts[stage] || 0;
+          return (
+            <button
+              key={stage}
+              onClick={() => setStageFilter(stage)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                isActive ? 'bg-blue-600 text-white border-blue-500' : 'border-white/20 text-gray-200 hover:border-white/40'
+              }`}
+            >
+              {label} {stage !== 'all' && <span className="opacity-70">({count})</span>}
+            </button>
+          );
+        })}
       </div>
 
       {error && (
@@ -148,42 +166,10 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Category Guide */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-gray-300 mb-3">Lead Categories</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-          {PIPELINE_STAGES.map((stage) => {
-            const StageIcon = stage.icon;
-            const stageCount = getLeadsByStage(stage.key).length;
-            const colors = STAGE_COLORS[stage.key];
-            return (
-              <div key={stage.key} className={`rounded-lg border p-3 ${colors.bg} ${colors.border}`}>
-                <div className={`flex items-center justify-between text-xs font-semibold ${colors.text}`}>
-                  <span className="flex items-center gap-1.5">
-                    <StageIcon className="h-3.5 w-3.5" />
-                    {stage.label}
-                  </span>
-                  <span>{stageCount}</span>
-                </div>
-                <p className="mt-2 text-xs text-gray-300">{PIPELINE_STAGE_HELP[stage.key]}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex justify-center py-20">
           <Loader className="w-8 h-8 text-blue-400 animate-spin" />
         </div>
-      ) : viewMode === 'pipeline' ? (
-        <PipelineView
-          leads={filteredLeads}
-          getLeadsByStage={getLeadsByStage}
-          navigate={navigate}
-          onDelete={handleDeleteLead}
-          deletingLeadId={deletingLeadId}
-        />
       ) : (
         <TableView
           leads={filteredLeads}
@@ -195,131 +181,20 @@ export default function LeadsPage() {
 
       <DeleteConfirmModal
         open={!!deleteTarget}
-        title="Delete Lead"
+        title="Delete Client"
         message={
           deleteTarget
             ? `Delete ${(deleteTarget.firstName || '')} ${(deleteTarget.lastName || '')}`.trim() +
-              '?\n\nThis permanently removes the lead and related records.'
+              '?\n\nThis permanently removes the client and related records.'
             : ''
         }
-        confirmLabel="Delete Lead"
+        confirmLabel="Delete Client"
         loading={deletingLeadId === deleteTarget?.id}
         onCancel={() => {
           if (deletingLeadId !== deleteTarget?.id) setDeleteTarget(null);
         }}
         onConfirm={handleConfirmDeleteLead}
       />
-    </div>
-  );
-}
-
-/* ===== PIPELINE / KANBAN VIEW ===== */
-function PipelineView({ leads, getLeadsByStage, navigate, onDelete, deletingLeadId }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 min-h-[500px]">
-      {PIPELINE_STAGES.map(stage => {
-        const stageLeads = getLeadsByStage(stage.key);
-        const colors = STAGE_COLORS[stage.key];
-        const StageIcon = stage.icon;
-
-        return (
-          <div key={stage.key} className="flex flex-col min-h-0">
-            {/* Column Header */}
-            <div className={`flex items-center justify-between px-3 py-2.5 rounded-xl ${colors.bg} border ${colors.border} mb-3`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                <span className={`text-sm font-semibold ${colors.text}`}>{stage.label}</span>
-              </div>
-              <span className={`text-xs font-bold ${colors.text} bg-white/10 px-2 py-0.5 rounded-full`}>
-                {stageLeads.length}
-              </span>
-            </div>
-
-            {/* Cards */}
-            <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1">
-              {stageLeads.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 text-xs">No leads</p>
-                </div>
-              ) : (
-                stageLeads.map(lead => (
-                  <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    navigate={navigate}
-                    onDelete={onDelete}
-                    deletingLeadId={deletingLeadId}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function LeadCard({ lead, navigate, onDelete, deletingLeadId }) {
-  const name = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unknown';
-  const initials = `${(lead.firstName || '?')[0]}${(lead.lastName || '?')[0]}`.toUpperCase();
-
-  return (
-    <div
-      onClick={() => navigate(`/admin/leads/${lead.id}`)}
-      className="bg-white/5 border border-white/10 rounded-xl p-3.5 cursor-pointer hover:border-blue-500/30 hover:bg-white/[0.07] transition-all group"
-    >
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400 text-xs font-bold flex-shrink-0">
-          {initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white truncate">{name}</p>
-          {lead.productType && (
-            <p className="text-xs text-gray-500 truncate">{lead.productType.toUpperCase()}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 transition-colors" />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.(lead);
-            }}
-            disabled={deletingLeadId === lead.id}
-            className="p-1 rounded text-red-400/80 hover:text-red-300 hover:bg-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
-            title="Delete lead"
-          >
-            {deletingLeadId === lead.id ? (
-              <Loader className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        {lead.email && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Mail className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">{lead.email}</span>
-          </div>
-        )}
-        {lead.phone && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Phone className="w-3 h-3 flex-shrink-0" />
-            <span>{lead.phone}</span>
-          </div>
-        )}
-      </div>
-
-      {lead.createdAt && (
-        <div className="flex items-center gap-1 mt-2 text-xs text-gray-600">
-          <Clock className="w-3 h-3" />
-          <span>{new Date(lead.createdAt).toLocaleDateString()}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -344,7 +219,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
             {leads.length === 0 ? (
               <tr>
                 <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                  No leads found.
+                  No clients found.
                 </td>
               </tr>
             ) : (
@@ -404,7 +279,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                             navigate(`/admin/leads/${lead.id}`);
                           }}
                           className="p-1 text-gray-500 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                          title="Open lead"
+                          title="Open client"
                         >
                           <ArrowRight className="h-4 w-4" />
                         </button>
@@ -415,7 +290,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                           }}
                           disabled={deletingLeadId === lead.id}
                           className="p-1 text-red-400/80 hover:text-red-300 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                          title="Delete lead"
+                          title="Delete client"
                         >
                           {deletingLeadId === lead.id ? (
                             <Loader className="h-4 w-4 animate-spin" />
@@ -433,7 +308,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
         </table>
       </div>
       <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between text-sm text-gray-500">
-        <span>Showing {leads.length} leads</span>
+        <span>Showing {leads.length} clients</span>
       </div>
     </div>
   );

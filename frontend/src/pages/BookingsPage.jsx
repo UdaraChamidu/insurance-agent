@@ -4,7 +4,7 @@ import bookingsService from '../services/bookingsService';
 import {
   Calendar, Clock, User, Mail, Phone, MapPin,
   Video, CheckCircle, XCircle, Loader, RefreshCw,
-  ChevronDown, Search, Filter, ArrowRight, AlertCircle, Trash2
+  ChevronDown, Search, ArrowRight, AlertCircle, Trash2
 } from 'lucide-react';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
@@ -16,34 +16,51 @@ const STATUS_COLORS = {
   no_show:   { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20', label: 'No Show' },
 };
 
+const STATUS_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'no_show', label: 'No Show' },
+];
+
+// simple cache to avoid blank state on navigation
+let appointmentsCache = null;
+
 export default function BookingsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
-    setLoading(true);
+    if (!appointmentsCache || appointmentsCache.length === 0) {
+      setLoading(true);
+    }
     setError('');
     try {
-      const filters = {};
-      if (statusFilter) filters.status = statusFilter;
-      const data = await bookingsService.getAppointments(filters);
+      const data = await bookingsService.getAppointments({});
       setAppointments(data);
+      appointmentsCache = data;
     } catch (err) {
       setError('Failed to load appointments. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, []);
 
   useEffect(() => {
+    if (Array.isArray(appointmentsCache)) {
+      setAppointments(appointmentsCache);
+      setLoading(false);
+    }
     fetchAppointments();
   }, [fetchAppointments]);
 
@@ -132,23 +149,51 @@ export default function BookingsPage() {
       (apt.date || '').includes(q) ||
       (apt.serviceName || '').toLowerCase().includes(q)
     );
-  });
+  }).filter(apt => (statusFilter === 'all' ? true : apt.status === statusFilter));
+
+  const statusCounts = STATUS_FILTERS.reduce((acc, filter) => {
+    if (filter.key === 'all') {
+      acc[filter.key] = appointments.length;
+      return acc;
+    }
+    acc[filter.key] = appointments.filter((apt) => apt.status === filter.key).length;
+    return acc;
+  }, {});
 
   const upcoming = filtered.filter(a => a.status === 'confirmed' || a.status === 'pending').sort((a, b) => a.date.localeCompare(b.date));
   const past = filtered.filter(a => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
 
+  const renderLoading = (
+    <div className="h-full flex items-center justify-center py-20">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400 mx-auto mb-4" />
+        <p className="text-gray-400">Loading appointments...</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header + Controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Appointments</h1>
           <p className="text-gray-400 text-sm mt-1">{appointments.length} total appointments</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="relative sm:w-80 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, email, or date..."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/40 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+            />
+          </div>
           <button
             onClick={fetchAppointments}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 rounded-xl hover:bg-white/10 transition-all text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -158,32 +203,21 @@ export default function BookingsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, email, or date..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="pl-10 pr-10 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white appearance-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-          >
-            <option value="" className="bg-slate-800">All Statuses</option>
-            <option value="confirmed" className="bg-slate-800">Confirmed</option>
-            <option value="pending" className="bg-slate-800">Pending</option>
-            <option value="completed" className="bg-slate-800">Completed</option>
-            <option value="cancelled" className="bg-slate-800">Cancelled</option>
-            <option value="no_show" className="bg-slate-800">No Show</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-        </div>
+        {STATUS_FILTERS.map((filter) => {
+          const isActive = statusFilter === filter.key;
+          const count = statusCounts[filter.key] || 0;
+          return (
+            <button
+              key={filter.key}
+              onClick={() => setStatusFilter(filter.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                isActive ? 'bg-blue-600 text-white border-blue-500' : 'border-white/20 text-gray-200 hover:border-white/40'
+              }`}
+            >
+              {filter.label} {filter.key !== 'all' && <span className="opacity-70">({count})</span>}
+            </button>
+          );
+        })}
       </div>
 
       {error && (
@@ -194,9 +228,7 @@ export default function BookingsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader className="w-8 h-8 text-blue-400 animate-spin" />
-        </div>
+        renderLoading
       ) : (
         <>
           {/* Upcoming Section */}

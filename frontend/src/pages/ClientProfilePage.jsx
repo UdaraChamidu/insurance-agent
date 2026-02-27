@@ -136,7 +136,7 @@ export default function ClientProfilePage() {
         <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
         <p className="text-gray-400 text-lg">Lead not found</p>
         <button onClick={() => navigate('/admin/leads')} className="text-blue-400 hover:text-blue-300 mt-2 text-sm">
-          â† Back to Leads
+          â† Back to Clients
         </button>
       </div>
     );
@@ -173,7 +173,7 @@ export default function ClientProfilePage() {
         className="flex items-center text-gray-400 hover:text-blue-400 transition-colors text-sm"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
-        Back to Leads
+        Back to Clients
       </button>
 
       {/* Profile Header */}

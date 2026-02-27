@@ -1,26 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
-  Database, FileText, Activity, RefreshCw, ArrowLeft, 
+  Database, FileText, Activity, RefreshCw, 
   CheckCircle, AlertCircle, Clock, Zap, HardDrive,
-  RotateCcw, XCircle, ChevronDown, ChevronUp, Bell
+  RotateCcw, XCircle, ChevronDown, ChevronUp, Bell, Search
 } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/network';
 
 const API_URL = getApiBaseUrl();
 const REFRESH_INTERVAL = 30000; // 30 seconds
 const SHAREPOINT_URL = 'https://helmygenesis.sharepoint.com/sites/EliteDealBroker/SitePages/CollabHome.aspx?ga=1';
+let docsCache = null;
 
 export default function DocumentsPage() {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(() => docsCache?.stats || null);
+  const [files, setFiles] = useState(() => docsCache?.files || []);
+  const [loading, setLoading] = useState(() => !docsCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [expandedErrors, setExpandedErrors] = useState(false);
   const [reprocessingKeys, setReprocessingKeys] = useState(new Set());
+  const [fileSearch, setFileSearch] = useState('');
   const prevFileCountRef = useRef(null);
 
   // Fetch stats and files
@@ -52,6 +52,10 @@ export default function DocumentsPage() {
 
       setStats(statsData);
       setFiles(filesData.files || []);
+      docsCache = {
+        stats: statsData,
+        files: filesData.files || [],
+      };
       setError(null);
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -68,6 +72,11 @@ export default function DocumentsPage() {
 
   // Auto-refresh
   useEffect(() => {
+    if (docsCache) {
+      setStats(docsCache.stats || null);
+      setFiles(docsCache.files || []);
+      setLoading(false);
+    }
     fetchData();
     const interval = setInterval(() => fetchData(), REFRESH_INTERVAL);
     return () => clearInterval(interval);
@@ -152,6 +161,15 @@ export default function DocumentsPage() {
   const pinecone = stats?.pinecone || {};
   const errors = ingestion.errors || [];
   const processingFiles = ingestion.processingFiles || [];
+  const filteredFiles = files.filter(f => {
+    const q = fileSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      f.fileName?.toLowerCase().includes(q) ||
+      f.namespace?.toLowerCase().includes(q) ||
+      (f.status || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -170,7 +188,7 @@ export default function DocumentsPage() {
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Database className="h-6 w-6 text-blue-500" />
@@ -178,22 +196,32 @@ export default function DocumentsPage() {
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage document ingestion & vector search status</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="relative sm:w-72 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              value={fileSearch}
+              onChange={(e) => setFileSearch(e.target.value)}
+              placeholder="Search files, namespaces, status..."
+              className="w-full pl-10 pr-3 py-2.5 bg-slate-900/40 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+            />
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400 sm:inline text-center">
             Auto-refreshes every 30s
           </span>
           <a
             href={SHAREPOINT_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all text-sm justify-center"
           >
             Open SharePoint
           </a>
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white rounded-lg transition-all text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold justify-center"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -341,10 +369,10 @@ export default function DocumentsPage() {
               <FileText className="h-5 w-5 text-blue-400" />
               Processed Documents
             </h2>
-            <span className="text-xs text-gray-500">{files.length} file(s)</span>
+            <span className="text-xs text-gray-500">{filteredFiles.length} file(s)</span>
           </div>
 
-          {files.length === 0 ? (
+          {filteredFiles.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-20" />
               <p className="text-lg font-medium">No documents processed yet</p>
@@ -365,7 +393,7 @@ export default function DocumentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {files.map((file) => (
+                  {filteredFiles.map((file) => (
                     <tr key={file.key} className="hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
