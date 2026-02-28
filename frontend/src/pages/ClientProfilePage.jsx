@@ -46,6 +46,7 @@ export default function ClientProfilePage() {
   const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [recordingUrl, setRecordingUrl] = useState('');
+  const [recordingPath, setRecordingPath] = useState('');
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [recordingError, setRecordingError] = useState('');
   const [meetingArtifacts, setMeetingArtifacts] = useState({
@@ -72,7 +73,15 @@ export default function ClientProfilePage() {
       }
       const payload = await res.json();
       const signedUrl = payload?.recording?.url || '';
+      const persistedPath = payload?.recording?.path || '';
       setRecordingUrl(signedUrl);
+      setRecordingPath(persistedPath);
+      if (persistedPath) {
+        setSession((prev) => {
+          if (prev?.recordingLink === persistedPath) return prev;
+          return { ...(prev || {}), recordingLink: persistedPath };
+        });
+      }
     } catch (err) {
       console.error('Error fetching meeting recording:', err);
       setRecordingUrl('');
@@ -117,6 +126,7 @@ export default function ClientProfilePage() {
   const fetchClientData = async () => {
     setLoading(true);
     setRecordingUrl('');
+    setRecordingPath('');
     setRecordingError('');
     setRecordingLoading(false);
     setMeetingArtifacts({
@@ -139,14 +149,7 @@ export default function ClientProfilePage() {
         const leadArtifacts = leadData?.meetingArtifacts || null;
         setMeetingArtifacts(normalizeArtifacts(leadArtifacts));
         await fetchMeetingArtifacts(false, leadArtifacts);
-
-        if (sessionData?.recordingLink) {
-          await fetchMeetingRecording(true);
-        } else {
-          setRecordingUrl('');
-          setRecordingError('');
-          setRecordingLoading(false);
-        }
+        await fetchMeetingRecording(Boolean(sessionData?.recordingLink));
       }
 
       // Fetch appointments for this lead
@@ -275,6 +278,8 @@ export default function ClientProfilePage() {
   const artifactTranscriptions = Array.isArray(meetingArtifacts?.transcriptions) ? meetingArtifacts.transcriptions : [];
   const artifactAiResponses = Array.isArray(meetingArtifacts?.aiResponses) ? meetingArtifacts.aiResponses : [];
   const artifactFullChat = Array.isArray(meetingArtifacts?.fullChat) ? meetingArtifacts.fullChat : [];
+  const effectiveRecordingPath = session?.recordingLink || recordingPath;
+  const hasRecording = Boolean(effectiveRecordingPath);
 
   const tabs = [
     { key: 'overview', label: 'Overview' },
@@ -535,7 +540,7 @@ export default function ClientProfilePage() {
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Meeting Audio Recording</h3>
             <button
               onClick={() => fetchMeetingRecording(true)}
-              disabled={!session?.recordingLink || recordingLoading}
+              disabled={!hasRecording || recordingLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 rounded-lg text-xs hover:bg-white/20 transition-all disabled:opacity-60"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${recordingLoading ? 'animate-spin' : ''}`} />
@@ -543,7 +548,7 @@ export default function ClientProfilePage() {
             </button>
           </div>
 
-          {!session?.recordingLink ? (
+          {!hasRecording ? (
             <p className="text-sm text-gray-500">No recording saved for this client yet.</p>
           ) : recordingLoading && !recordingUrl ? (
             <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -573,9 +578,9 @@ export default function ClientProfilePage() {
             </p>
           )}
 
-          {session?.recordingLink && (
+          {effectiveRecordingPath && (
             <p className="text-xs text-gray-500 break-all">
-              Stored path: {session.recordingLink}
+              Stored path: {effectiveRecordingPath}
             </p>
           )}
         </div>

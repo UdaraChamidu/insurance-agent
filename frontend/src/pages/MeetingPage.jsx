@@ -15,7 +15,7 @@ const LATENCY_SAMPLE_WINDOW = 60;
 const LATENCY_LOG_INTERVAL = 5;
 const MIN_PANEL_WIDTH_PERCENT = 18;
 const DEFAULT_PANEL_WIDTHS = [34, 33, 33];
-const DEFAULT_VIDEO_WIDTH_PERCENT = 58;
+const DEFAULT_VIDEO_WIDTH_PERCENT = 35;
 const MIN_VIDEO_WIDTH_PERCENT = 35;
 const MIN_ADMIN_WIDTH_PERCENT = 25;
 
@@ -154,6 +154,7 @@ export default function MeetingPage() {
   const [activeTab, setActiveTab] = useState('ai'); // 'ai' or 'scripts'
   const [showWrapUp, setShowWrapUp] = useState(false);
   const [leadContext, setLeadContext] = useState(null);
+  const [resolvedLeadId, setResolvedLeadId] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [isSavingArtifacts, setIsSavingArtifacts] = useState(false);
@@ -178,6 +179,7 @@ export default function MeetingPage() {
   const [showRecordingDecision, setShowRecordingDecision] = useState(false);
   const [recordingDecisionReason, setRecordingDecisionReason] = useState('admin-leave');
   const [isRecordingDecisionBusy, setIsRecordingDecisionBusy] = useState(false);
+  const [showClientLeaveConfirm, setShowClientLeaveConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearConfirmConfig, setClearConfirmConfig] = useState({
     target: 'all',
@@ -247,7 +249,7 @@ export default function MeetingPage() {
   };
 
   const getEffectiveLeadId = () => (
-    leadContext?.id || leadIdFromQuery || null
+    leadContext?.id || leadIdFromQuery || resolvedLeadId || null
   );
 
   const mapServerTimestamp = (rawTimestamp) => {
@@ -646,6 +648,7 @@ export default function MeetingPage() {
     }
     if (!effectiveLeadId) {
       addLog('Lead context missing. Meeting audio upload skipped.');
+      pushMeetingNotice('Cannot save recording: this meeting is not linked to a client.', 'warning');
       return false;
     }
 
@@ -662,7 +665,26 @@ export default function MeetingPage() {
         body: formData
       });
       if (!res.ok) {
-        throw new Error(`Recording upload failed (${res.status})`);
+        const rawError = await res.text().catch(() => '');
+        let detail = rawError;
+        try {
+          const parsed = JSON.parse(rawError);
+          detail = parsed?.detail || rawError;
+        } catch {
+          // Keep raw body if it is not JSON.
+        }
+
+        if (res.status === 404) {
+          if (String(detail || '').trim().toLowerCase() === 'not found') {
+            pushMeetingNotice('Recording API unavailable. Restart backend and try again.', 'warning');
+            addLog('Recording upload route missing (/api/leads/{lead_id}/recording).');
+          } else {
+            pushMeetingNotice('Client record not found. Re-open meeting from appointment/client.', 'warning');
+            addLog(`Recording upload failed: ${detail || 'Lead not found'}`);
+          }
+        }
+
+        throw new Error(`Recording upload failed (${res.status})${detail ? `: ${detail}` : ''}`);
       }
 
       clearPendingMeetingRecording();
@@ -772,10 +794,54 @@ export default function MeetingPage() {
     }
   };
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const resolveLeadIdFromMeeting = async () => {
+      if (role !== 'admin') return;
+      if (leadIdFromQuery) {
+        setResolvedLeadId(null);
+        return;
+      }
+      if (!meetingId) {
+        setResolvedLeadId(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/api/scheduling/appointments?limit=500`);
+        if (!res.ok) return;
+
+        const appointments = await res.json();
+        if (!Array.isArray(appointments)) return;
+
+        const matched = appointments.find((apt) => apt?.meetingId === meetingId && apt?.leadId);
+        if (isCancelled) return;
+
+        if (matched?.leadId) {
+          setResolvedLeadId(matched.leadId);
+          addLog(`Lead context resolved from appointment: ${matched.leadId}`);
+        } else {
+          setResolvedLeadId(null);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setResolvedLeadId(null);
+        }
+        console.error('Error resolving lead ID from meeting ID:', err);
+      }
+    };
+
+    void resolveLeadIdFromMeeting();
+    return () => {
+      isCancelled = true;
+    };
+  }, [role, leadIdFromQuery, meetingId]);
+
   // Fetch Lead Context (Phase 2)
   useEffect(() => {
     const fetchLead = async () => {
-      const effectiveLeadId = leadIdFromQuery;
+      const effectiveLeadId = leadIdFromQuery || resolvedLeadId;
 
       if (effectiveLeadId) {
         try {
@@ -797,7 +863,7 @@ export default function MeetingPage() {
       }
     };
     if (role === 'admin') fetchLead();
-  }, [role, leadIdFromQuery]);
+  }, [role, leadIdFromQuery, resolvedLeadId]);
 
   useEffect(() => {
     if (!meetingId) {
@@ -846,6 +912,8 @@ export default function MeetingPage() {
     setShowRecordingDecision(false);
     setRecordingDecisionReason('admin-leave');
     setIsRecordingDecisionBusy(false);
+    setResolvedLeadId(null);
+    setShowClientLeaveConfirm(false);
     setShowClearConfirm(false);
     setClearConfirmConfig({ target: 'all', label: 'meeting data' });
     setIsClearActionRunning(false);
@@ -939,6 +1007,19 @@ export default function MeetingPage() {
     };
   }, [showClearConfirm, isClearActionRunning]);
 
+  useEffect(() => {
+    if (!showClientLeaveConfirm) return undefined;
+    const onEsc = (event) => {
+      if (event.key === 'Escape') {
+        setShowClientLeaveConfirm(false);
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [showClientLeaveConfirm]);
+
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
       alert('Please enter your name');
@@ -968,8 +1049,10 @@ export default function MeetingPage() {
       meetingService.onParticipantJoined = (data) => {
         if (data?.userId && data.userId !== meetingService.userId) {
           addLog(`Participant ${data.userId} joined`);
-          pushMeetingNotice(`Participant joined: ${data.userId}`, 'success');
           const participantIsHost = isHostRole(data?.role) || String(data?.userId || '').toLowerCase().startsWith('admin-');
+          if (role === 'admin') {
+            pushMeetingNotice(participantIsHost ? 'Another admin joined the meeting.' : 'Client joined the meeting.', 'success');
+          }
           if (role === 'admin' && !participantIsHost) {
             setHasClientParticipant(true);
             void maybeAutoStartRecording('client-joined');
@@ -1179,7 +1262,9 @@ export default function MeetingPage() {
             const adminLeft = participantRole === 'admin' || participantId.startsWith('admin-');
 
             if (adminLeft) {
-              pushMeetingNotice('admin left....', 'warning');
+              if (role === 'admin') {
+                pushMeetingNotice('Another admin left the meeting.', 'warning');
+              }
               if (role === 'client') {
                 setIsConnected(false);
                 setShowHostLeftPrompt(true);
@@ -1187,8 +1272,8 @@ export default function MeetingPage() {
               return;
             }
 
-            pushMeetingNotice(`Participant left: ${data.userId}`, 'warning');
             if (role === 'admin') {
+              pushMeetingNotice('Client left the meeting.', 'warning');
               void openRecordingDecisionModal('client-left').then((opened) => {
                 if (opened) {
                   pushMeetingNotice('Client left. Save or discard the recording.', 'warning');
@@ -1233,9 +1318,9 @@ export default function MeetingPage() {
       const normalizedMessage = String(error?.message || '').toLowerCase();
       const isHostNotReady = normalizedMessage.includes('wait for host start the meeting');
       if (isHostNotReady) {
-        pushMeetingNotice('wait for host start the meeting...', 'warning');
+        setError('The advisor has not started the meeting yet. Please try again in a moment.');
       } else {
-        alert('Failed to join meeting. Please check your camera and microphone permissions.');
+        setError('Unable to join right now. Please check camera/microphone permissions and try again.');
       }
     } finally {
       setIsJoining(false);
@@ -1355,9 +1440,7 @@ export default function MeetingPage() {
 
   const endCall = () => {
     if (role !== 'admin') {
-      if (confirm('Are you sure you want to leave the consultation?')) {
-        void leaveMeetingNow();
-      }
+      setShowClientLeaveConfirm(true);
       return;
     }
     setLeaveFlowStep('choice');
@@ -1651,10 +1734,12 @@ export default function MeetingPage() {
           <div className="text-center mb-8">
             <Video className="h-16 w-16 text-blue-600 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Join Consultation
+              {role === 'client' ? 'Join Meeting' : 'Join Consultation'}
             </h1>
             <p className="text-gray-600">
-              You're about to join a video consultation with SecureLife Insurance
+              {role === 'client'
+                ? "You're about to join your scheduled video meeting."
+                : "You're about to join a video consultation with SecureLife Insurance."}
             </p>
           </div>
 
@@ -1696,6 +1781,12 @@ export default function MeetingPage() {
     );
   }
 
+  const clientStatus = showHostLeftPrompt
+    ? { label: 'Meeting Ended', tone: 'bg-red-600/80 border-red-400/40 text-red-100' }
+    : (isConnected
+      ? { label: 'In Call', tone: 'bg-emerald-600/80 border-emerald-400/40 text-emerald-100' }
+      : { label: 'Waiting for Advisor', tone: 'bg-amber-600/80 border-amber-400/40 text-amber-100' });
+
   return (
     <div
       ref={mainLayoutContainerRef}
@@ -1710,11 +1801,20 @@ export default function MeetingPage() {
         <header className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/70 to-transparent px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <h1 className="text-sm md:text-lg font-semibold text-white truncate">Consultation</h1>
+              <h1 className="text-sm md:text-lg font-semibold text-white truncate">
+                {role === 'client' ? 'Video Meeting' : 'Consultation'}
+              </h1>
               {role === 'admin' && <span className="text-[10px] bg-blue-600 px-2 py-0.5 rounded text-white">Admin</span>}
             </div>
-            <div className="text-xs md:text-sm text-gray-300">
-              {userName}
+            <div className="flex items-center gap-2">
+              {role === 'client' && (
+                <span className={`hidden sm:inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${clientStatus.tone}`}>
+                  {clientStatus.label}
+                </span>
+              )}
+              <div className="text-xs md:text-sm text-gray-300">
+                {userName}
+              </div>
             </div>
           </div>
         </header>
@@ -1749,7 +1849,7 @@ export default function MeetingPage() {
             />
           </div>
 
-          {meetingNotices.length > 0 && (
+          {role === 'admin' && meetingNotices.length > 0 && (
             <div className="absolute top-16 right-2 left-2 md:left-auto md:right-4 z-20 space-y-2 max-w-[calc(100%-1rem)] md:max-w-xs">
               {meetingNotices.map((notice) => (
                 <div
@@ -1769,22 +1869,16 @@ export default function MeetingPage() {
           {role === 'client' && showHostLeftPrompt && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4">
               <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 text-center shadow-2xl">
-                <h3 className="text-lg font-semibold text-white">Host has left the meeting</h3>
+                <h3 className="text-lg font-semibold text-white">Meeting Ended</h3>
                 <p className="mt-2 text-sm text-gray-300">
-                  admin left.... Please leave this meeting and come again in a few minutes.
+                  Your advisor has left the meeting. You can leave now and rejoin later if needed.
                 </p>
                 <div className="mt-5 flex justify-center gap-2">
                   <button
                     onClick={() => { void leaveMeetingNow(); }}
-                    className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-                  >
-                    Leave Meeting
-                  </button>
-                  <button
-                    onClick={() => { void leaveMeetingNow(); }}
                     className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
                   >
-                    Come Again Later
+                    Leave Meeting
                   </button>
                 </div>
               </div>
@@ -2315,6 +2409,37 @@ export default function MeetingPage() {
                     className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
                   >
                     {isClearActionRunning ? 'Saving...' : 'Save & Clear'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {role === 'client' && showClientLeaveConfirm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  setShowClientLeaveConfirm(false);
+                }
+              }}
+            >
+              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                <h3 className="text-base font-semibold text-white">Leave meeting?</h3>
+                <p className="mt-2 text-sm text-gray-300">
+                  Are you sure you want to leave this video meeting now?
+                </p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowClientLeaveConfirm(false)}
+                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600"
+                  >
+                    Stay
+                  </button>
+                  <button
+                    onClick={() => { void leaveMeetingNow(); }}
+                    className="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                  >
+                    Leave
                   </button>
                 </div>
               </div>
