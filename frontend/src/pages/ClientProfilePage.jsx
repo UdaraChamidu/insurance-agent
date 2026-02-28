@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, Clock,
   FileText, MessageSquare, Shield, CheckCircle, AlertCircle,
-  Loader, Edit2, Save, X, Video, ChevronDown, Download
+  Loader, Edit2, Save, X, Video, ChevronDown, Download, RefreshCw
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 import { getApiBaseUrl } from '../utils/network';
@@ -46,22 +46,58 @@ export default function ClientProfilePage() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [recordingUrl, setRecordingUrl] = useState('');
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [recordingError, setRecordingError] = useState('');
 
   useEffect(() => {
     fetchClientData();
   }, [leadId]);
 
+  const fetchMeetingRecording = async (showLoader = false) => {
+    if (!leadId) return;
+    if (showLoader) setRecordingLoading(true);
+    setRecordingError('');
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${leadId}/recording`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch recording (${res.status})`);
+      }
+      const payload = await res.json();
+      const signedUrl = payload?.recording?.url || '';
+      setRecordingUrl(signedUrl);
+    } catch (err) {
+      console.error('Error fetching meeting recording:', err);
+      setRecordingUrl('');
+      setRecordingError('Unable to load recording link right now.');
+    } finally {
+      if (showLoader) setRecordingLoading(false);
+    }
+  };
+
   const fetchClientData = async () => {
     setLoading(true);
+    setRecordingUrl('');
+    setRecordingError('');
+    setRecordingLoading(false);
     try {
       // Fetch lead
       const leadRes = await fetch(`${API_URL}/api/leads/${leadId}`);
       if (leadRes.ok) {
         const leadData = await leadRes.json();
+        const sessionData = leadData.session || null;
         setLead(leadData);
-        setNotes(leadData.session?.notes || '');
-        setSession(leadData.session || null);
-        setTranscripts(leadData.session?.transcripts || []);
+        setNotes(sessionData?.notes || '');
+        setSession(sessionData);
+        setTranscripts(sessionData?.transcripts || []);
+
+        if (sessionData?.recordingLink) {
+          await fetchMeetingRecording(true);
+        } else {
+          setRecordingUrl('');
+          setRecordingError('');
+          setRecordingLoading(false);
+        }
       }
 
       // Fetch appointments for this lead
@@ -150,6 +186,7 @@ export default function ClientProfilePage() {
   const tabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'summary', label: 'Summary' },
+    { key: 'recording', label: 'Recording' },
     { key: 'appointments', label: `Appointments (${appointments.length})` },
     { key: 'documents', label: `Documents (${documents.length})` },
     { key: 'transcripts', label: `Transcripts (${transcripts.length})` },
@@ -394,6 +431,58 @@ export default function ClientProfilePage() {
           ) : (
             <p className="text-sm text-gray-500">
               No saved summary yet. Generate summary in Meeting page, then click Save to Supabase.
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'recording' && (
+        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Meeting Audio Recording</h3>
+            <button
+              onClick={() => fetchMeetingRecording(true)}
+              disabled={!session?.recordingLink || recordingLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 rounded-lg text-xs hover:bg-white/20 transition-all disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${recordingLoading ? 'animate-spin' : ''}`} />
+              {recordingLoading ? 'Refreshing...' : 'Refresh Link'}
+            </button>
+          </div>
+
+          {!session?.recordingLink ? (
+            <p className="text-sm text-gray-500">No recording saved for this client yet.</p>
+          ) : recordingLoading && !recordingUrl ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader className="w-4 h-4 animate-spin" />
+              Loading recording...
+            </div>
+          ) : recordingUrl ? (
+            <div className="space-y-3">
+              <audio controls preload="metadata" className="w-full" src={recordingUrl}>
+                Your browser does not support audio playback.
+              </audio>
+              <p className="text-xs text-gray-400">
+                If playback fails, click <span className="text-gray-200">Refresh Link</span> to generate a new secure URL.
+              </p>
+              <a
+                href={recordingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+              >
+                Open recording in new tab
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-red-300">
+              {recordingError || 'Recording exists but no playback URL is currently available.'}
+            </p>
+          )}
+
+          {session?.recordingLink && (
+            <p className="text-xs text-gray-500 break-all">
+              Stored path: {session.recordingLink}
             </p>
           )}
         </div>

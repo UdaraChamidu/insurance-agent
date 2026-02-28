@@ -170,8 +170,23 @@ export default function MeetingPage() {
   const [isLeaveActionRunning, setIsLeaveActionRunning] = useState(false);
   const [isLeaveSummarySaved, setIsLeaveSummarySaved] = useState(false);
   const [isLeaveSummaryGenerated, setIsLeaveSummaryGenerated] = useState(false);
+  const [isRecordingUploadInProgress, setIsRecordingUploadInProgress] = useState(false);
+  const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
+  const [isMeetingRecordingActive, setIsMeetingRecordingActive] = useState(false);
+  const [hasPendingRecording, setHasPendingRecording] = useState(false);
+  const [hasClientParticipant, setHasClientParticipant] = useState(false);
+  const [showRecordingDecision, setShowRecordingDecision] = useState(false);
+  const [recordingDecisionReason, setRecordingDecisionReason] = useState('admin-leave');
+  const [isRecordingDecisionBusy, setIsRecordingDecisionBusy] = useState(false);
   const panelContainerRef = useRef(null);
   const mainLayoutContainerRef = useRef(null);
+  const leaveInFlightRef = useRef(false);
+  const meetingAudioRecorderRef = useRef(null);
+  const meetingAudioChunksRef = useRef([]);
+  const pendingMeetingRecordingRef = useRef(null);
+  const recordingContextRef = useRef(null);
+  const recordingDestinationRef = useRef(null);
+  const recordingSourceNodesRef = useRef(new Map());
   const panelResizeRef = useRef({
     dividerIndex: -1,
     startX: 0,
@@ -240,6 +255,18 @@ export default function MeetingPage() {
   };
 
   const normalizeTranscriptStage = (value) => (value === 'draft' ? 'draft' : 'final');
+
+  const isHostRole = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === 'admin' || normalized === 'host';
+  };
+
+  const hasRecordingBuffer = () => (
+    Boolean(meetingAudioRecorderRef.current)
+    || meetingAudioChunksRef.current.length > 0
+    || Boolean(pendingMeetingRecordingRef.current?.size)
+    || hasPendingRecording
+  );
 
   const hydratePersistedArtifacts = (payload) => {
     if (!payload || !payload.success) return;
@@ -386,6 +413,330 @@ export default function MeetingPage() {
     }
   };
 
+  const getRecordingMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') {
+      return '';
+    }
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus'
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  };
+
+  const getRecordingExtension = (mimeType) => {
+    const normalized = String(mimeType || '').toLowerCase();
+    if (normalized.includes('mp4')) return 'mp4';
+    if (normalized.includes('ogg')) return 'ogg';
+    if (normalized.includes('wav')) return 'wav';
+    return 'webm';
+  };
+
+  const clearPendingMeetingRecording = () => {
+    pendingMeetingRecordingRef.current = null;
+    meetingAudioChunksRef.current = [];
+    setHasPendingRecording(false);
+  };
+
+  const cleanupRecordingGraph = async () => {
+    const sourceNodes = recordingSourceNodesRef.current;
+    sourceNodes.forEach((nodeBundle) => {
+      try { nodeBundle.source.disconnect(); } catch { /* no-op */ }
+      try { nodeBundle.gain.disconnect(); } catch { /* no-op */ }
+    });
+    sourceNodes.clear();
+
+    if (recordingDestinationRef.current?.stream) {
+      recordingDestinationRef.current.stream.getTracks().forEach((track) => track.stop());
+    }
+    recordingDestinationRef.current = null;
+
+    if (recordingContextRef.current) {
+      try {
+        await recordingContextRef.current.close();
+      } catch (err) {
+        console.warn('Failed to close recording AudioContext:', err);
+      }
+      recordingContextRef.current = null;
+    }
+  };
+
+  const ensureRecordingGraph = async () => {
+    if (!recordingContextRef.current) {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) {
+        throw new Error('AudioContext is not available in this browser');
+      }
+      recordingContextRef.current = new AudioContextCtor();
+      recordingDestinationRef.current = recordingContextRef.current.createMediaStreamDestination();
+    }
+
+    if (recordingContextRef.current.state === 'suspended') {
+      try {
+        await recordingContextRef.current.resume();
+      } catch (err) {
+        console.warn('Failed to resume recording AudioContext:', err);
+      }
+    }
+  };
+
+  const setRecordingSource = async (sourceKey, stream) => {
+    const existing = recordingSourceNodesRef.current.get(sourceKey);
+    if (existing) {
+      try { existing.source.disconnect(); } catch { /* no-op */ }
+      try { existing.gain.disconnect(); } catch { /* no-op */ }
+      recordingSourceNodesRef.current.delete(sourceKey);
+    }
+
+    if (!stream || stream.getAudioTracks().length === 0) {
+      return;
+    }
+
+    await ensureRecordingGraph();
+    const source = recordingContextRef.current.createMediaStreamSource(stream);
+    const gain = recordingContextRef.current.createGain();
+    gain.gain.value = 1;
+    source.connect(gain);
+    gain.connect(recordingDestinationRef.current);
+    recordingSourceNodesRef.current.set(sourceKey, { source, gain });
+  };
+
+  const startMeetingAudioRecording = async (localStream, options = {}) => {
+    const { replacePending = false } = options;
+    if (role !== 'admin') return;
+    if (!isRecordingEnabled) return;
+    if (!getEffectiveLeadId()) {
+      addLog('Lead context missing. Meeting recording skipped.');
+      return;
+    }
+    if (meetingAudioRecorderRef.current || typeof MediaRecorder === 'undefined') {
+      return;
+    }
+    if (pendingMeetingRecordingRef.current?.size && !replacePending) {
+      addLog('Pending recording exists. Save or discard before starting a new one.');
+      return;
+    }
+
+    try {
+      const streamToUse = localStream || meetingService.localStream;
+      if (!streamToUse) {
+        addLog('Local stream unavailable. Recording start skipped.');
+        return;
+      }
+      if (replacePending) {
+        clearPendingMeetingRecording();
+      }
+
+      await setRecordingSource('local', streamToUse);
+
+      const mixedStream = recordingDestinationRef.current?.stream;
+      if (!mixedStream || mixedStream.getAudioTracks().length === 0) {
+        addLog('No audio tracks available for meeting recording.');
+        return;
+      }
+
+      const mimeType = getRecordingMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(mixedStream, { mimeType })
+        : new MediaRecorder(mixedStream);
+
+      meetingAudioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          meetingAudioChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onerror = (event) => {
+        console.error('Meeting recording error:', event);
+      };
+      recorder.start(1000);
+      meetingAudioRecorderRef.current = recorder;
+      setIsMeetingRecordingActive(true);
+      setHasPendingRecording(false);
+      addLog('Meeting audio recording started.');
+    } catch (err) {
+      console.error('Failed to start meeting recording:', err);
+      setIsMeetingRecordingActive(false);
+      addLog('Meeting audio recording could not start.');
+    }
+  };
+
+  const stopMeetingAudioRecording = async (options = {}) => {
+    const { keepPending = true } = options;
+    const recorder = meetingAudioRecorderRef.current;
+    if (!recorder) {
+      setIsMeetingRecordingActive(false);
+      if (pendingMeetingRecordingRef.current?.size) {
+        return pendingMeetingRecordingRef.current;
+      }
+      await cleanupRecordingGraph();
+      return null;
+    }
+
+    const recordingBlob = await new Promise((resolve) => {
+      const finalize = () => {
+        const chunks = meetingAudioChunksRef.current;
+        meetingAudioChunksRef.current = [];
+        meetingAudioRecorderRef.current = null;
+        if (!chunks.length) {
+          resolve(null);
+          return;
+        }
+        resolve(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
+      };
+
+      if (recorder.state === 'inactive') {
+        finalize();
+        return;
+      }
+
+      recorder.addEventListener('stop', finalize, { once: true });
+      recorder.stop();
+    });
+
+    if (recordingBlob?.size && keepPending) {
+      pendingMeetingRecordingRef.current = recordingBlob;
+      setHasPendingRecording(true);
+    } else if (!keepPending) {
+      clearPendingMeetingRecording();
+    }
+    setIsMeetingRecordingActive(false);
+    await cleanupRecordingGraph();
+    return keepPending ? (pendingMeetingRecordingRef.current || recordingBlob) : null;
+  };
+
+  const discardMeetingAudioRecording = async () => {
+    const hadData = hasRecordingBuffer();
+    if (meetingAudioRecorderRef.current) {
+      await stopMeetingAudioRecording({ keepPending: false });
+    } else {
+      await cleanupRecordingGraph();
+      clearPendingMeetingRecording();
+      setIsMeetingRecordingActive(false);
+    }
+    if (hadData) {
+      pushMeetingNotice('Recording discarded.', 'warning');
+    }
+  };
+
+  const uploadMeetingAudioRecording = async (options = {}) => {
+    const { finalizeIfActive = true } = options;
+    if (role !== 'admin') {
+      await stopMeetingAudioRecording({ keepPending: false });
+      return true;
+    }
+
+    if (finalizeIfActive && meetingAudioRecorderRef.current) {
+      await stopMeetingAudioRecording({ keepPending: true });
+    }
+
+    const effectiveLeadId = getEffectiveLeadId();
+    const recordingBlob = pendingMeetingRecordingRef.current;
+    if (!recordingBlob || recordingBlob.size === 0) {
+      addLog('No captured meeting audio to upload.');
+      return false;
+    }
+    if (!effectiveLeadId) {
+      addLog('Lead context missing. Meeting audio upload skipped.');
+      return false;
+    }
+
+    setIsRecordingUploadInProgress(true);
+    try {
+      const extension = getRecordingExtension(recordingBlob.type);
+      const filename = `meeting-${meetingId}-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
+      const formData = new FormData();
+      formData.append('file', recordingBlob, filename);
+      formData.append('meeting_id', meetingId || '');
+
+      const res = await fetch(`${API_URL}/api/leads/${effectiveLeadId}/recording`, {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error(`Recording upload failed (${res.status})`);
+      }
+
+      clearPendingMeetingRecording();
+      setIsMeetingRecordingActive(false);
+      addLog('Meeting audio uploaded successfully.');
+      pushMeetingNotice('Meeting audio saved.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Meeting recording upload failed:', err);
+      pushMeetingNotice('Meeting audio upload failed.', 'warning');
+      return false;
+    } finally {
+      setIsRecordingUploadInProgress(false);
+    }
+  };
+
+  const maybeAutoStartRecording = async (reason = 'client-joined') => {
+    if (role !== 'admin') return;
+    if (!isRecordingEnabled) return;
+    if (isMeetingRecordingActive || meetingAudioRecorderRef.current) return;
+    if (pendingMeetingRecordingRef.current?.size) return;
+
+    await startMeetingAudioRecording(meetingService.localStream, { replacePending: false });
+    if (meetingAudioRecorderRef.current) {
+      if (reason === 'client-joined') {
+        pushMeetingNotice('Client joined. Recording started automatically.', 'success');
+      }
+    }
+  };
+
+  const toggleMeetingRecording = async () => {
+    if (role !== 'admin') return;
+    if (isMeetingRecordingActive || meetingAudioRecorderRef.current) {
+      setIsRecordingEnabled(false);
+      await stopMeetingAudioRecording({ keepPending: true });
+      pushMeetingNotice('Recording stopped by admin.', 'warning');
+      return;
+    }
+
+    setIsRecordingEnabled(true);
+    if (pendingMeetingRecordingRef.current?.size) {
+      clearPendingMeetingRecording();
+    }
+
+    if (hasClientParticipant || remoteDisplayStream) {
+      await startMeetingAudioRecording(meetingService.localStream, { replacePending: false });
+      if (meetingAudioRecorderRef.current) {
+        pushMeetingNotice('Recording started by admin.', 'success');
+      }
+      return;
+    }
+
+    pushMeetingNotice('Recording armed. It will start when client joins.', 'success');
+  };
+
+  const openRecordingDecisionModal = async (reason) => {
+    if (role !== 'admin') return false;
+    if (showRecordingDecision || isRecordingDecisionBusy) return true;
+
+    if (reason === 'client-left') {
+      await stopMeetingAudioRecording({ keepPending: true });
+    }
+
+    if (!hasRecordingBuffer()) {
+      if (reason === 'client-left') {
+        pushMeetingNotice('Client left. No recording available to save.', 'warning');
+      }
+      return false;
+    }
+
+    setRecordingDecisionReason(reason);
+    setShowRecordingDecision(true);
+    return true;
+  };
+
+  const closeRecordingDecisionModal = () => {
+    if (isRecordingDecisionBusy) return;
+    setShowRecordingDecision(false);
+  };
+
   const bindStreamToVideo = async (videoEl, stream, muted = false) => {
     if (!videoEl) return;
 
@@ -452,6 +803,7 @@ export default function MeetingPage() {
 
     return () => {
       settleManualAIRequest();
+      void stopMeetingAudioRecording({ keepPending: false });
       if (meetingService) {
         meetingService.leaveMeeting();
       }
@@ -480,12 +832,25 @@ export default function MeetingPage() {
     setRemoteDisplayStream(null);
     setIsAIMonitoring(false);
     setIsManualAIRequestPending(false);
+    setIsRecordingUploadInProgress(false);
+    setIsRecordingEnabled(true);
+    setIsMeetingRecordingActive(false);
+    setHasPendingRecording(false);
+    setHasClientParticipant(false);
+    setShowRecordingDecision(false);
+    setRecordingDecisionReason('admin-leave');
+    setIsRecordingDecisionBusy(false);
     isMonitoringRef.current = false;
     lastDraftAIByTurnRef.current = {};
     finalAIRequestedTurnRef.current = {};
     latestAIRequestRef.current = { requestId: '', requestedAtMs: 0 };
     seenAIResponseIdsRef.current = [];
     pendingManualAIRequestRef.current = { requestId: '', timeoutId: null };
+    leaveInFlightRef.current = false;
+    meetingAudioChunksRef.current = [];
+    meetingAudioRecorderRef.current = null;
+    pendingMeetingRecordingRef.current = null;
+    void cleanupRecordingGraph();
   }, [meetingId]);
 
   useEffect(() => {
@@ -495,6 +860,17 @@ export default function MeetingPage() {
   useEffect(() => {
     bindStreamToVideo(remoteVideoRef.current, remoteDisplayStream, false);
   }, [remoteDisplayStream, isJoined]);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    void setRecordingSource('remote', remoteDisplayStream);
+  }, [role, remoteDisplayStream]);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    if (!meetingService.localStream) return;
+    void setRecordingSource('local', meetingService.localStream);
+  }, [role, isJoined]);
 
   useEffect(() => {
     if (role !== 'admin' || !isJoined) return;
@@ -528,6 +904,19 @@ export default function MeetingPage() {
     };
   }, [showLeaveConfirm, isLeaveActionRunning, leaveFlowStep]);
 
+  useEffect(() => {
+    if (!showRecordingDecision) return undefined;
+    const onEsc = (event) => {
+      if (event.key === 'Escape' && !isRecordingDecisionBusy) {
+        closeRecordingDecisionModal();
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [showRecordingDecision, isRecordingDecisionBusy]);
+
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
       alert('Please enter your name');
@@ -546,6 +935,11 @@ export default function MeetingPage() {
       meetingService.onRemoteStream = (stream) => {
         addLog('📹 Remote stream received');
         setRemoteDisplayStream(stream);
+        if (role === 'admin') {
+          setHasClientParticipant(true);
+          void setRecordingSource('remote', stream);
+          void maybeAutoStartRecording('client-joined');
+        }
         setIsConnected(true);
       };
 
@@ -553,6 +947,11 @@ export default function MeetingPage() {
         if (data?.userId && data.userId !== meetingService.userId) {
           addLog(`Participant ${data.userId} joined`);
           pushMeetingNotice(`Participant joined: ${data.userId}`, 'success');
+          const participantIsHost = isHostRole(data?.role) || String(data?.userId || '').toLowerCase().startsWith('admin-');
+          if (role === 'admin' && !participantIsHost) {
+            setHasClientParticipant(true);
+            void maybeAutoStartRecording('client-joined');
+          }
         }
       };
       
@@ -748,6 +1147,10 @@ export default function MeetingPage() {
       meetingService.onParticipantLeft = (data) => {
           addLog(`👋 Participant ${data.userId} left`);
           setRemoteDisplayStream(null);
+          if (role === 'admin') {
+            setHasClientParticipant(false);
+            void setRecordingSource('remote', null);
+          }
           if (data?.userId && data.userId !== meetingService.userId) {
             const participantRole = String(data?.role || '').toLowerCase();
             const participantId = String(data?.userId || '').toLowerCase();
@@ -763,6 +1166,13 @@ export default function MeetingPage() {
             }
 
             pushMeetingNotice(`Participant left: ${data.userId}`, 'warning');
+            if (role === 'admin') {
+              void openRecordingDecisionModal('client-left').then((opened) => {
+                if (opened) {
+                  pushMeetingNotice('Client left. Save or discard the recording.', 'warning');
+                }
+              });
+            }
           }
       };
       
@@ -870,10 +1280,61 @@ export default function MeetingPage() {
     navigate('/');
   };
 
+  const requestAdminLeave = async () => {
+    if (role !== 'admin') {
+      leaveMeetingNow();
+      return;
+    }
+    if (leaveInFlightRef.current || isRecordingDecisionBusy) return;
+    setShowLeaveConfirm(false);
+    setRecordingDecisionReason('admin-leave');
+    setShowRecordingDecision(true);
+  };
+
+  const handleSaveRecordingDecision = async () => {
+    if (isRecordingDecisionBusy) return;
+    if (!hasRecordingBuffer()) {
+      pushMeetingNotice('No recording captured to save.', 'warning');
+      return;
+    }
+    setIsRecordingDecisionBusy(true);
+    try {
+      const saved = await uploadMeetingAudioRecording({ finalizeIfActive: true });
+      if (!saved) {
+        pushMeetingNotice('Recording save failed. Try again or discard.', 'warning');
+        return;
+      }
+      setShowRecordingDecision(false);
+      if (recordingDecisionReason === 'admin-leave') {
+        leaveInFlightRef.current = true;
+        leaveMeetingNow();
+        leaveInFlightRef.current = false;
+      }
+    } finally {
+      setIsRecordingDecisionBusy(false);
+    }
+  };
+
+  const handleDiscardRecordingDecision = async () => {
+    if (isRecordingDecisionBusy) return;
+    setIsRecordingDecisionBusy(true);
+    try {
+      await discardMeetingAudioRecording();
+      setShowRecordingDecision(false);
+      if (recordingDecisionReason === 'admin-leave') {
+        leaveInFlightRef.current = true;
+        leaveMeetingNow();
+        leaveInFlightRef.current = false;
+      }
+    } finally {
+      setIsRecordingDecisionBusy(false);
+    }
+  };
+
   const endCall = () => {
     if (role !== 'admin') {
       if (confirm('Are you sure you want to leave the consultation?')) {
-        leaveMeetingNow();
+        void leaveMeetingNow();
       }
       return;
     }
@@ -1208,13 +1669,13 @@ export default function MeetingPage() {
                 </p>
                 <div className="mt-5 flex justify-center gap-2">
                   <button
-                    onClick={leaveMeetingNow}
+                    onClick={() => { void leaveMeetingNow(); }}
                     className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
                   >
                     Leave Meeting
                   </button>
                   <button
-                    onClick={leaveMeetingNow}
+                    onClick={() => { void leaveMeetingNow(); }}
                     className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
                   >
                     Come Again Later
@@ -1325,6 +1786,28 @@ export default function MeetingPage() {
               >
                 <CheckSquare className="w-3 h-3" /> Wrap Up
               </button>
+
+              <button
+                onClick={() => { void toggleMeetingRecording(); }}
+                className={`px-3 py-1 text-xs font-bold rounded shadow-sm transition-colors ${
+                  isMeetingRecordingActive
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isMeetingRecordingActive ? 'Stop Recording' : 'Start Recording'}
+              </button>
+              <span className={`text-[10px] uppercase font-bold ${
+                isMeetingRecordingActive
+                  ? 'text-red-300'
+                  : hasPendingRecording
+                    ? 'text-amber-300'
+                    : isRecordingEnabled
+                      ? 'text-blue-300'
+                      : 'text-gray-500'
+              }`}>
+                {isMeetingRecordingActive ? 'Recording' : hasPendingRecording ? 'Captured' : (isRecordingEnabled ? 'Auto Ready' : 'Recording Off')}
+              </span>
 
               <div className="h-4 w-px bg-gray-600 mx-2"></div>
 
@@ -1680,7 +2163,7 @@ export default function MeetingPage() {
                       Stay
                     </button>
                     <button
-                      onClick={leaveMeetingNow}
+                      onClick={() => { void requestAdminLeave(); }}
                       className="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
                     >
                       Direct Leave
@@ -1735,7 +2218,7 @@ export default function MeetingPage() {
                       {isSavingArtifacts ? 'Saving...' : 'Save Summary to Supabase'}
                     </button>
                     <button
-                      onClick={leaveMeetingNow}
+                      onClick={() => { void requestAdminLeave(); }}
                       className="rounded bg-red-600 px-3 py-2 text-xs text-white hover:bg-red-700"
                     >
                       Leave Meeting
@@ -1743,8 +2226,11 @@ export default function MeetingPage() {
                   </div>
 
                   <p className="mt-3 text-[11px] text-gray-400">
-                    Note: Live transcription, AI responses, and full chat are persisted during the meeting. Saving summary stores wrap-up fields to Supabase.
+                    Note: Live transcription, AI responses, and full chat are persisted during the meeting. On meeting end, you can save or discard recording.
                   </p>
+                  {isRecordingUploadInProgress && (
+                    <p className="mt-1 text-[11px] text-amber-300">Uploading meeting audio...</p>
+                  )}
                   {isLeaveSummaryGenerated && (
                     <p className="mt-1 text-[11px] text-green-300">Summary generated for this meeting.</p>
                   )}
@@ -1757,6 +2243,61 @@ export default function MeetingPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+          {showRecordingDecision && role === 'admin' && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+              onClick={(event) => {
+                if (event.target === event.currentTarget && !isRecordingDecisionBusy) {
+                  closeRecordingDecisionModal();
+                }
+              }}
+            >
+              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                <h3 className="text-base font-semibold text-white">Save meeting recording?</h3>
+                <p className="mt-2 text-sm text-gray-300">
+                  {recordingDecisionReason === 'client-left'
+                    ? 'The client has left the meeting. Save this recording to Supabase or discard it.'
+                    : 'Before leaving, choose whether to save this recording to Supabase or discard it.'}
+                </p>
+                {!hasRecordingBuffer() && (
+                  <p className="mt-2 text-xs text-amber-300">
+                    No recording was captured. You can leave using "Do Not Save".
+                  </p>
+                )}
+
+                <div className="mt-4 rounded border border-gray-700 bg-gray-800/70 p-3 text-xs text-gray-200">
+                  <div>Recording status: {isMeetingRecordingActive ? 'Active' : (hasPendingRecording ? 'Captured' : 'Not captured')}</div>
+                  {isRecordingUploadInProgress && (
+                    <div className="mt-1 text-amber-300">Uploading recording...</div>
+                  )}
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={closeRecordingDecisionModal}
+                    disabled={isRecordingDecisionBusy || isRecordingUploadInProgress}
+                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { void handleDiscardRecordingDecision(); }}
+                    disabled={isRecordingDecisionBusy || isRecordingUploadInProgress}
+                    className="rounded bg-rose-700 px-3 py-2 text-sm text-white hover:bg-rose-600 disabled:opacity-60"
+                  >
+                    Do Not Save
+                  </button>
+                  <button
+                    onClick={() => { void handleSaveRecordingDecision(); }}
+                    disabled={isRecordingDecisionBusy || isRecordingUploadInProgress || !hasRecordingBuffer()}
+                    className="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-60"
+                  >
+                    Save Recording
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

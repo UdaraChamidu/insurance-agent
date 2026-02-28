@@ -1,0 +1,35 @@
+RAG:
+-citations
+-he has told to build whole vectors again when an uptate happen in sharepoint
+
+Twillio:
+
+
+Others:
+- audio file link
+- call disposition (meeting type)
+- Access attempts must be logged
+
+
+
+
+Issues i found while testing:
+1. Intake page:
+- can not upload documents while intake. but can book meeting. show railway error for upload.
+- in booking calendar, some days are invisible.  why ? 
+
+
+2. appionments page:
+- show past due incomplete meetings....
+- 
+
+3. Email:
+- sending meeting link via email need to be more user friendly.
+
+4. IN meeting:
+- when admin share the screen, it  is not visible to the client. i do not  know it is an issue with the client device or network error... however please check it also.
+- admin page 3 columns need much space in default...
+- clear chats option
+
+5. client profile:
+- transcript, AI response, full chat need to be displayed in the client profile after the meeting and those can be download by the admin too..

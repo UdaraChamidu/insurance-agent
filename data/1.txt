@@ -1,0 +1,70 @@
+Hello,
+
+
+
+I’m hiring you for a software engineering role only to build an AI-assisted call support dashboard. This system will be used by a licensed U.S. health insurance agent, but you will not be involved in insurance, compliance, or customer interaction in any way.
+
+
+
+### Your responsibilities (engineering only)
+- Build a browser-based softphone using Twilio WebRTC
+- Display live speech-to-text transcription during calls
+- Send transcripts to an LLM API and display a suggested response on screen
+- Implement a retrieval system (RAG) using a vector database (e.g., Pinecone) so answers come only from provided documents
+- Display citations for retrieved sources
+- Implement logging:
+- audio file link
+- transcript
+- retrieved documents
+- AI-suggested response
+- call disposition
+- Build a simple web dashboard (React or Streamlit is fine)
+
+
+
+### What you will NOT do
+- No interpretation of insurance laws or regulations
+- No writing or approving sales scripts
+- No compliance decisions
+- No communication with customers, carriers, or FMOs
+- No access to real production calls or real personal data (PHI)
+
+
+
+### Data & security constraints (mandatory)
+- You will work only with test or synthetic data
+- Separate development vs production environments
+- You will not have access to:
+- live calls
+- real recordings
+- real transcripts
+- All access must follow least-privilege principles
+- Sensitive data must be encrypted at rest
+- Access attempts must be logged
+
+
+
+### Build order (milestones)
+1. Softphone works in browser
+2. Live transcription visible
+3. Transcript → AI suggested response (no RAG yet)
+4. Add vector database retrieval + citations
+5. Add logging and audit trail
+
+
+
+### Important
+This system is a decision-support tool, not an autonomous agent.
+The licensed agent remains fully responsible for all customer interactions and compliance.
+
+
+
+If this scope is clear and acceptable, please confirm and provide:
+- Relevant past projects (Twilio / LLM / RAG)
+- Estimated timeline per milestone
+- Fixed-price or milestone-based pricing
+
+
+
+Thank you.
+Abdelrahman

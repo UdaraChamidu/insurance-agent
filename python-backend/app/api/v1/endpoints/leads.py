@@ -2,11 +2,13 @@ import uuid
 import csv
 import io
 import json
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
+from app.core.supabase import supabase
 from app.models import Lead, Session as DbSession, Transcript, Appointment, Document
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
 from app.services.integrations.ghl import ghl_service
@@ -89,6 +91,34 @@ def _serialize_session(session: DbSession, include_transcripts: bool = False) ->
         payload["transcripts"] = [_serialize_transcript(row) for row in transcript_rows]
 
     return payload
+
+
+def _extract_signed_url(signed_url_payload: Any) -> Optional[str]:
+    if not signed_url_payload:
+        return None
+
+    if isinstance(signed_url_payload, str):
+        return signed_url_payload
+
+    if isinstance(signed_url_payload, dict):
+        for key in ("signedURL", "signedUrl", "signed_url", "url"):
+            value = signed_url_payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+        nested = signed_url_payload.get("data")
+        if isinstance(nested, dict):
+            for key in ("signedURL", "signedUrl", "signed_url", "url"):
+                value = nested.get(key)
+                if isinstance(value, str) and value:
+                    return value
+
+    for attr in ("signedURL", "signedUrl", "signed_url", "url"):
+        value = getattr(signed_url_payload, attr, None)
+        if isinstance(value, str) and value:
+            return value
+
+    return None
 
 
 def _serialize_lead(lead: Lead) -> Dict[str, Any]:
@@ -530,6 +560,139 @@ async def update_lead_session(
         db.rollback()
         print(f"Error updating lead session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{lead_id}/recording", response_model=Dict[str, Any])
+async def upload_meeting_recording(
+    lead_id: str,
+    file: UploadFile = File(...),
+    meeting_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload full meeting audio for a lead and persist storage path into Session.recordingLink.
+    Audio bytes are stored in Supabase Storage (client-docs bucket).
+    """
+    try:
+        session = _ensure_session_for_lead(db, lead_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        if not file:
+            raise HTTPException(status_code=400, detail="Recording file is required")
+
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Supabase client not initialized")
+
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Recording file is empty")
+
+        bucket_name = "client-docs"
+        ext = os.path.splitext(file.filename or "")[1].lower()
+        if ext not in {".webm", ".mp4", ".m4a", ".wav", ".ogg"}:
+            ext = ".webm"
+
+        unique_name = f"{session.id}-{uuid.uuid4()}{ext}"
+        storage_path = f"recordings/{lead_id}/{unique_name}"
+        content_type = file.content_type or "audio/webm"
+
+        try:
+            supabase.storage.from_(bucket_name).upload(
+                path=storage_path,
+                file=content,
+                file_options={"content-type": content_type}
+            )
+        except Exception as upload_error:
+            print(f"Meeting recording upload error: {upload_error}")
+            raise HTTPException(status_code=500, detail="Failed to upload meeting recording")
+
+        previous_recording_path = session.recordingLink
+        session.recordingLink = storage_path
+        db.commit()
+        db.refresh(session)
+
+        # Best-effort cleanup for superseded recording file.
+        if previous_recording_path and previous_recording_path != storage_path:
+            try:
+                supabase.storage.from_(bucket_name).remove([previous_recording_path])
+            except Exception as cleanup_error:
+                print(f"Superseded recording cleanup skipped: {cleanup_error}")
+
+        signed_url = None
+        try:
+            signed_payload = supabase.storage.from_(bucket_name).create_signed_url(storage_path, 3600)
+            signed_url = _extract_signed_url(signed_payload)
+        except Exception as signed_error:
+            print(f"Signed URL generation skipped after upload: {signed_error}")
+
+        return {
+            "success": True,
+            "leadId": lead_id,
+            "sessionId": session.id,
+            "meetingId": meeting_id,
+            "recording": {
+                "path": storage_path,
+                "url": signed_url,
+                "contentType": content_type,
+                "size": len(content),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving meeting recording: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{lead_id}/recording", response_model=Dict[str, Any])
+async def get_meeting_recording(
+    lead_id: str,
+    expires_in: int = Query(default=3600, ge=60, le=86400),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the persisted recording path and a signed playback URL for the lead session.
+    """
+    try:
+        session = _ensure_session_for_lead(db, lead_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        recording_path = session.recordingLink
+        if not recording_path:
+            return {
+                "success": True,
+                "leadId": lead_id,
+                "sessionId": session.id,
+                "recording": None,
+            }
+
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Supabase client not initialized")
+
+        signed_payload = supabase.storage.from_("client-docs").create_signed_url(recording_path, expires_in)
+        signed_url = _extract_signed_url(signed_payload)
+        if not signed_url:
+            raise HTTPException(status_code=500, detail="Failed to generate signed recording URL")
+
+        return {
+            "success": True,
+            "leadId": lead_id,
+            "sessionId": session.id,
+            "recording": {
+                "path": recording_path,
+                "url": signed_url,
+                "expiresIn": expires_in,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching meeting recording: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/{lead_id}/wrapup", response_model=Dict[str, Any])
 async def lead_wrapup(
