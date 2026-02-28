@@ -1,0 +1,288 @@
+It explains what we’re building, why, how far we are, and exactly what the developer’s role is, so ChatGPT can moderate/validate technical decisions going forward.
+
+
+
+⸻
+
+
+
+Project Brief: Elite Deal Broker — Compliance-First AI Knowledge System
+
+
+
+1. The objective (what we are building)
+
+
+
+We are building a compliance-first, AI-assisted knowledge and call-support system for a Florida-based health insurance agency that sells all health-related product lines (Medicare, ACA, Group, Self-Funded/ERISA, Medicaid, Ancillary, LTC, etc.).
+
+
+
+The system is not an autonomous sales agent.
+It is a decision-support system that:
+• Listens to questions (via transcript input)
+• Retrieves only authoritative regulatory and policy text
+• Surfaces short, safe, citable answers for a licensed agent to read
+• Escalates when information is missing, unclear, or sensitive
+
+
+
+The licensed agent (me) always remains the decision-maker.
+
+
+
+⸻
+
+
+
+2. Core design principle (non-negotiable)
+
+
+
+We are not building “one health insurance rulebook.”
+
+
+
+Health insurance is governed by multiple overlapping regulatory universes, each with different authorities and enforcement risk:
+• Florida state insurance law (DFS / OIR)
+• CMS (Medicare marketing & communications)
+• Federal ACA/HHS rules
+• ERISA / DOL / IRS (self-funded & MEWA)
+• Florida Medicaid agency rules
+• Carrier & FMO policies (often stricter than law)
+
+
+
+Therefore:
+The system must route questions into the correct regulatory universe first, then perform semantic search within that universe only.
+
+
+
+This is why metadata and document structure matter more than the AI model itself.
+
+
+
+⸻
+
+
+
+3. What we completed today (critical foundation)
+
+
+
+A. SharePoint as the authoritative document store
+We chose Microsoft SharePoint as the single source of truth for all regulatory and policy documents because it provides:
+• Versioning
+• Audit logs
+• Permissions
+• Folder-level defaults
+
+
+
+We created two document libraries:
+• KB-DEV → developer can access (no PHI, no production data)
+• KB-PROD → production only (developer cannot access)
+
+
+
+⸻
+
+
+
+B. Folder structure = compliance universes
+Inside KB-DEV, we created these folders:
+• 00_TrainingReference
+• 01_FL_State_Authority
+• 02_CMS_Medicare_Authority
+• 03_Federal_ACA_Authority
+• 04_ERISA_IRS_SelfFunded
+• 05_FL_Medicaid_Agency
+• 06_Carrier_FMO_Policies
+
+
+
+Each folder represents a regulatory universe with different controlling authorities.
+
+
+
+⸻
+
+
+
+C. Metadata schema (this is the heart of the system)
+We added structured metadata columns to KB-DEV so documents can be:
+• Filtered
+• Audited
+• Retrieved safely by AI
+
+
+
+Columns created:
+• State
+• ProductUniverse
+• Regulator
+• AuthorityLevel
+• EffectiveDate
+• DocVersion
+• TopicTags
+• Carrier
+• CitationPrefix
+
+
+
+This metadata is what allows the AI to answer:
+
+
+
+“Under Florida + Medicare + CMS guidance, what am I allowed to say?”
+
+
+
+instead of hallucinating.
+
+
+
+⸻
+
+
+
+D. Folder-level default values (major risk reduction)
+We configured default metadata values per folder, so documents are auto-tagged correctly when uploaded.
+
+
+
+Examples:
+• TrainingReference → AuthorityLevel = TrainingReference
+• CMS Medicare → ProductUniverse = Medicare, Regulator = CMS
+• Florida State → Regulator = FL-DFS/OIR, AuthorityLevel = Law
+• Carrier/FMO → AuthorityLevel = CarrierPolicy
+
+
+
+This prevents accidental misclassification — one of the biggest compliance risks in AI systems.
+
+
+
+⸻
+
+
+
+4. The Master File (how it’s used)
+
+
+
+The Health Insurance Master File is stored in:
+• 00_TrainingReference
+• Tagged as TrainingReference, not Law
+
+
+
+It is used as:
+• A training index
+• A cross-reference map
+• A way to normalize terminology
+
+
+
+It is not treated as legal authority unless backed by authoritative sources.
+
+
+
+⸻
+
+
+
+5. What comes next (high level)
+
+
+
+Once document ingestion begins, the system will:
+1. Read documents from SharePoint
+2. Chunk them (150–350 words, by headings)
+3. Generate embeddings
+4. Store them in a semantic search database (e.g. Pinecone)
+5. Enforce retrieval rules:
+• Filter by metadata first
+• Then semantic similarity
+6. Send retrieved text to an LLM for answer synthesis only
+
+
+
+No fine-tuning on laws.
+No guessing.
+If it’s not in the sources → “Needs verification / escalate.”
+
+
+
+⸻
+
+
+
+6. Developer’s role (explicit boundaries)
+
+
+
+The developer is responsible for engineering only:
+• SharePoint ingestion (via Microsoft Graph)
+• Text extraction & chunking
+• Embedding generation
+• Vector DB ingestion
+• Retrieval logic (filters + semantic search)
+• API endpoints
+• UI wiring
+
+
+
+The developer does NOT:
+• Interpret insurance law
+• Decide what is compliant
+• Write sales language
+• Approve scripts
+• Interact with customers
+• Access PHI or live calls
+
+
+
+Compliance logic, escalation rules, and final approval stay with the licensed agent + FMO.
+
+
+
+⸻
+
+
+
+7. ChatGPT’s role in this group
+
+
+
+ChatGPT is used as:
+• A technical reviewer
+• A compliance-safety backstop
+• A design challenger
+
+
+
+When the developer proposes an approach:
+• ChatGPT should agree if it meets the objective
+• Or suggest a safer / more scalable / more compliant alternative
+
+
+
+⸻
+
+
+
+8. The end goal (why this matters)
+
+
+
+This system is designed so that:
+• Every answer can be explained
+• Every claim can be cited
+• Every call can be audited
+• The agent’s license is protected
+• Scaling does not increase compliance risk
+
+
+
+The technology serves compliance and accuracy first, speed second.

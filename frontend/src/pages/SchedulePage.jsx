@@ -15,6 +15,12 @@ const TIMEZONE_OPTIONS = [
   { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
 ];
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+const toDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function SchedulePage() {
   const navigate = useNavigate();
@@ -72,8 +78,8 @@ export default function SchedulePage() {
       const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
 
-      const fromStr = from.toISOString().split('T')[0];
-      const toStr = to.toISOString().split('T')[0];
+      const fromStr = toDateKey(from);
+      const toStr = toDateKey(to);
 
       const res = await fetch(`${API_URL}/api/scheduling/availability?from=${fromStr}&to=${toStr}`);
       if (res.ok) {
@@ -97,7 +103,7 @@ export default function SchedulePage() {
   // Get slots for selected date
   const slotsForDate = useMemo(() => {
     if (!selectedDate) return [];
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = toDateKey(selectedDate);
     const dayData = availability.find(d => d.date === dateStr);
     return dayData ? dayData.slots : [];
   }, [selectedDate, availability]);
@@ -119,7 +125,7 @@ export default function SchedulePage() {
     // Days
     for (let d = 1; d <= lastDay.getDate(); d++) {
       const date = new Date(year, month, d);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = toDateKey(date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -160,7 +166,7 @@ export default function SchedulePage() {
     setError('');
 
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = toDateKey(selectedDate);
 
       const res = await fetch(`${API_URL}/api/scheduling/appointments`, {
         method: 'POST',
@@ -413,7 +419,7 @@ export default function SchedulePage() {
                           ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105'
                           : canSelect
                             ? 'text-white hover:bg-white/10 hover:scale-105'
-                            : 'text-gray-600 cursor-not-allowed'
+                            : 'text-gray-500/80 cursor-not-allowed'
                         }
                         ${dayInfo.isToday && !isSelected ? 'ring-1 ring-blue-500/50' : ''}
                       `}

@@ -76,39 +76,40 @@ export default function IntakePage() {
         // Save leadId and redirect to Schedule (which is the Microsoft Bookings page)
         localStorage.setItem('currentLeadId', data.leadId);
 
-        // Upload files if any
+        // Upload files if any (non-blocking for scheduling flow)
         if (selectedFiles.length > 0) {
+          const uploadFailures = [];
           for (const file of selectedFiles) {
-             const formData = new FormData();
-             formData.append('file', file);
-             formData.append('lead_id', data.leadId);
-             try {
-                // Pre-check connectivity
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', file);
+            uploadFormData.append('lead_id', data.leadId);
+            try {
+              const uploadRes = await fetch(`${API_URL}/api/client-docs/upload-file`, {
+                method: 'POST',
+                body: uploadFormData
+              });
+
+              if (!uploadRes.ok) {
+                const rawError = await uploadRes.text();
+                let errorMessage = rawError || 'Unknown upload error';
                 try {
-                    const testRes = await fetch(`${API_URL}/api/client-docs/test`);
-                    if (!testRes.ok) console.warn("Test endpoint failed");
-                    else console.log("Test endpoint OK");
-                } catch (e) {
-                    console.error("Test endpoint network error", e);
+                  const parsed = JSON.parse(rawError);
+                  errorMessage = parsed?.detail || parsed?.message || errorMessage;
+                } catch {
+                  // Non-JSON error body: keep raw text
                 }
+                uploadFailures.push(`${file.name}: ${errorMessage}`);
+              }
+            } catch (err) {
+              console.error('File upload network error', err);
+              uploadFailures.push(`${file.name}: Network error (failed to reach backend)`);
+            }
+          }
 
-                const uploadUrl = `${API_URL}/api/client-docs/upload-file`;
-                console.log(`Uploading to: ${uploadUrl}`);
-
-                const uploadRes = await fetch(uploadUrl, {
-                  method: 'POST',
-                  body: formData
-                });
-                
-                if (!uploadRes.ok) {
-                    const errData = await uploadRes.json();
-                    console.error('Upload failed:', errData);
-                    alert(`Failed to upload file: ${file.name}. \nURL: ${uploadUrl} \nError: ${errData.detail || 'Unknown error'}`);
-                }
-             } catch (err) {
-                console.error('File upload network error', err);
-                alert(`Network error uploading ${file.name}. \nTarget: ${API_URL}/api/client-docs/upload-file \nCheck console for details.`);
-             }
+          if (uploadFailures.length > 0) {
+            alert(
+              `Some documents could not be uploaded.\n\n${uploadFailures.join('\n')}\n\nYou can still continue and re-upload from the client profile later.`
+            );
           }
         }
         

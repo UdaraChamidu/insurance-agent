@@ -178,6 +178,12 @@ export default function MeetingPage() {
   const [showRecordingDecision, setShowRecordingDecision] = useState(false);
   const [recordingDecisionReason, setRecordingDecisionReason] = useState('admin-leave');
   const [isRecordingDecisionBusy, setIsRecordingDecisionBusy] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearConfirmConfig, setClearConfirmConfig] = useState({
+    target: 'all',
+    label: 'meeting data'
+  });
+  const [isClearActionRunning, setIsClearActionRunning] = useState(false);
   const panelContainerRef = useRef(null);
   const mainLayoutContainerRef = useRef(null);
   const leaveInFlightRef = useRef(false);
@@ -840,6 +846,9 @@ export default function MeetingPage() {
     setShowRecordingDecision(false);
     setRecordingDecisionReason('admin-leave');
     setIsRecordingDecisionBusy(false);
+    setShowClearConfirm(false);
+    setClearConfirmConfig({ target: 'all', label: 'meeting data' });
+    setIsClearActionRunning(false);
     isMonitoringRef.current = false;
     lastDraftAIByTurnRef.current = {};
     finalAIRequestedTurnRef.current = {};
@@ -916,6 +925,19 @@ export default function MeetingPage() {
       window.removeEventListener('keydown', onEsc);
     };
   }, [showRecordingDecision, isRecordingDecisionBusy]);
+
+  useEffect(() => {
+    if (!showClearConfirm) return undefined;
+    const onEsc = (event) => {
+      if (event.key === 'Escape' && !isClearActionRunning) {
+        closeClearConfirm();
+      }
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [showClearConfirm, isClearActionRunning]);
 
   const handleJoinMeeting = async () => {
     if (!userName.trim()) {
@@ -1410,7 +1432,8 @@ export default function MeetingPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `meeting-report-${meetingId}-${new Date().toISOString().slice(0,10)}.json`;
+    const timestampToken = new Date().toISOString().replace(/[:.]/g, '-');
+    a.download = `meeting-report-${meetingId || 'session'}-${timestampToken}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1434,7 +1457,8 @@ export default function MeetingPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `meeting-artifacts-${effectiveLeadId}-${new Date().toISOString().slice(0,10)}.csv`;
+      const timestampToken = new Date().toISOString().replace(/[:.]/g, '-');
+      a.download = `meeting-artifacts-${effectiveLeadId}-${timestampToken}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1443,6 +1467,88 @@ export default function MeetingPage() {
     } catch (err) {
       console.error('CSV download error:', err);
       pushMeetingNotice('Failed to download CSV artifacts.', 'warning');
+    }
+  };
+
+  const clearPanelData = (target) => {
+    const normalizedTarget = target || 'all';
+    const hasTranscriptions = transcriptions.length > 0;
+    const hasAiSuggestions = aiSuggestions.length > 0;
+    const hasChat = conversationHistory.length > 0;
+    const hasSummary = Boolean(
+      summaryData?.callSummary
+      || (Array.isArray(summaryData?.actionItems) && summaryData.actionItems.length > 0)
+      || summaryData?.complianceFlags
+    );
+
+    const targetMap = {
+      transcription: hasTranscriptions,
+      ai: hasAiSuggestions,
+      chat: hasChat,
+      all: hasTranscriptions || hasAiSuggestions || hasChat || hasSummary,
+    };
+    if (!targetMap[normalizedTarget]) {
+      pushMeetingNotice('Nothing to clear in this section.', 'warning');
+      return;
+    }
+
+    const labelMap = {
+      transcription: 'transcriptions',
+      ai: 'AI responses',
+      chat: 'full chat',
+      all: 'transcriptions, AI responses, full chat, and summary',
+    };
+    const label = labelMap[normalizedTarget] || 'meeting panels';
+
+    setClearConfirmConfig({ target: normalizedTarget, label });
+    setShowClearConfirm(true);
+  };
+
+  const applyClearPanelData = (target, options = {}) => {
+    const { saveBackup = false } = options;
+    const normalizedTarget = target || 'all';
+    const label = clearConfirmConfig?.label || 'meeting data';
+
+    if (saveBackup) {
+      downloadConversation();
+    }
+
+    if (normalizedTarget === 'transcription' || normalizedTarget === 'all') {
+      setTranscriptions([]);
+      lastDraftAIByTurnRef.current = {};
+      finalAIRequestedTurnRef.current = {};
+    }
+    if (normalizedTarget === 'ai' || normalizedTarget === 'all') {
+      setAiSuggestions([]);
+      latestAIRequestRef.current = { requestId: '', requestedAtMs: 0 };
+      seenAIResponseIdsRef.current = [];
+    }
+    if (normalizedTarget === 'chat' || normalizedTarget === 'all') {
+      setConversationHistory([]);
+    }
+    if (normalizedTarget === 'all') {
+      setSummaryData(null);
+      setIsInlineSummaryVisible(true);
+      setIsLeaveSummaryGenerated(false);
+      setIsLeaveSummarySaved(false);
+    }
+
+    pushMeetingNotice(`Cleared ${label}.`, 'success');
+  };
+
+  const closeClearConfirm = () => {
+    if (isClearActionRunning) return;
+    setShowClearConfirm(false);
+  };
+
+  const handleClearConfirm = (saveBackup) => {
+    if (isClearActionRunning) return;
+    setIsClearActionRunning(true);
+    try {
+      applyClearPanelData(clearConfirmConfig?.target || 'all', { saveBackup });
+      setShowClearConfirm(false);
+    } finally {
+      setIsClearActionRunning(false);
     }
   };
 
@@ -1712,19 +1818,23 @@ export default function MeetingPage() {
                         const stream = await meetingService.startScreenShare();
                         setLocalDisplayStream(stream);
                         setIsScreenSharing(true);
+                        pushMeetingNotice('Screen share started.', 'success');
                         
                         // Detect when the stream ends (e.g. Stop sharing in browser)
                         stream.getVideoTracks()[0].onended = () => {
                           setIsScreenSharing(false);
                           setLocalDisplayStream(meetingService.localStream);
+                          pushMeetingNotice('Screen share stopped.', 'warning');
                         };
                       } else {
                         await meetingService.stopScreenShare();
                         setLocalDisplayStream(meetingService.localStream);
                         setIsScreenSharing(false);
+                        pushMeetingNotice('Screen share stopped.', 'warning');
                       }
                     } catch (err) {
                       console.error('Screen share error:', err);
+                      pushMeetingNotice('Screen share failed. Check browser permissions/device.', 'warning');
                     }
                   }}
                   className={`p-3 md:p-4 rounded-full ${isScreenSharing ? 'bg-blue-600' : 'bg-gray-700'} hover:opacity-80 transition-all shadow-lg`}
@@ -1785,6 +1895,14 @@ export default function MeetingPage() {
                 className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow-sm transition-colors flex items-center gap-1"
               >
                 <CheckSquare className="w-3 h-3" /> Wrap Up
+              </button>
+
+              <button
+                onClick={() => clearPanelData('all')}
+                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded shadow-sm transition-colors"
+                title="Clear transcription, AI responses, and full chat from this view"
+              >
+                Clear All
               </button>
 
               <button
@@ -1850,50 +1968,59 @@ export default function MeetingPage() {
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <span>Live Transcription</span>
                 </h3>
-                <button 
-                  onClick={() => {
-                    if (isManualAIRequestPending) {
-                      pushMeetingNotice('AI request already in progress. Please wait.', 'warning');
-                      return;
-                    }
-                    if (transcriptions.length > 0) {
-                      const finalEntries = transcriptions.filter(item => normalizeTranscriptStage(item?.transcriptStage) === 'final');
-                      const lastEntry = finalEntries.length > 0
-                        ? finalEntries[finalEntries.length - 1]
-                        : transcriptions[transcriptions.length - 1];
-                      const now = Date.now();
-                      const requestId = `manual-${now}-${Math.random().toString(36).slice(2, 8)}`;
-                      beginManualAIRequest(requestId);
-                      lastAIRequestAtRef.current = now;
-                      lastAIRequestTextRef.current = lastEntry.text.trim().toLowerCase();
-                      registerAIRequest(requestId, now);
-                      meetingService.requestAISuggestion(
-                        meetingId,
-                        lastEntry.text,
-                        'customer',
-                        {
-                          requestId,
-                          requestOrigin: 'manual-button',
-                          transcriptStage: normalizeTranscriptStage(lastEntry?.transcriptStage),
-                          turnId: lastEntry?.turnId || null,
-                          requestedAtMs: now,
-                          sourceAudioStartMs: lastEntry.clientAudioStartMs || null,
-                          sourceTranscriptionAtMs: lastEntry.receivedAtMs || null
-                        }
-                      );
-                    } else {
-                      alert('No transcription available to analyze.');
-                    }
-                  }}
-                  disabled={isManualAIRequestPending || transcriptions.length === 0}
-                  className={`px-2 py-0.5 text-white text-[10px] rounded flex items-center space-x-1 transition-colors ${
-                    isManualAIRequestPending || transcriptions.length === 0
-                      ? 'bg-purple-900 cursor-not-allowed opacity-70'
-                      : 'bg-purple-600 hover:bg-purple-700'
-                  }`}
-                >
-                  <span>{isManualAIRequestPending ? 'Waiting...' : 'Ask AI'}</span>
-                </button>
+                <div className="ml-2 flex items-center gap-1">
+                  <button
+                    onClick={() => clearPanelData('transcription')}
+                    className="px-2 py-0.5 text-white text-[10px] rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                    title="Clear transcriptions"
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (isManualAIRequestPending) {
+                        pushMeetingNotice('AI request already in progress. Please wait.', 'warning');
+                        return;
+                      }
+                      if (transcriptions.length > 0) {
+                        const finalEntries = transcriptions.filter(item => normalizeTranscriptStage(item?.transcriptStage) === 'final');
+                        const lastEntry = finalEntries.length > 0
+                          ? finalEntries[finalEntries.length - 1]
+                          : transcriptions[transcriptions.length - 1];
+                        const now = Date.now();
+                        const requestId = `manual-${now}-${Math.random().toString(36).slice(2, 8)}`;
+                        beginManualAIRequest(requestId);
+                        lastAIRequestAtRef.current = now;
+                        lastAIRequestTextRef.current = lastEntry.text.trim().toLowerCase();
+                        registerAIRequest(requestId, now);
+                        meetingService.requestAISuggestion(
+                          meetingId,
+                          lastEntry.text,
+                          'customer',
+                          {
+                            requestId,
+                            requestOrigin: 'manual-button',
+                            transcriptStage: normalizeTranscriptStage(lastEntry?.transcriptStage),
+                            turnId: lastEntry?.turnId || null,
+                            requestedAtMs: now,
+                            sourceAudioStartMs: lastEntry.clientAudioStartMs || null,
+                            sourceTranscriptionAtMs: lastEntry.receivedAtMs || null
+                          }
+                        );
+                      } else {
+                        alert('No transcription available to analyze.');
+                      }
+                    }}
+                    disabled={isManualAIRequestPending || transcriptions.length === 0}
+                    className={`px-2 py-0.5 text-white text-[10px] rounded flex items-center space-x-1 transition-colors ${
+                      isManualAIRequestPending || transcriptions.length === 0
+                        ? 'bg-purple-900 cursor-not-allowed opacity-70'
+                        : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
+                  >
+                    <span>{isManualAIRequestPending ? 'Waiting...' : 'Ask AI'}</span>
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {transcriptions.length === 0 ? (
@@ -1931,7 +2058,7 @@ export default function MeetingPage() {
               className="min-w-0 border-r border-gray-700 flex flex-col"
               style={{ flex: `0 0 ${panelWidths[1]}%` }}
             >
-              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700">
+              <div className="px-3 py-2 bg-gray-800 border-b border-gray-700 flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold text-white flex items-center justify-between w-full">
                   <div className="flex items-center">
                     <span className="mr-1">💡</span>
@@ -1939,6 +2066,13 @@ export default function MeetingPage() {
                   </div>
                   {!isAIMonitoring && <span className="text-[10px] text-gray-500 bg-gray-700 px-1 rounded animate-pulse">PAUSED</span>}
                 </h3>
+                <button
+                  onClick={() => clearPanelData('ai')}
+                  className="px-2 py-0.5 text-white text-[10px] rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                  title="Clear AI responses"
+                >
+                  Clear
+                </button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2 relative">
                 {aiSuggestions.length === 0 ? (
@@ -2003,6 +2137,13 @@ export default function MeetingPage() {
                       title="Download full meeting report (JSON)"
                     >
                       <Download className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => clearPanelData('chat')}
+                      className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white transition"
+                      title="Clear full chat panel"
+                    >
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -2135,6 +2276,50 @@ export default function MeetingPage() {
               pushMeetingNotice('Wrap-up saved successfully.', 'success');
             }}
           />
+          {showClearConfirm && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={(event) => {
+                if (event.target === event.currentTarget && !isClearActionRunning) {
+                  closeClearConfirm();
+                }
+              }}
+            >
+              <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-5 shadow-2xl">
+                <h3 className="text-base font-semibold text-white">Clear current meeting data?</h3>
+                <p className="mt-2 text-sm text-gray-300">
+                  This will clear {clearConfirmConfig.label} from the current meeting view.
+                </p>
+                <p className="mt-2 text-xs text-gray-400">
+                  Optional: save a JSON backup first, then clear.
+                </p>
+
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    onClick={closeClearConfirm}
+                    disabled={isClearActionRunning}
+                    className="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleClearConfirm(false)}
+                    disabled={isClearActionRunning}
+                    className="rounded bg-rose-700 px-3 py-2 text-sm text-white hover:bg-rose-600 disabled:opacity-60"
+                  >
+                    {isClearActionRunning ? 'Working...' : 'Clear Only'}
+                  </button>
+                  <button
+                    onClick={() => handleClearConfirm(true)}
+                    disabled={isClearActionRunning}
+                    className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+                  >
+                    {isClearActionRunning ? 'Saving...' : 'Save & Clear'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {showLeaveConfirm && (
             <div
               className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"

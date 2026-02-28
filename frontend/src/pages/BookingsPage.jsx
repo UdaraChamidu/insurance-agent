@@ -11,6 +11,8 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 const STATUS_COLORS = {
   confirmed: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', label: 'Confirmed' },
   pending:   { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', label: 'Pending' },
+  past_due:  { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', label: 'Past Due' },
+  incomplete:{ bg: 'bg-yellow-500/10', text: 'text-yellow-300', border: 'border-yellow-500/20', label: 'Incomplete' },
   cancelled: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', label: 'Cancelled' },
   completed: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', label: 'Completed' },
   no_show:   { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20', label: 'No Show' },
@@ -20,10 +22,35 @@ const STATUS_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'confirmed', label: 'Confirmed' },
   { key: 'pending', label: 'Pending' },
+  { key: 'past_due', label: 'Past Due' },
+  { key: 'incomplete', label: 'Incomplete' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
   { key: 'no_show', label: 'No Show' },
 ];
+
+const KNOWN_BASE_STATUSES = new Set(['confirmed', 'pending', 'completed', 'cancelled', 'no_show']);
+const isPastAppointmentSlot = (appointment) => {
+  const datePart = String(appointment?.date || '').trim();
+  if (!datePart) return false;
+  const startPart = String(appointment?.startTime || '00:00').trim() || '00:00';
+  const dt = new Date(`${datePart}T${startPart}:00`);
+  if (Number.isNaN(dt.getTime())) return false;
+  return dt.getTime() < Date.now();
+};
+
+const deriveStatus = (appointment) => {
+  const baseStatus = String(appointment?.status || '').trim().toLowerCase();
+  if (!KNOWN_BASE_STATUSES.has(baseStatus)) {
+    return 'incomplete';
+  }
+
+  if ((baseStatus === 'confirmed' || baseStatus === 'pending') && isPastAppointmentSlot(appointment)) {
+    return 'past_due';
+  }
+
+  return baseStatus;
+};
 
 // simple cache to avoid blank state on navigation
 let appointmentsCache = null;
@@ -46,8 +73,12 @@ export default function BookingsPage() {
     setError('');
     try {
       const data = await bookingsService.getAppointments({});
-      setAppointments(data);
-      appointmentsCache = data;
+      const normalized = (Array.isArray(data) ? data : []).map((apt) => ({
+        ...apt,
+        normalizedStatus: deriveStatus(apt),
+      }));
+      setAppointments(normalized);
+      appointmentsCache = normalized;
     } catch (err) {
       setError('Failed to load appointments. Please try again.');
       console.error(err);
@@ -58,7 +89,12 @@ export default function BookingsPage() {
 
   useEffect(() => {
     if (Array.isArray(appointmentsCache)) {
-      setAppointments(appointmentsCache);
+      setAppointments(
+        appointmentsCache.map((apt) => ({
+          ...apt,
+          normalizedStatus: apt.normalizedStatus || deriveStatus(apt),
+        }))
+      );
       setLoading(false);
     }
     fetchAppointments();
@@ -149,19 +185,27 @@ export default function BookingsPage() {
       (apt.date || '').includes(q) ||
       (apt.serviceName || '').toLowerCase().includes(q)
     );
-  }).filter(apt => (statusFilter === 'all' ? true : apt.status === statusFilter));
+  }).filter(apt => (statusFilter === 'all' ? true : apt.normalizedStatus === statusFilter));
 
   const statusCounts = STATUS_FILTERS.reduce((acc, filter) => {
     if (filter.key === 'all') {
       acc[filter.key] = appointments.length;
       return acc;
     }
-    acc[filter.key] = appointments.filter((apt) => apt.status === filter.key).length;
+    acc[filter.key] = appointments.filter((apt) => apt.normalizedStatus === filter.key).length;
     return acc;
   }, {});
 
-  const upcoming = filtered.filter(a => a.status === 'confirmed' || a.status === 'pending').sort((a, b) => a.date.localeCompare(b.date));
-  const past = filtered.filter(a => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show');
+  const upcoming = filtered
+    .filter(a => a.normalizedStatus === 'confirmed' || a.normalizedStatus === 'pending')
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const past = filtered.filter(a => (
+    a.normalizedStatus === 'completed'
+    || a.normalizedStatus === 'cancelled'
+    || a.normalizedStatus === 'no_show'
+    || a.normalizedStatus === 'past_due'
+    || a.normalizedStatus === 'incomplete'
+  ));
 
   const renderLoading = (
     <div className="h-full flex items-center justify-center py-20">
@@ -307,8 +351,9 @@ export default function BookingsPage() {
 }
 
 function AppointmentCard({ apt, expanded, onToggle, onStatusChange, onCancel, onDelete, onJoin }) {
-  const status = STATUS_COLORS[apt.status] || STATUS_COLORS.pending;
-  const isUpcoming = apt.status === 'confirmed' || apt.status === 'pending';
+  const statusKey = apt.normalizedStatus || apt.status;
+  const status = STATUS_COLORS[statusKey] || STATUS_COLORS.pending;
+  const isUpcoming = statusKey === 'confirmed' || statusKey === 'pending';
 
   return (
     <div className={`bg-white/5 border border-white/10 rounded-xl overflow-hidden transition-all hover:border-white/20`}>

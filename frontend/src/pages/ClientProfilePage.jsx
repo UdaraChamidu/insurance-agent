@@ -40,7 +40,6 @@ export default function ClientProfilePage() {
   const [lead, setLead] = useState(null);
   const [session, setSession] = useState(null);
   const [appointments, setAppointments] = useState([]);
-  const [transcripts, setTranscripts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -49,6 +48,14 @@ export default function ClientProfilePage() {
   const [recordingUrl, setRecordingUrl] = useState('');
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [recordingError, setRecordingError] = useState('');
+  const [meetingArtifacts, setMeetingArtifacts] = useState({
+    transcriptions: [],
+    aiResponses: [],
+    fullChat: [],
+    summary: null,
+  });
+  const [artifactsLoading, setArtifactsLoading] = useState(false);
+  const [artifactsError, setArtifactsError] = useState('');
 
   useEffect(() => {
     fetchClientData();
@@ -75,11 +82,51 @@ export default function ClientProfilePage() {
     }
   };
 
+  const normalizeArtifacts = (payload) => ({
+    transcriptions: Array.isArray(payload?.transcriptions) ? payload.transcriptions : [],
+    aiResponses: Array.isArray(payload?.aiResponses) ? payload.aiResponses : [],
+    fullChat: Array.isArray(payload?.fullChat) ? payload.fullChat : [],
+    summary: payload?.summary && typeof payload.summary === 'object' ? payload.summary : null,
+  });
+
+  const fetchMeetingArtifacts = async (showLoader = false, fallbackPayload = null) => {
+    if (!leadId) return;
+    if (showLoader) setArtifactsLoading(true);
+    setArtifactsError('');
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${leadId}/meeting-artifacts`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch meeting artifacts (${res.status})`);
+      }
+      const payload = await res.json();
+      if (!payload?.success) {
+        throw new Error('Meeting artifacts response was not successful');
+      }
+      setMeetingArtifacts(normalizeArtifacts(payload));
+    } catch (err) {
+      console.error('Error fetching meeting artifacts:', err);
+      if (fallbackPayload) {
+        setMeetingArtifacts(normalizeArtifacts(fallbackPayload));
+      }
+      setArtifactsError('Unable to load latest meeting artifacts right now.');
+    } finally {
+      if (showLoader) setArtifactsLoading(false);
+    }
+  };
+
   const fetchClientData = async () => {
     setLoading(true);
     setRecordingUrl('');
     setRecordingError('');
     setRecordingLoading(false);
+    setMeetingArtifacts({
+      transcriptions: [],
+      aiResponses: [],
+      fullChat: [],
+      summary: null,
+    });
+    setArtifactsError('');
+    setArtifactsLoading(false);
     try {
       // Fetch lead
       const leadRes = await fetch(`${API_URL}/api/leads/${leadId}`);
@@ -89,7 +136,9 @@ export default function ClientProfilePage() {
         setLead(leadData);
         setNotes(sessionData?.notes || '');
         setSession(sessionData);
-        setTranscripts(sessionData?.transcripts || []);
+        const leadArtifacts = leadData?.meetingArtifacts || null;
+        setMeetingArtifacts(normalizeArtifacts(leadArtifacts));
+        await fetchMeetingArtifacts(false, leadArtifacts);
 
         if (sessionData?.recordingLink) {
           await fetchMeetingRecording(true);
@@ -158,6 +207,47 @@ export default function ClientProfilePage() {
     window.open(`${API_URL}/api/client-docs/download/${docId}`, '_blank', 'noopener,noreferrer');
   };
 
+  const handleDownloadArtifactsJson = () => {
+    const report = {
+      leadId,
+      generatedAt: new Date().toISOString(),
+      summary: meetingArtifacts.summary || null,
+      transcriptions: meetingArtifacts.transcriptions || [],
+      aiResponses: meetingArtifacts.aiResponses || [],
+      fullChat: meetingArtifacts.fullChat || [],
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meeting-artifacts-${leadId}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadArtifactsCsv = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/leads/${leadId}/meeting-artifacts.csv`);
+      if (!res.ok) {
+        throw new Error(`Failed to download CSV (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meeting-artifacts-${leadId}-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading artifacts CSV:', err);
+      alert('Failed to download meeting artifacts CSV.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -182,6 +272,9 @@ export default function ClientProfilePage() {
   const initials = `${(lead.firstName || '?')[0]}${(lead.lastName || '?')[0]}`.toUpperCase();
   const currentStage = lead.pipelineStatus || 'new';
   const stageColor = PIPELINE_COLORS[currentStage] || PIPELINE_COLORS.new;
+  const artifactTranscriptions = Array.isArray(meetingArtifacts?.transcriptions) ? meetingArtifacts.transcriptions : [];
+  const artifactAiResponses = Array.isArray(meetingArtifacts?.aiResponses) ? meetingArtifacts.aiResponses : [];
+  const artifactFullChat = Array.isArray(meetingArtifacts?.fullChat) ? meetingArtifacts.fullChat : [];
 
   const tabs = [
     { key: 'overview', label: 'Overview' },
@@ -189,7 +282,7 @@ export default function ClientProfilePage() {
     { key: 'recording', label: 'Recording' },
     { key: 'appointments', label: `Appointments (${appointments.length})` },
     { key: 'documents', label: `Documents (${documents.length})` },
-    { key: 'transcripts', label: `Transcripts (${transcripts.length})` },
+    { key: 'transcripts', label: `Meeting Artifacts (${artifactFullChat.length})` },
     { key: 'notes', label: 'AI Notes' },
   ];
 
@@ -568,30 +661,72 @@ export default function ClientProfilePage() {
       )}
 
       {activeTab === 'transcripts' && (
-        <div className="space-y-3">
-          {transcripts.length === 0 ? (
+        <div className="space-y-4">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-white">Meeting Artifacts</p>
+              <p className="text-xs text-gray-400">
+                Transcriptions ({artifactTranscriptions.length}) • AI Responses ({artifactAiResponses.length}) • Full Chat ({artifactFullChat.length})
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchMeetingArtifacts(true)}
+                disabled={artifactsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 rounded-lg text-xs hover:bg-white/20 transition-all disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${artifactsLoading ? 'animate-spin' : ''}`} />
+                {artifactsLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={handleDownloadArtifactsCsv}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                CSV
+              </button>
+              <button
+                onClick={handleDownloadArtifactsJson}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                JSON
+              </button>
+            </div>
+          </div>
+
+          {artifactsError && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300">
+              {artifactsError}
+            </div>
+          )}
+
+          {artifactFullChat.length === 0 ? (
             <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
               <MessageSquare className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No transcripts for this client.</p>
+              <p className="text-gray-400">No meeting artifacts for this client yet.</p>
             </div>
           ) : (
-            transcripts.map(t => (
-              <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    t.role === 'agent' ? 'bg-blue-500/10 text-blue-400' :
-                    t.role === 'ai' ? 'bg-purple-500/10 text-purple-400' :
-                    'bg-gray-500/10 text-gray-400'
-                  }`}>
-                    {t.role}
-                  </span>
-                  <span className="text-xs text-gray-600">
-                    {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : ''}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300 whitespace-pre-wrap">{t.content}</p>
-              </div>
-            ))
+            <div className="grid gap-4 md:grid-cols-3">
+              <ArtifactColumn
+                title="Transcriptions"
+                items={artifactTranscriptions}
+                emptyText="No transcriptions"
+                badgeClass="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+              />
+              <ArtifactColumn
+                title="AI Responses"
+                items={artifactAiResponses}
+                emptyText="No AI responses"
+                badgeClass="bg-blue-500/10 text-blue-300 border border-blue-500/20"
+              />
+              <ArtifactColumn
+                title="Full Chat"
+                items={artifactFullChat}
+                emptyText="No chat timeline"
+                badgeClass="bg-purple-500/10 text-purple-300 border border-purple-500/20"
+              />
+            </div>
           )}
         </div>
       )}
@@ -643,6 +778,33 @@ export default function ClientProfilePage() {
               {notes || 'No notes yet. Click Edit to add notes.'}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArtifactColumn({ title, items, emptyText, badgeClass }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-3 min-h-[220px]">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">{title}</h4>
+        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClass || ''}`}>
+          {items.length}
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-xs text-gray-500">{emptyText}</p>
+      ) : (
+        <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+          {items.map((entry, idx) => (
+            <div key={`${entry.id || 'artifact'}-${idx}`} className="bg-black/20 border border-white/10 rounded-lg p-2">
+              <div className="text-[11px] text-gray-500 mb-1">
+                {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp'}
+              </div>
+              <div className="text-xs text-gray-200 whitespace-pre-wrap">{entry.content || '—'}</div>
+            </div>
+          ))}
         </div>
       )}
     </div>

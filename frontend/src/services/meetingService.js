@@ -400,6 +400,38 @@ class MeetingService {
     }
   }
 
+  async renegotiateConnection(reason = 'track-update') {
+    if (!this.peerConnection || !this.targetUserId || !this.meetingId) {
+      return false;
+    }
+    if (this.peerConnection.signalingState !== 'stable') {
+      console.log(`Skipping renegotiation (${reason}) due to signaling state:`, this.peerConnection.signalingState);
+      return false;
+    }
+
+    try {
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      await this.peerConnection.setLocalDescription(offer);
+      this.send({
+        type: 'offer',
+        meetingId: this.meetingId,
+        targetUserId: this.targetUserId,
+        signal: {
+          type: 'offer',
+          sdp: offer.sdp
+        }
+      });
+      console.log(`🔁 Sent renegotiation offer (${reason})`);
+      return true;
+    } catch (error) {
+      console.warn(`Renegotiation failed (${reason}):`, error);
+      return false;
+    }
+  }
+
   async handleOffer(data) {
     try {
       const fromUserId = data.fromUserId || data.from;
@@ -750,6 +782,9 @@ class MeetingService {
       // Get screen stream
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = this.screenStream.getVideoTracks()[0];
+      if (!screenTrack) {
+        throw new Error('Screen track unavailable');
+      }
       
       // Replace video track in peer connection
       if (this.peerConnection) {
@@ -757,13 +792,16 @@ class MeetingService {
         if (sender) {
           console.log('🔄 Replacing camera track with screen track');
           await sender.replaceTrack(screenTrack);
+        } else {
+          this.peerConnection.addTrack(screenTrack, this.screenStream);
         }
+        await this.renegotiateConnection('start-screen-share');
       }
       
       // Handle browser's "Stop Sharing" button
       screenTrack.onended = () => {
         console.log('🛑 Screen sharing ended via browser UI');
-        this.stopScreenShare();
+        void this.stopScreenShare();
       };
       
       return this.screenStream;
@@ -789,7 +827,10 @@ class MeetingService {
       if (sender && cameraTrack) {
         console.log('🔄 Reverting to camera track');
         await sender.replaceTrack(cameraTrack);
+      } else if (cameraTrack) {
+        this.peerConnection.addTrack(cameraTrack, this.localStream);
       }
+      await this.renegotiateConnection('stop-screen-share');
     }
     
     return this.localStream;

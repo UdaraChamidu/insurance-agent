@@ -1,0 +1,61 @@
+Building your own system gives you ultimate control. To fully replace the software for your agency workflow, here are the four core modules you need to develop.
+* Lead Capture Front End
+You need fast web pages to catch your ad traffic. This includes custom forms to collect contact details and secure file upload fields for when clients need to submit income or immigration documents.
+* Scheduling Engine
+You need a custom calendar interface that handles your availability and timezone math. This must integrate directly with the Zoom API to automatically generate a unique meeting link the moment a prospect picks a time.
+* Communication Server
+You need to connect your backend to services like AWS SES for email and Twilio for texting. This will handle the immediate booking confirmations, automated Zoom reminders to reduce no-shows, and bulk messaging for open enrollment renewals.
+* Client Management Dashboard
+You need a visual interface connected to your Supabase database. This should feature a pipeline board to track who is quoted versus enrolled. It must display individual client profiles, store the call transcripts, and provide a secure endpoint for your custom AI to push its notes. Strict user authentication will be required to keep all health data compliant.
+Since you are already writing in Javascript and Node, building the API routes to connect these modules will be very straightforward.
+
+
+
+-------------------------
+
+
+
+The workflow for lead capturing will be like this
+
+
+
+First, the prospect clicks your advertisement and lands on your new custom web page. This page replaces your Squarespace site and is designed specifically to capture their contact information and basic health needs.
+
+
+
+Second, the prospect chooses an available appointment time on your custom calendar interface. This interface reads your real-time availability directly from your Supabase database, completely replacing Microsoft Bookings.
+
+
+
+Third, the moment they submit the form, your Node backend takes over. It instantly saves the prospect's profile into your Supabase database.
+
+
+
+Fourth, your backend automatically sends a secure request to the Zoom API. Zoom generates a unique meeting room for that specific time and sends the link back to your server, which saves it to the client's profile.
+
+
+
+Fifth, your server uses a service like Amazon Simple Email Service or Twilio to immediately send a confirmation text and email to the prospect containing their new Zoom link.
+
+
+
+Finally, when it is time for the consultation, you open your custom dashboard. The client's information is already loaded from Supabase, ready for you to enroll them in a Medicare or ACA plan while your artificial intelligence assistant listens in on your private screen.
+
+
+
+----------------------------------
+
+
+
+The Client Experience
+The client does not create an account or set a password. They simply pick a time on your website, fill out their basic information, and receive their automated Zoom link via text and email. To them, it is just a simple booking process.
+The Hidden Admin Profile
+Behind the scenes, your backend takes that form data and creates a private contact record in your Supabase database. This acts as your digital file cabinet. The client never sees this, and they do not know a profile was created.
+How the AI Connects
+Because this hidden profile is generated instantly, it is assigned a unique database ID. When the Zoom call takes place, your AI software will use that exact ID to attach the call transcript and plan details directly into that specific client's file.
+Admin Access Only
+You will have a secure login to your custom dashboard. When you log in, you will be able to view and manage all of these hidden client profiles, while the public remains completely locked out.
+
+
+
+

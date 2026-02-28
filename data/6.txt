@@ -1,0 +1,271 @@
+Look professional and compliant
+• Build confidence fast
+• Push users to schedule
+• Avoid anything that looks like “AI advice”
+
+
+
+Keep it clean, conservative, and calm.
+
+
+
+⸻
+
+
+
+1️⃣ Theme color (recommended)
+
+
+
+Best choice for insurance (Florida + health):
+
+
+
+Primary: Deep blue / navy
+Secondary: White / light gray
+Accent: Muted green or teal
+
+
+
+Why:
+• Blue = trust, regulation, professionalism
+• Green = health, reassurance
+• Avoid aggressive colors (red, orange, neon)
+
+
+
+Example palette (you can give this directly):
+• Primary: #0B3C5D (navy blue)
+• Secondary: #FFFFFF (white)
+• Accent: #2E8B57 (soft green)
+• Text: #1F2937 (dark gray)
+
+
+
+Tell the dev:
+
+
+
+Keep it conservative and readable. No gradients, no neon, no dark themes.
+
+
+
+⸻
+
+
+
+2️⃣ Images to include (very important)
+
+
+
+What to include ✅
+• Realistic people (families, seniors, professionals)
+• Neutral healthcare imagery
+• Calm, friendly faces
+• Lifestyle shots (not hospitals)
+
+
+
+What to avoid ❌
+• Robots, AI brains, chat bubbles
+• Doctors in scrubs (you’re not a provider)
+• Stock photos that look fake or salesy
+• Anything that implies medical treatment
+
+
+
+Where images go:
+• Hero section (one strong image)
+• One supporting image mid-page
+• Optional small icons (simple line icons only)
+
+
+
+Tell the dev:
+
+
+
+Use high-quality, neutral stock images. No AI/robot imagery.
+
+
+
+⸻
+
+
+
+3️⃣ Reference websites (style, not content)
+
+
+
+Tell him to use these as inspiration only, not copy:
+• Health insurance broker sites (clean, boring, trustworthy)
+• Financial advisory landing pages
+• Medicare advisory services (visually simple)
+
+
+
+You can say:
+
+
+
+Look for clean insurance or financial advisory landing pages. Minimal sections, strong CTA, no flashy animations.
+
+
+
+(He can find these himself — you don’t need to pick exact URLs.)
+
+
+
+⸻
+
+
+
+4️⃣ Page structure (this is the most important part)
+
+
+
+The homepage should have only these sections:
+
+
+
+1. Hero section
+• Headline
+• One sentence explaining who you help
+• Primary CTA: “Schedule a Consultation”
+
+
+
+2. What we help with
+
+
+
+Short bullet list:
+• Individual & family health insurance
+• Medicare guidance
+• Small business coverage
+• Life & supplemental insurance
+
+
+
+No details. No promises.
+
+
+
+3. How it works
+
+
+
+3 steps max:
+1. Schedule a consultation
+2. Discuss your situation with a licensed agent
+3. Review available options
+
+
+
+4. Why choose us
+• Licensed professionals
+• Compliance-first approach
+• Personalized guidance
+• No obligation consultation
+
+
+
+5. CTA again
+
+
+
+Booking button (Microsoft Bookings)
+
+
+
+That’s it. No long scrolling.
+
+
+
+⸻
+
+
+
+5️⃣ Texts (very important guidance for AI-generated copy)
+
+
+
+What AI text is OK for:
+• General descriptions
+• Process explanations
+• Friendly tone
+• Marketing language
+
+
+
+What MUST be reviewed/edited manually:
+• Anything that sounds like:
+• “We recommend…”
+• “You qualify for…”
+• “Best plan for you”
+• “Guaranteed savings”
+• Anything that sounds like advice or decisions
+
+
+
+Tell the dev:
+
+
+
+Generate draft text if needed, but I will review and approve all copy. Avoid definitive or advisory language.
+
+
+
+Safe wording examples:
+• “We help you understand your options”
+• “We guide you through available choices”
+• “We explain how coverage works”
+
+
+
+Unsafe wording to avoid:
+• “We choose the best plan for you”
+• “We ensure you qualify”
+• “AI-powered recommendations”
+
+
+
+⸻
+
+
+
+6️⃣ What to reply to the developer (copy/paste)
+
+
+
+You can send him this:
+
+
+
+For the public website:
+• Keep it clean, conservative, and trust-focused
+• Theme: navy/blue + white, minimal accents
+• Images: neutral people/lifestyle, no AI/robot imagery
+• Structure: hero → what we help with → how it works → why us → booking CTA
+• No AI references, no advice language
+• Generate draft text if needed, but I’ll review and adjust for compliance
+
+
+
+This site is for intake and scheduling only. AI outputs live in a separate private agent app.
+
+
+
+⸻
+
+
+
+My honest recommendation
+
+
+
+Don’t overdesign this now.
+
+
+
+A simple, professional landing page that converts is far better than a fancy site that raises compliance questions.

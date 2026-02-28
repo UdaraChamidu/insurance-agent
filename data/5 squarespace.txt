@@ -1,0 +1,95 @@
+Public Website (Squarespace) – What the customer sees
+
+
+
+A. Landing page (high-level, trust-first)
+
+
+
+They should see:
+• Who you are (Elite Deal Broker)
+• What you help with (health insurance guidance)
+• Who it’s for (individuals, families, small businesses)
+• Why you’re different (clarity, compliance, human guidance)
+• Clear call to action: “Schedule a consultation”
+
+
+
+They should NOT see:
+• “AI-powered”
+• “Chatbot”
+• “Automated decisions”
+• Anything that sounds like advice without a human
+
+
+
+📌 This protects you legally and builds trust.
+
+
+
+⸻
+
+
+
+B. Before booking – light intake (very important)
+
+
+
+This is NOT underwriting.
+This is context gathering.
+
+
+
+Recommended questions (safe + useful):
+1. What type of insurance are you looking for?
+• Individual / Family
+• Medicare
+• Small business
+• ACA marketplace
+• Not sure yet
+2. What state are you currently in?
+• Dropdown (US states)
+3. Have you recently experienced a life event? (optional)
+• Moved to a new state
+• Lost coverage
+• Turned 65
+• Employer coverage change
+• None
+4. Preferred consultation type
+• Phone
+• Video
+5. Anything you want us to know before the call?
+• Free text (optional)
+
+
+
+Why this is perfect:
+• No advice
+• No eligibility decisions
+• No promises
+• Fully compliant
+• Extremely helpful for AI prep later
+
+
+
+⸻
+
+
+
+C. Booking confirmation page
+
+
+
+They should see:
+• Date & time
+• Who they’ll speak with
+• What will happen on the call
+• What to prepare (ID, current plan, questions)
+
+
+
+Add a small disclaimer (important):
+
+
+
+“This consultation is informational and does not constitute legal or financial advice. Coverage eligibility and pricing are determined by carriers and regulators.”

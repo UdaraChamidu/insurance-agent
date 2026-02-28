@@ -40,23 +40,31 @@ async def upload_document(
         if not supabase:
             raise HTTPException(status_code=500, detail="Supabase client not initialized")
 
-        # Create unique path: public/lead_id/uuid-filename
-        # Or private bucket 'client-docs'
+        # Create unique path in private 'client-docs' bucket.
         bucket_name = "client-docs"
-        file_ext = os.path.splitext(file.filename)[1]
+        file_ext = os.path.splitext(file.filename or "")[1]
         unique_name = f"{uuid.uuid4()}{file_ext}"
         file_path = f"{lead_id}/{unique_name}"
-        
-        # Upload
-        res = supabase.storage.from_(bucket_name).upload(
+        content_type = (file.content_type or "application/octet-stream").strip()
+
+        upload_options = {
+            "content-type": content_type,
+            "upsert": False,
+        }
+        upload_result = supabase.storage.from_(bucket_name).upload(
             path=file_path,
             file=content,
-            file_options={"content-type": file.content_type}
+            file_options=upload_options,
         )
-        
-        # If upload fails, res usually contains error or data. 
-        # supabase-py can throw exceptions too.
-        
+
+        # Some supabase client versions return error payloads without raising.
+        if isinstance(upload_result, dict):
+            error_payload = upload_result.get("error")
+            if error_payload:
+                raise RuntimeError(str(error_payload))
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Supabase Upload Error: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")

@@ -15,16 +15,28 @@ app = FastAPI(
 # Honor X-Forwarded-* headers from Railway so generated redirect URLs keep https.
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# Set all CORS enabled origins
-if settings.CORS_ORIGINS:
-    print(f"CORS Allowed Origins: {settings.CORS_ORIGINS}")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[str(origin).rstrip("/") for origin in settings.CORS_ORIGINS],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Set CORS enabled origins (always-on for stable local development + configurable origins)
+default_local_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+]
+configured_origins = []
+try:
+    configured_origins = [str(origin).rstrip("/") for origin in (settings.CORS_ORIGINS or [])]
+except Exception as cors_origin_error:
+    print(f"CORS config parse warning: {cors_origin_error}")
+
+allowed_origins = sorted(set(default_local_origins + configured_origins))
+print(f"CORS Allowed Origins: {allowed_origins}")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 

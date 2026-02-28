@@ -27,6 +27,13 @@ const formatTime12 = (time24) => {
   return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
+const toDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function ManageAppointmentPage() {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -97,8 +104,8 @@ export default function ManageAppointmentPage() {
     try {
       const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-      const fromStr = from.toISOString().split('T')[0];
-      const toStr = to.toISOString().split('T')[0];
+      const fromStr = toDateKey(from);
+      const toStr = toDateKey(to);
 
       const res = await fetch(`${API_URL}/api/scheduling/availability?from=${fromStr}&to=${toStr}`);
       if (res.ok) setAvailability(await res.json());
@@ -117,7 +124,7 @@ export default function ManageAppointmentPage() {
 
   const slotsForDate = useMemo(() => {
     if (!selectedDate) return [];
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = toDateKey(selectedDate);
     const dayData = availability.find(d => d.date === dateStr);
     return dayData ? dayData.slots : [];
   }, [selectedDate, availability]);
@@ -132,7 +139,7 @@ export default function ManageAppointmentPage() {
     for (let i = 0; i < startPad; i++) days.push(null);
     for (let d = 1; d <= lastDay.getDate(); d++) {
       const date = new Date(year, month, d);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = toDateKey(date);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       days.push({
         date, dateStr, day: d,
@@ -173,7 +180,7 @@ export default function ManageAppointmentPage() {
     if (!selectedDate || !selectedSlot) return;
     setActionLoading(true);
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = toDateKey(selectedDate);
       const res = await fetch(`${API_URL}/api/scheduling/manage/${token}/reschedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -479,7 +486,7 @@ export default function ManageAppointmentPage() {
                       disabled={!canSelect}
                       className={`h-10 rounded-lg text-sm font-medium transition-all relative flex items-center justify-center
                         ${isSelected ? 'bg-blue-600 text-white shadow-lg scale-105'
-                          : canSelect ? 'text-white hover:bg-white/10' : 'text-gray-600 cursor-not-allowed'}
+                          : canSelect ? 'text-white hover:bg-white/10' : 'text-gray-500/80 cursor-not-allowed'}
                         ${dayInfo.isToday && !isSelected ? 'ring-1 ring-blue-500/50' : ''}
                       `}>
                       {dayInfo.day}
