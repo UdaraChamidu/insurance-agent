@@ -1,0 +1,93 @@
+[
+  {
+    "intent_id": "ACA_SEP_MOVE",
+    "product_universe": "ACA",
+    "primary_regulators": ["HHS"],
+    "preferred_doc_types": ["Guidance", "Playbook", "Checklist"],
+    "required_disclaimers": ["general_informational"],
+    "must_ask_questions": ["What was the move date?", "What is the new ZIP code?", "Do you have proof of move?"],
+    "escalation_triggers": ["conflicting dates", "missing SEP proof"],
+    "keywords": ["sep", "move", "moved", "special enrollment", "zipcode", "address change"]
+  },
+  {
+    "intent_id": "ACA_APTC_CSR",
+    "product_universe": "ACA",
+    "primary_regulators": ["HHS", "IRS"],
+    "preferred_doc_types": ["Guidance", "FAQ", "Playbook"],
+    "required_disclaimers": ["general_informational"],
+    "must_ask_questions": ["What is estimated annual income?", "Any household changes?", "Did you receive 1095-A?"],
+    "escalation_triggers": ["tax reconciliation uncertainty"],
+    "keywords": ["aptc", "csr", "1095-a", "subsidy", "income", "reconciliation"]
+  },
+  {
+    "intent_id": "ACA_APPEAL_STEPS",
+    "product_universe": "ACA",
+    "primary_regulators": ["HHS"],
+    "preferred_doc_types": ["Guidance", "Checklist", "Playbook"],
+    "required_disclaimers": ["general_informational"],
+    "must_ask_questions": ["What notice was received?", "When was notice date?", "Any supporting documents available?"],
+    "escalation_triggers": ["appeal deadline near", "legal complaint"],
+    "keywords": ["appeal", "denial", "eligibility notice", "hearing", "deadline"]
+  },
+  {
+    "intent_id": "MEDICARE_ENROLLMENT_PERIODS",
+    "product_universe": "Medicare",
+    "primary_regulators": ["CMS"],
+    "preferred_doc_types": ["Guidance", "Regulation", "Playbook"],
+    "required_disclaimers": ["medicare_marketing", "general_informational"],
+    "must_ask_questions": ["Are you in IEP, AEP, OEP, or SEP?", "What is your Medicare start date?", "Any recent qualifying event?"],
+    "escalation_triggers": ["possible late enrollment penalty"],
+    "keywords": ["medicare", "iep", "aep", "oep", "sep", "part b", "enrollment period"]
+  },
+  {
+    "intent_id": "MEDICARE_MARKETING_DISCLAIMERS",
+    "product_universe": "Medicare",
+    "primary_regulators": ["CMS"],
+    "preferred_doc_types": ["Guidance", "Script", "Checklist"],
+    "required_disclaimers": ["medicare_marketing"],
+    "must_ask_questions": ["Was scope-of-appointment completed?", "Was recording consent disclosed if applicable?"],
+    "escalation_triggers": ["unapproved marketing statement"],
+    "keywords": ["marketing", "soa", "scope of appointment", "cms disclaimer", "call recording"]
+  },
+  {
+    "intent_id": "MEDIGAP_GI_RIGHTS",
+    "product_universe": "Medigap",
+    "primary_regulators": ["CMS", "FL-DFS/OIR"],
+    "preferred_doc_types": ["Regulation", "Guidance", "FAQ"],
+    "required_disclaimers": ["general_informational"],
+    "must_ask_questions": ["What event triggered GI rights?", "When did prior coverage end?"],
+    "escalation_triggers": ["outside guaranteed issue window"],
+    "keywords": ["medigap", "guaranteed issue", "gi rights", "supplement", "open enrollment"]
+  },
+  {
+    "intent_id": "FL_RECORDING_CONSENT",
+    "product_universe": "General",
+    "primary_regulators": ["FL-DFS/OIR"],
+    "preferred_doc_types": ["Law", "Guidance", "Script"],
+    "required_disclaimers": ["fl_recording_consent"],
+    "must_ask_questions": ["Did all parties provide consent?"],
+    "escalation_triggers": ["no consent", "state law conflict"],
+    "keywords": ["florida", "recording", "consent", "two-party consent", "call recording law"]
+  },
+  {
+    "intent_id": "FL_ADVERTISING_DO_DONTS",
+    "product_universe": "General",
+    "primary_regulators": ["FL-DFS/OIR"],
+    "preferred_doc_types": ["Law", "Regulation", "Checklist"],
+    "required_disclaimers": ["general_informational"],
+    "must_ask_questions": ["What exact wording is planned?"],
+    "escalation_triggers": ["rebating", "misleading claim"],
+    "keywords": ["advertising", "rebate", "florida rules", "marketing claim", "unfair trade"]
+  },
+  {
+    "intent_id": "CARRIER_ENROLLMENT_STEPS",
+    "product_universe": "General",
+    "primary_regulators": ["Carrier", "FMO"],
+    "preferred_doc_types": ["Manual", "Checklist", "Playbook"],
+    "required_disclaimers": ["carrier_specific"],
+    "must_ask_questions": ["Which carrier?", "Which product and state?"],
+    "escalation_triggers": ["carrier rule conflict"],
+    "keywords": ["carrier", "fmo", "enrollment steps", "submission", "appointment status"]
+  }
+]
+

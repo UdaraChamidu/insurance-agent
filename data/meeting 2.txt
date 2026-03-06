@@ -1,0 +1,21 @@
+-BM25 is a keyword ranking method.
+-FTS is Full Text Search
+
+
+- tell me exactly how like the folders structure in sharepoint
+- also tell me details about documents. what they contains and more...
+- tell me exactly what should be retrieve. 
+- 
+- 
+
+
+-why use supabase in RAG ? we need pinecone and only it. also pdfs are in shareponit. there we have security i think.
+-why 2 knowledge bases?
+-uploading file to the sharepoint, how comes to the supabase ?
+
+-i saw something on convert into readme.md... why ? which files ? where those .md files storing?
+-which data need to be retrieved from the vectore stores.? like citations, rules...
+-
+- please tell me what should exactly show from the AI response...
+please send me as a text. then i can implement all the logics. 
+

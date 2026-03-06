@@ -143,6 +143,16 @@ async def reprocess_file(request: ReprocessRequest):
         removed_file = ingestion_service.reprocess_file(request.fileKey)
         if not removed_file:
             raise HTTPException(status_code=404, detail="File not found in tracking")
+
+        namespace = str(removed_file.get("namespace") or "").strip()
+        if namespace:
+            try:
+                pinecone_service.delete_by_filter(
+                    namespace=namespace,
+                    filter_payload={"doc_id": {"$eq": request.fileKey}},
+                )
+            except Exception as delete_error:
+                print(f"Reprocess pre-delete skipped for {request.fileKey}: {delete_error}")
             
         # Trigger Notification
         from app.services.notification_service import notification_service

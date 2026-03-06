@@ -61,4 +61,14 @@ class PineconeService:
             print(f"Pinecone query error: {e}")
             return []
 
+    def delete_by_filter(self, namespace, filter_payload):
+        if not self.index:
+            return False
+        try:
+            self.index.delete(namespace=namespace, filter=filter_payload)
+            return True
+        except Exception as e:
+            print(f"Pinecone delete error: {e}")
+            return False
+
 pinecone_service = PineconeService()

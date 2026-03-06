@@ -1,0 +1,346 @@
+## Step 1 — Create two separate knowledge bases (to prevent contamination)
+
+
+
+A) LIVE_ASSIST_KB (used during calls)
+😎 TRAINING_KB (exam prep only)
+
+LIVE_ASSIST_KB must never index study mnemonics or practice Qs.
+
+---
+
+
+
+## Step 2 — Inside LIVE_ASSIST_KB, implement the 3-layer separation
+
+
+
+Create these top folders:
+
+
+
+### Layer A — Authority (source of truth)
+
+
+
+* A_Authority_PDFs_Original
+* A_Authority_CleanText_MD (generated versions for search)
+
+
+
+### Layer B — Playbooks (agent workflows)
+
+
+
+* B_Playbooks
+* B_Checklists
+* B_Scripts_Disclaimers
+* B_FAQs_EdgeCases
+
+Layer B always cites Layer A.
+
+---
+
+
+
+## Step 3 — Organize by “Universe” first (not by exam chapters)
+
+
+
+Inside Layer A and B, create universes:
+
+
+
+* FL_State_Rules (DFS/OIR, agent conduct, advertising, recording consent)
+* ACA_Marketplace (OEP/SEP, eligibility, verifications, APTC/CSR, appeals)
+* Medicare (MA/PDP/Medigap marketing rules, enrollment periods, SOA, retention)
+* SelfFunded_ERISA (only if selling)
+* Medicaid_FL (only if selling)
+* Carrier_FMO_Policies (once appointed)
+
+
+
+---
+
+
+
+## Step 4 — Standardize document naming (so citations are clean)
+
+
+
+Use this naming format everywhere:
+
+
+
+[Universe]_[DocType]_[Topic]_[EffectiveDate]_[Version]
+
+
+
+Examples:
+
+
+
+* ACA_Guidance_SEP_Move_2026-01_v1
+* FL_Law_UnfairTradePractices_2025-07_v3
+* Medicare_CMS_MarketingGuidelines_2026_v1
+
+
+
+---
+
+
+
+## Step 5 — Add metadata columns (or embed metadata at top of doc)
+
+
+
+For every file, ensure these exist (columns or header block):
+
+
+
+* State = FL
+* ProductUniverse (ACA/Medicare/etc.)
+* Regulator (CMS/FL-DFS/OIR/HHS/Carrier)
+* AuthorityLevel (Law/Guidance/CarrierPolicy/InternalSOP/TrainingReference)
+* ProcessStage (Intake/Eligibility/Enrollment/PostEnroll/Appeals)
+* EffectiveDate
+* DocVersion
+* TopicTags
+* Carrier (if relevant)
+
+
+
+---
+
+
+
+## Step 6 — Convert all Layer A PDFs into “clean Markdown”
+
+
+
+Do not embed raw PDF text directly.
+
+
+
+Pipeline should:
+
+
+
+* Extract text correctly (tables, multi-columns)
+* Create clean.md for retrieval
+* Keep the original PDF for UI citation links
+
+
+
+Store both:
+
+
+
+* Search uses Markdown
+* UI citations link to original PDF page
+
+
+
+---
+
+
+
+## Step 7 — Build “Conversation Packs” (what customers ask together)
+
+
+
+Create curated bundles (folders or tags) for consecutive question flows:
+
+
+
+High priority packs:
+
+
+
+* ACA_SEP_Pack (move, loss of coverage, marriage, newborn)
+* ACA_APTC_CSR_Pack (income changes, subsidy basics, reconciliation)
+* ACA_Appeals_Pack
+* Medicare_Enrollment_Pack
+* FL_Compliance_Pack (recording consent, advertising rules, rebating, disclosures)
+
+
+
+---
+
+
+
+## Step 8 — Write Playbooks using one strict template (Layer 😎
+
+
+
+Every playbook must follow this structure:
+
+
+
+* Applies to (Universe + Stage)
+* Goal
+* Agent “Read-back” (2–4 sentences)
+* Ask next (required questions)
+* Evidence required (docs/proofs)
+* Do/Don’t say (compliance)
+* Escalate triggers
+* Citations (Layer A references)
+
+
+
+---
+
+
+
+## Step 9 — Dependency mapping (prevent playbook decay)
+
+
+
+Each playbook stores its cited sources:
+
+
+
+* source_doc_id
+* source_version/etag
+
+
+
+When any cited authority doc changes → flag playbook “Needs review”.
+
+
+
+---
+
+
+
+## Step 10 — Build your “Intent Cards” (fast routing)
+
+
+
+Create 30–80 macro-intents as small docs (or JSON) like:
+
+
+
+* ACA_SEP_MOVE
+* ACA_APPEAL_STEPS
+* MEDICARE_IEP_AEP_OEP
+* FL_RECORDING_CONSENT
+
+
+
+Each intent card defines:
+
+
+
+* Universe/regulator filters
+* Required disclaimers
+* Must-ask questions
+* Escalations
+* Preferred doc types
+
+
+
+These are indexed separately and used to route retrieval quickly.
+
+
+
+---
+
+
+
+## Step 11 — Index design: separate indexes
+
+
+
+Create at least:
+
+
+
+* Live Assist Index (Layer A + B only)
+* Training Index (exam prep only)
+
+
+
+Optional:
+
+
+
+* Intent Index (intent cards only)
+
+
+
+---
+
+
+
+## Step 12 — Retrieval strategy (hybrid)
+
+
+
+For Live Assist:
+
+
+
+* Hard filter by universe + state
+* Hybrid search: keyword (BM25) + vector
+* Rerank top results
+* Return 6–10 chunks max
+
+
+
+---
+
+
+
+## Step 13 — Output formatting rules (agent-assist)
+
+
+
+Always output:
+
+
+
+* Read-back
+* Ask next
+* Do/Don’t
+* Citations
+* Escalate triggers
+
+
+
+If no evidence → “verify/escalate”.
+
+
+
+---
+
+
+
+## Step 14 — QA and weekly update loop
+
+
+
+* Sample calls weekly
+* Add missing playbooks
+* Fix chunking errors
+* Update packs and intents
+* Re-sync SharePoint and reindex changed docs only
+
+
+
+---
+
+
+
+## Step 15 — Training KB organization (separate)
+
+
+
+In TRAINING_KB:
+
+
+
+* Organize by exam domains
+* Practice questions, mnemonics allowed
+* Tag as TrainingReference
+* Never mixed with Live Assist

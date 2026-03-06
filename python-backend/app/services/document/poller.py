@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import List
 
@@ -14,6 +15,7 @@ class DocumentPoller:
         self.is_running = False
         self._task = None
         self.processing_stale_minutes = 20
+        self.sharepoint_library = os.getenv("SHAREPOINT_KB_LIBRARY", "KB-DEV").strip() or "KB-DEV"
 
     async def start(self):
         if self.is_running:
@@ -69,6 +71,7 @@ class DocumentPoller:
                 files = await asyncio.to_thread(
                     sharepoint_service.list_documents_in_folder,
                     folder_name,
+                    self.sharepoint_library,
                 )
                 
                 for file in files:
@@ -149,7 +152,16 @@ class DocumentPoller:
                 )
                 
                 # 2. Ingest
-                chunks_count, vectors_count = await ingestion_orchestrator.process_file_content(content, file_name, folder_name, namespace)
+                chunks_count, vectors_count = await ingestion_orchestrator.process_file_content(
+                    content=content,
+                    filename=file_name,
+                    folder_name=folder_name,
+                    namespace=namespace,
+                    file_id=file_id,
+                    file_metadata=file_info.get("metadata") or {},
+                    sharepoint_url=file_info.get("sharepointUrl"),
+                    last_modified=last_modified,
+                )
                 
                 # 3. Update State
                 status = "success" if (vectors_count or 0) > 0 else "no_vectors"

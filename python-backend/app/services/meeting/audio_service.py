@@ -6,6 +6,7 @@ import os
 import time
 import json
 import inspect
+import re
 import google.generativeai as genai
 import requests
 import websockets
@@ -16,6 +17,10 @@ from app.services.meeting.websocket_manager import manager
 from app.services.integrations.pinecone import pinecone_service
 from app.services.llm.embeddings import embedding_service
 from app.services.llm.usage_tracker import gemini_usage_tracker
+from app.services.rag.audit_logger import rag_audit_logger
+from app.services.rag.intent_router import intent_router
+from app.services.rag.keyword_index import keyword_index_service
+from app.services.rag.redaction import redaction_service
 
 # Configure Gemini
 if settings.GEMINI_API_KEY:
@@ -140,7 +145,6 @@ class AudioService:
         else:
             default_namespaces = list(getattr(pinecone_service, "namespaces", {}).values())
             self.rag_namespaces = list(dict.fromkeys(default_namespaces)) if default_namespaces else [
-                "training-reference",
                 "fl-state-authority",
                 "cms-medicare",
                 "federal-aca",
@@ -148,10 +152,32 @@ class AudioService:
                 "fl-medicaid-agency",
                 "carrier-fmo-policies",
             ]
+        self.rag_namespaces = [ns for ns in self.rag_namespaces if ns != "training-reference"]
         self.rag_top_k_per_namespace = max(
             1,
             self._read_non_negative_int_env("MEETING_RAG_TOP_K_PER_NAMESPACE", 3),
         )
+        self.rag_vector_top_k = max(
+            1,
+            self._read_non_negative_int_env("MEETING_RAG_VECTOR_TOP_K", 30),
+        )
+        self.rag_keyword_top_k = max(
+            1,
+            self._read_non_negative_int_env("MEETING_RAG_KEYWORD_TOP_K", 30),
+        )
+        self.rag_return_top_k = max(
+            1,
+            self._read_non_negative_int_env("MEETING_RAG_RETURN_TOP_K", 8),
+        )
+        self.rag_intent_min_confidence = self._read_non_negative_float_env(
+            "MEETING_RAG_INTENT_MIN_CONFIDENCE",
+            0.25,
+        )
+        self.rag_evidence_min_confidence = self._read_non_negative_float_env(
+            "MEETING_RAG_EVIDENCE_MIN_CONFIDENCE",
+            0.58,
+        )
+        self.rag_stage_boost = self._read_non_negative_float_env("MEETING_RAG_STAGE_BOOST", 0.06)
         self.rag_min_score = self._read_non_negative_float_env("MEETING_RAG_MIN_SCORE", 0.62)
         self.rag_fallback_min_score = self._read_non_negative_float_env(
             "MEETING_RAG_FALLBACK_MIN_SCORE",
@@ -244,8 +270,99 @@ class AudioService:
     def _normalize_request_text(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
 
+    def _extract_context_flags(self, metadata: Optional[Dict[str, Any]]) -> Dict[str, str]:
+        safe = metadata if isinstance(metadata, dict) else {}
+        return {
+            "state": str(
+                safe.get("state")
+                or safe.get("State")
+                or "FL"
+            ).strip() or "FL",
+            "product_universe": str(
+                safe.get("product_universe")
+                or safe.get("productUniverse")
+                or safe.get("ProductUniverse")
+                or ""
+            ).strip(),
+            "regulator": str(safe.get("regulator") or safe.get("Regulator") or "").strip(),
+            "process_stage": str(
+                safe.get("process_stage")
+                or safe.get("processStage")
+                or ""
+            ).strip(),
+            "carrier": str(safe.get("carrier") or safe.get("Carrier") or "").strip(),
+            "doc_type": str(safe.get("doc_type") or safe.get("docType") or "").strip(),
+        }
+
+    def _namespace_candidates_for_universe(self, product_universe: str) -> List[str]:
+        universe = (product_universe or "").strip().lower()
+        if not universe:
+            return [ns for ns in self.rag_namespaces if ns]
+
+        mapping = {
+            "medicare": ["cms-medicare"],
+            "aca": ["federal-aca"],
+            "medigap": ["cms-medicare", "fl-state-authority"],
+            "selffunded_erisa": ["erisa-irs-selffunded"],
+            "mewa": ["erisa-irs-selffunded"],
+            "medicaid": ["fl-medicaid-agency"],
+            "general": ["fl-state-authority", "cms-medicare", "federal-aca", "carrier-fmo-policies"],
+        }
+        mapped = mapping.get(universe)
+        if mapped:
+            return [ns for ns in mapped if ns in self.rag_namespaces]
+        return [ns for ns in self.rag_namespaces if ns]
+
+    def _build_retrieval_filter(
+        self,
+        context_flags: Dict[str, str],
+        intent_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        filter_payload: Dict[str, Any] = {}
+
+        state = context_flags.get("state")
+        if state:
+            filter_payload["state"] = {"$eq": state}
+
+        product_universe = (
+            context_flags.get("product_universe")
+            or str(intent_payload.get("product_universe") or "").strip()
+        )
+        if product_universe and product_universe.lower() != "general":
+            filter_payload["product_universe"] = {"$eq": product_universe}
+
+        regulators = [str(v).strip() for v in (intent_payload.get("primary_regulators") or []) if str(v).strip()]
+        if regulators:
+            filter_payload["regulator"] = {"$in": regulators}
+
+        preferred_doc_types = [
+            str(v).strip()
+            for v in (intent_payload.get("preferred_doc_types") or [])
+            if str(v).strip()
+        ]
+        if preferred_doc_types:
+            filter_payload["doc_type"] = {"$in": preferred_doc_types}
+
+        carrier = context_flags.get("carrier")
+        if carrier:
+            filter_payload["carrier"] = {"$eq": carrier}
+
+        return filter_payload
+
+    def _extract_exact_tokens(self, query: str) -> List[str]:
+        tokens = set()
+        normalized = self._normalize_request_text(query)
+        for token in re.findall(r"\b[a-z0-9\-]{2,}\b", normalized):
+            if token in {"1095-a", "aptc", "csr", "sep", "aep", "oep", "cfr", "usc"}:
+                tokens.add(token)
+            elif any(ch.isdigit() for ch in token):
+                tokens.add(token)
+        return sorted(tokens)
+
     def _parse_match_hit(self, match_obj: Any, namespace: str) -> Optional[Dict[str, Any]]:
         metadata = getattr(match_obj, "metadata", None)
+        if metadata is None and isinstance(match_obj, dict):
+            metadata = match_obj.get("metadata")
         if not isinstance(metadata, dict):
             metadata = {}
 
@@ -260,36 +377,188 @@ class AudioService:
             return None
 
         source = str(
-            metadata.get("filename")
+            metadata.get("source_title")
+            or metadata.get("filename")
             or metadata.get("source")
             or metadata.get("title")
             or metadata.get("document_id")
             or f"{namespace}-document"
         )
         raw_score = getattr(match_obj, "score", 0)
+        if raw_score is None and isinstance(match_obj, dict):
+            raw_score = match_obj.get("score", 0)
+        raw_id = getattr(match_obj, "id", None)
+        if raw_id is None and isinstance(match_obj, dict):
+            raw_id = match_obj.get("id")
         try:
             score = float(raw_score)
         except (TypeError, ValueError):
             score = 0.0
 
         return {
+            "chunk_id": str(metadata.get("chunk_id") or raw_id or ""),
+            "doc_id": str(metadata.get("doc_id") or metadata.get("document_id") or ""),
             "source": source,
             "namespace": namespace,
             "text": text_content,
             "score": score,
+            "section_path": str(metadata.get("section_path") or ""),
+            "page_start": metadata.get("page_start"),
+            "page_end": metadata.get("page_end"),
+            "doc_version": str(metadata.get("doc_version") or ""),
+            "effective_date": str(metadata.get("effective_date") or ""),
+            "citation_prefix": str(metadata.get("citation_prefix") or ""),
+            "regulator": str(metadata.get("regulator") or ""),
+            "authority_level": str(metadata.get("authority_level") or ""),
+            "process_stage": str(metadata.get("process_stage") or ""),
+            "sharepoint_url": str(metadata.get("sharepoint_url") or ""),
+            "product_universe": str(metadata.get("product_universe") or ""),
+            "metadata": metadata,
         }
 
-    def _dedupe_rank_hits(self, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        ranked = sorted(hits, key=lambda item: item.get("score", 0.0), reverse=True)
+    def _normalize_keyword_hit(self, hit: Dict[str, Any]) -> Dict[str, Any]:
+        metadata = hit.get("metadata") or {}
+        source = str(
+            hit.get("source")
+            or metadata.get("source_title")
+            or metadata.get("filename")
+            or "keyword-document"
+        )
+        return {
+            "chunk_id": str(hit.get("chunk_id") or metadata.get("chunk_id") or ""),
+            "doc_id": str(metadata.get("doc_id") or metadata.get("document_id") or ""),
+            "source": source,
+            "namespace": str(hit.get("namespace") or metadata.get("namespace") or "unknown"),
+            "text": str(hit.get("text") or ""),
+            "score": float(hit.get("score") or 0.0),
+            "section_path": str(metadata.get("section_path") or ""),
+            "page_start": metadata.get("page_start"),
+            "page_end": metadata.get("page_end"),
+            "doc_version": str(metadata.get("doc_version") or ""),
+            "effective_date": str(metadata.get("effective_date") or ""),
+            "citation_prefix": str(metadata.get("citation_prefix") or ""),
+            "regulator": str(metadata.get("regulator") or ""),
+            "authority_level": str(metadata.get("authority_level") or ""),
+            "process_stage": str(metadata.get("process_stage") or ""),
+            "sharepoint_url": str(metadata.get("sharepoint_url") or ""),
+            "product_universe": str(metadata.get("product_universe") or ""),
+            "metadata": metadata,
+        }
+
+    def _fuse_hits(
+        self,
+        vector_hits: List[Dict[str, Any]],
+        keyword_hits: List[Dict[str, Any]],
+        query_text: str,
+    ) -> List[Dict[str, Any]]:
+        exact_tokens = self._extract_exact_tokens(query_text)
+        keyword_weight = 0.7 if exact_tokens else 0.5
+        vector_weight = 1.0 - keyword_weight
+        if not keyword_hits:
+            keyword_weight = 0.0
+            vector_weight = 1.0
+        elif not vector_hits:
+            keyword_weight = 1.0
+            vector_weight = 0.0
+
+        max_vector = max([float(hit.get("score", 0.0)) for hit in vector_hits] or [1.0])
+        max_keyword = max([float(hit.get("score", 0.0)) for hit in keyword_hits] or [1.0])
+        if max_vector <= 0:
+            max_vector = 1.0
+        if max_keyword <= 0:
+            max_keyword = 1.0
+
+        fused: Dict[str, Dict[str, Any]] = {}
+
+        for hit in vector_hits:
+            key = str(hit.get("chunk_id") or f"{hit.get('source')}::{hit.get('text','')[:120]}")
+            normalized_score = float(hit.get("score", 0.0)) / max_vector
+            payload = dict(hit)
+            payload["vector_score"] = normalized_score
+            payload["keyword_score"] = 0.0
+            payload["score"] = vector_weight * normalized_score
+            fused[key] = payload
+
+        for raw_hit in keyword_hits:
+            hit = self._normalize_keyword_hit(raw_hit)
+            key = str(hit.get("chunk_id") or f"{hit.get('source')}::{hit.get('text','')[:120]}")
+            normalized_score = float(hit.get("score", 0.0)) / max_keyword
+            if key in fused:
+                fused[key]["keyword_score"] = max(float(fused[key].get("keyword_score", 0.0)), normalized_score)
+                fused[key]["score"] = (
+                    vector_weight * float(fused[key].get("vector_score", 0.0))
+                    + keyword_weight * float(fused[key].get("keyword_score", 0.0))
+                )
+                # Prefer richer metadata if one side has empty values.
+                if len(str(fused[key].get("text", ""))) < len(str(hit.get("text", ""))):
+                    fused[key]["text"] = hit.get("text", "")
+            else:
+                payload = dict(hit)
+                payload["vector_score"] = 0.0
+                payload["keyword_score"] = normalized_score
+                payload["score"] = keyword_weight * normalized_score
+                fused[key] = payload
+
+        return list(fused.values())
+
+    def _dedupe_rank_hits(self, hits: List[Dict[str, Any]], process_stage: str = "") -> List[Dict[str, Any]]:
+        boosted_hits = []
+        for hit in hits:
+            payload = dict(hit)
+            score = float(payload.get("score", 0.0))
+            if process_stage:
+                chunk_stage = str(payload.get("process_stage") or "").strip().lower()
+                if chunk_stage and chunk_stage == process_stage.strip().lower():
+                    score += self.rag_stage_boost
+            payload["score"] = score
+            boosted_hits.append(payload)
+
+        ranked = sorted(boosted_hits, key=lambda item: item.get("score", 0.0), reverse=True)
         unique: List[Dict[str, Any]] = []
         seen = set()
         for hit in ranked:
-            key = (hit.get("source"), hit.get("text", "")[:160])
+            key = str(hit.get("chunk_id") or f"{hit.get('source')}::{hit.get('text', '')[:160]}")
             if key in seen:
                 continue
             seen.add(key)
             unique.append(hit)
         return unique
+
+    def _compute_evidence_confidence(self, query_text: str, hits: List[Dict[str, Any]]) -> float:
+        if not hits:
+            return 0.0
+
+        top_hits = hits[: min(len(hits), self.rag_return_top_k)]
+        avg_score = sum(float(hit.get("score", 0.0)) for hit in top_hits) / max(len(top_hits), 1)
+        source_count = len({str(hit.get("source") or "") for hit in top_hits if str(hit.get("source") or "").strip()})
+        source_factor = min(1.0, source_count / 3.0)
+
+        exact_tokens = self._extract_exact_tokens(query_text)
+        if not exact_tokens:
+            token_factor = 1.0
+        else:
+            combined_text = " ".join(str(hit.get("text") or "").lower() for hit in top_hits)
+            token_factor = (
+                len([token for token in exact_tokens if token in combined_text]) / max(len(exact_tokens), 1)
+            )
+
+        confidence = 0.55 * avg_score + 0.25 * source_factor + 0.20 * token_factor
+        return max(0.0, min(1.0, confidence))
+
+    def _rerank_hits(self, query_text: str, hits: List[Dict[str, Any]], keep_top: int = 40) -> List[Dict[str, Any]]:
+        query_tokens = set(re.findall(r"[a-z0-9\-]+", query_text.lower()))
+        if not query_tokens:
+            return hits[:keep_top]
+
+        rescored: List[Dict[str, Any]] = []
+        for hit in hits:
+            payload = dict(hit)
+            text_tokens = set(re.findall(r"[a-z0-9\-]+", str(payload.get("text") or "").lower()))
+            overlap = len(query_tokens.intersection(text_tokens)) / max(len(query_tokens), 1)
+            payload["score"] = float(payload.get("score", 0.0)) + (0.2 * overlap)
+            rescored.append(payload)
+        rescored.sort(key=lambda item: item.get("score", 0.0), reverse=True)
+        return rescored[: max(1, keep_top)]
 
     def _create_noop_task(self) -> asyncio.Task:
         async def _noop():
@@ -1255,28 +1524,46 @@ class AudioService:
             context_mode = "none"
             context_results: List[str] = []
             citations: List[Dict[str, Any]] = []
+            retrieval_filter: Dict[str, Any] = {}
+            selected_hits: List[Dict[str, Any]] = []
+            evidence_confidence = 0.0
+            context_flags = self._extract_context_flags(metadata)
+            redacted_text = redaction_service.redact(text)
+            intent_payload = intent_router.route(redacted_text)
+            intent_confidence = float(intent_payload.get("confidence") or 0.0)
+            retrieval_filter = self._build_retrieval_filter(context_flags, intent_payload)
 
-            embedding = await embedding_service.generate_embedding(text)
+            target_universe = (
+                context_flags.get("product_universe")
+                or str(intent_payload.get("product_universe") or "").strip()
+            )
+            namespaces = self._namespace_candidates_for_universe(target_universe)
+            if not namespaces:
+                namespaces = [ns for ns in self.rag_namespaces if ns]
+
+            intent_needs_clarification = (
+                intent_payload.get("intent_id") == "UNKNOWN"
+                or intent_confidence < self.rag_intent_min_confidence
+            )
+
+            embedding = await embedding_service.generate_embedding(redacted_text)
             if embedding:
                 if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
                     print(f"Skipping stale AI task before context lookup for {meeting_id}/{user_id}")
                     return
 
-                namespaces = [
-                    ns.strip()
-                    for ns in (self.rag_namespaces or [])
-                    if isinstance(ns, str) and ns.strip()
-                ]
-                if not namespaces:
-                    namespaces = ["training-reference", "fl-state-authority", "cms-medicare"]
-
-                raw_hits: List[Dict[str, Any]] = []
+                raw_vector_hits: List[Dict[str, Any]] = []
+                per_namespace_top_k = max(
+                    self.rag_top_k_per_namespace,
+                    int(self.rag_vector_top_k / max(len(namespaces), 1)),
+                )
                 for ns in namespaces:
                     try:
                         matches = pinecone_service.query(
                             embedding,
                             ns,
-                            top_k=self.rag_top_k_per_namespace,
+                            top_k=per_namespace_top_k,
+                            filter=retrieval_filter or None,
                         )
                     except Exception as query_err:
                         print(f"Pinecone query failed for namespace '{ns}': {query_err}")
@@ -1285,9 +1572,26 @@ class AudioService:
                     for match_obj in matches:
                         parsed_hit = self._parse_match_hit(match_obj, ns)
                         if parsed_hit:
-                            raw_hits.append(parsed_hit)
+                            raw_vector_hits.append(parsed_hit)
 
-                ranked_hits = self._dedupe_rank_hits(raw_hits)
+                vector_hits = self._dedupe_rank_hits(
+                    raw_vector_hits,
+                    process_stage=context_flags.get("process_stage", ""),
+                )[: self.rag_vector_top_k]
+
+                keyword_hits_raw = keyword_index_service.search(
+                    redacted_text,
+                    top_k=self.rag_keyword_top_k,
+                    filter_payload=retrieval_filter,
+                )
+
+                fused_hits = self._fuse_hits(vector_hits, keyword_hits_raw, redacted_text)
+                ranked_hits = self._dedupe_rank_hits(
+                    fused_hits,
+                    process_stage=context_flags.get("process_stage", ""),
+                )
+                ranked_hits = self._rerank_hits(redacted_text, ranked_hits, keep_top=40)
+
                 verified_hits = [
                     hit for hit in ranked_hits
                     if float(hit.get("score", 0.0)) >= self.rag_min_score
@@ -1302,20 +1606,51 @@ class AudioService:
                     context_mode = "verified"
                 elif fallback_hits:
                     context_mode = "fallback"
+                else:
+                    context_mode = "unverified"
 
-                for hit in selected_hits[:4]:
+                evidence_confidence = self._compute_evidence_confidence(
+                    redacted_text,
+                    selected_hits if selected_hits else ranked_hits,
+                )
+                if evidence_confidence < self.rag_evidence_min_confidence:
+                    selected_hits = []
+                    context_mode = "weak_evidence"
+
+                if intent_needs_clarification and not selected_hits:
+                    context_mode = "needs_clarification"
+
+                for hit in selected_hits[: self.rag_return_top_k]:
                     source = str(hit.get("source", "Unknown Source"))
                     namespace = str(hit.get("namespace", "unknown"))
                     score = float(hit.get("score", 0.0))
                     source_text = str(hit.get("text", ""))
+                    section_path = str(hit.get("section_path") or "Unknown section")
+                    doc_version = str(hit.get("doc_version") or "n/a")
+                    effective_date = str(hit.get("effective_date") or "n/a")
 
                     context_results.append(
-                        f"[Source: {source} | Namespace: {namespace} | Score: {score:.2f}]\n{source_text}"
+                        (
+                            f"[Source: {source} | Namespace: {namespace} | Score: {score:.2f} | "
+                            f"Section: {section_path} | Version: {doc_version} | Effective: {effective_date}]"
+                            f"\n{source_text}"
+                        )
                     )
                     citations.append({
+                        "chunkId": hit.get("chunk_id"),
+                        "docId": hit.get("doc_id"),
                         "source": source,
                         "namespace": namespace,
                         "score": score,
+                        "sectionPath": section_path,
+                        "pageStart": hit.get("page_start"),
+                        "pageEnd": hit.get("page_end"),
+                        "docVersion": doc_version,
+                        "effectiveDate": effective_date,
+                        "citationPrefix": hit.get("citation_prefix"),
+                        "regulator": hit.get("regulator"),
+                        "authorityLevel": hit.get("authority_level"),
+                        "sharepointUrl": hit.get("sharepoint_url"),
                         "text": (source_text[:120] + "...") if len(source_text) > 120 else source_text,
                     })
             else:
@@ -1325,40 +1660,87 @@ class AudioService:
                 print(f"Skipping stale AI task before response generation for {meeting_id}/{user_id}")
                 return
 
-            if not context_results:
-                if self.allow_unverified_ai_fallback:
-                    context_mode = "unverified"
-                    context_results = [
-                        "No verified vector source was retrieved for this turn. "
-                        "Provide cautious guidance and ask the admin to verify plan-specific details manually."
+            verify_required = (
+                context_mode in {"needs_clarification", "weak_evidence"}
+                or not context_results
+            )
+            if verify_required:
+                clarifying_questions = [
+                    str(question).strip()
+                    for question in (
+                        intent_payload.get("clarifying_questions")
+                        or intent_payload.get("must_ask_questions")
+                        or []
+                    )
+                    if str(question).strip()
+                ]
+                if not clarifying_questions:
+                    clarifying_questions = [
+                        "Can you confirm the product universe and state context?",
+                        "Can you share the exact policy/code reference that must be verified?",
                     ]
-                else:
-                    latency_fields = self._build_ai_latency_fields(metadata)
-                    self._record_ai_latency_metrics(latency_fields)
-                    warning_msg = "WARNING: NO VERIFIED SOURCES FOUND. ESCALATE OR VERIFY MANUAL."
-                    await manager.broadcast_to_admin(meeting_id, {
-                        "type": "ai-suggestion",
-                        "suggestion": warning_msg,
-                        "relatedTo": text,
-                        "citations": [],
-                        "contextSourceMode": "none",
-                        **latency_fields,
-                    })
-                    if not is_draft_request:
-                        self.save_transcript_to_db(meeting_id, "ai_assistant", warning_msg, "ai")
-                    return
+
+                preferred_docs = [
+                    str(doc_type).strip()
+                    for doc_type in (intent_payload.get("preferred_doc_types") or [])
+                    if str(doc_type).strip()
+                ]
+                missing_doc_category = ", ".join(preferred_docs[:2]) if preferred_docs else "regulatory guidance"
+
+                verify_message = (
+                    "Need to verify before answering.\n"
+                    f"- Clarifying question 1: {clarifying_questions[0]}\n"
+                    f"- Clarifying question 2: {clarifying_questions[1] if len(clarifying_questions) > 1 else clarifying_questions[0]}\n"
+                    f"- Missing document category: {missing_doc_category}"
+                )
+
+                latency_fields = self._build_ai_latency_fields(metadata)
+                self._record_ai_latency_metrics(latency_fields)
+
+                await manager.broadcast_to_admin(meeting_id, {
+                    "type": "ai-suggestion",
+                    "suggestion": verify_message,
+                    "relatedTo": text,
+                    "citations": citations,
+                    "contextSourceMode": context_mode or "unverified",
+                    "evidenceConfidence": evidence_confidence,
+                    **latency_fields,
+                })
+                if not is_draft_request:
+                    self.save_transcript_to_db(meeting_id, "ai_assistant", verify_message, "ai")
+
+                rag_audit_logger.log_event({
+                    "sessionId": meeting_id,
+                    "requestId": metadata.get("requestId"),
+                    "requestOrigin": metadata.get("requestOrigin"),
+                    "router": intent_payload,
+                    "filters": retrieval_filter,
+                    "retrievedChunkIds": [c.get("chunkId") for c in citations],
+                    "retrievedScores": [c.get("score") for c in citations],
+                    "citationsShown": citations,
+                    "finalAnswerShown": verify_message,
+                    "agentDisposition": metadata.get("agentDisposition"),
+                    "contextSourceMode": context_mode,
+                    "evidenceConfidence": evidence_confidence,
+                })
+                return
 
             retrieved_context = "\n\n".join(context_results[:3])
 
             system_prompt = """
             You are a compliance-first AI insurance assistant.
-            Your role is to guide the agent based on the provided context.
+            Return output using EXACT sections:
+            1) Read-back
+            2) Ask next
+            3) Internal Do/Don't
+            4) Citations
+            5) Escalate if
 
             RULES:
-            1. Suggest a SHORT, compliant response.
-            2. IF context is missing, admit uncertainty and ask for verification.
-            3. ALWAYS include a mandatory disclaimer if mentioning benefits.
-            4. If context quality is fallback or unverified, ask the admin to verify details before quoting.
+            - Keep guidance short, specific, and compliant.
+            - Do not invent facts beyond provided evidence.
+            - If uncertain, ask to verify and escalate.
+            - Do not include customer PII.
             """
 
             user_prompt = f"""
@@ -1369,10 +1751,16 @@ class AudioService:
             - verified: strong retrieval matches
             - fallback: weaker retrieval matches
             - unverified: no vector matches (general guidance only)
+            - weak_evidence: retrieval exists but confidence is below threshold
 
-            Customer just said: "{text}"
+            Intent:
+            {intent_payload.get("intent_id")} (confidence={intent_confidence:.2f})
+            Required disclaimers (deterministic):
+            {", ".join(intent_payload.get("required_disclaimers") or []) or "general_informational"}
 
-            Provide a short suggestion for the agent:
+            Customer just said (redacted): "{redacted_text}"
+
+            Provide the final agent-assist response now.
             """
 
             model = genai.GenerativeModel(self.ai_model_name)
@@ -1400,11 +1788,27 @@ class AudioService:
                 "relatedTo": text,
                 "citations": citations,
                 "contextSourceMode": context_mode,
+                "evidenceConfidence": evidence_confidence,
                 **latency_fields,
             })
 
             if not is_draft_request:
                 self.save_transcript_to_db(meeting_id, "ai_assistant", suggestion, "ai")
+
+            rag_audit_logger.log_event({
+                "sessionId": meeting_id,
+                "requestId": metadata.get("requestId"),
+                "requestOrigin": metadata.get("requestOrigin"),
+                "router": intent_payload,
+                "filters": retrieval_filter,
+                "retrievedChunkIds": [c.get("chunkId") for c in citations],
+                "retrievedScores": [c.get("score") for c in citations],
+                "citationsShown": citations,
+                "finalAnswerShown": suggestion,
+                "agentDisposition": metadata.get("agentDisposition"),
+                "contextSourceMode": context_mode,
+                "evidenceConfidence": evidence_confidence,
+            })
 
         except asyncio.CancelledError:
             print(f"AI suggestion task cancelled for {meeting_id}/{user_id}")

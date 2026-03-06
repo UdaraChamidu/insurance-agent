@@ -155,7 +155,7 @@ class SharePointService:
             # Path based addressing: /drives/{drive-id}/root:/{path}:/children
             url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{folder_name}:/children"
             params = {
-                "$select": "id,name,file,size,lastModifiedDateTime,@microsoft.graph.downloadUrl",
+                "$select": "id,name,file,size,lastModifiedDateTime,eTag,webUrl,@microsoft.graph.downloadUrl",
                 "$expand": "listItem($expand=fields)"
             }
             
@@ -163,7 +163,7 @@ class SharePointService:
             response.raise_for_status()
             items = response.json().get("value", [])
             
-            supported_exts = ['.pdf', '.docx', '.xlsx', '.xls', '.txt', '.md', '.csv']
+            supported_exts = ['.pdf', '.docx', '.xlsx', '.txt', '.md', '.csv']
             
             documents = []
             for item in items:
@@ -180,6 +180,8 @@ class SharePointService:
                     "name": item["name"],
                     "size": item["size"],
                     "lastModified": item["lastModifiedDateTime"],
+                    "etag": item.get("eTag"),
+                    "sharepointUrl": item.get("webUrl"),
                     "downloadUrl": item.get("@microsoft.graph.downloadUrl"),
                     "metadata": self._extract_metadata(item, folder_name)
                 }
@@ -201,6 +203,8 @@ class SharePointService:
             "productUniverse": fields.get("ProductUniverse"),
             "regulator": fields.get("Regulator"),
             "authorityLevel": fields.get("AuthorityLevel"),
+            "docType": fields.get("DocType"),
+            "processStage": fields.get("ProcessStage"),
             "effectiveDate": fields.get("EffectiveDate"),
             "docVersion": fields.get("DocVersion"),
             "topicTags": fields.get("TopicTags", []),
