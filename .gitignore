@@ -6,8 +6,13 @@ frontend/.env
 backend/.env.example
 frontend/.env.example
 python-backend/ingestion_state.json
+python-backend/keyword_index_state.json
+python-backend/assist_audit_log.jsonl
 
+.pytest_cache/
 pytest_cache/
+__pycache__/
+*.pyc
 
 # Dependencies
 node_modules/
@@ -21,6 +26,7 @@ yarn.lock
 
 # Build outputs
 dist/
+frontend/dist/
 build/
 *.log
 

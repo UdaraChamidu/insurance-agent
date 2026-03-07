@@ -68,7 +68,7 @@ function App() {
             <Route
               path="/admin"
               element={(
-                <RequireAdminAuth>
+                <RequireAdminAuth> 
                   <AdminLayout />
                 </RequireAdminAuth>
               )}
