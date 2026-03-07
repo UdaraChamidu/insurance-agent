@@ -13,24 +13,42 @@ class EmbeddingService:
         self.model = 'models/gemini-embedding-001'
         self.dimensions = 768
 
-    async def generate_embedding(self, text: str):
+    async def _generate_embedding(self, text: str, task_type: str, operation: str):
         retries = 3
         for attempt in range(retries):
             try:
                 result = genai.embed_content(
                     model=self.model,
                     content=text,
-                    task_type="retrieval_document"
+                    task_type=task_type
                 )
                 gemini_usage_tracker.record_response(
-                    operation="embedding",
+                    operation=operation,
                     response_payload=result,
                     request_text=text,
                 )
                 embedding = result['embedding']
                 return embedding[:self.dimensions]
             except Exception as e:
-                gemini_usage_tracker.record_error("embedding", e)
+                gemini_usage_tracker.record_error(operation, e)
+                # Some providers reject specific task_type values; query flow can
+                # fall back to retrieval_document embedding safely.
+                if task_type == "retrieval_query":
+                    try:
+                        result = genai.embed_content(
+                            model=self.model,
+                            content=text,
+                            task_type="retrieval_document"
+                        )
+                        gemini_usage_tracker.record_response(
+                            operation=f"{operation}_fallback_document",
+                            response_payload=result,
+                            request_text=text,
+                        )
+                        embedding = result['embedding']
+                        return embedding[:self.dimensions]
+                    except Exception:
+                        pass
                 if "429" in str(e) or "quota" in str(e).lower():
                     wait_time = 30 * (attempt + 1)
                     print(f"Rate limit hit. Waiting {wait_time}s...")
@@ -39,6 +57,21 @@ class EmbeddingService:
                     print(f"Embedding error: {e}")
                     return None
         return None
+
+    async def generate_embedding(self, text: str):
+        # Backward compatible default used for document/chunk embeddings.
+        return await self._generate_embedding(
+            text=text,
+            task_type="retrieval_document",
+            operation="embedding_document",
+        )
+
+    async def generate_query_embedding(self, text: str):
+        return await self._generate_embedding(
+            text=text,
+            task_type="retrieval_query",
+            operation="embedding_query",
+        )
 
     async def generate_embeddings_batch(self, texts: list):
         embeddings = []

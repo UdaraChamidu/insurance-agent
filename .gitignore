@@ -7,6 +7,7 @@ backend/.env.example
 frontend/.env.example
 python-backend/ingestion_state.json
 
+pytest_cache/
 
 # Dependencies
 node_modules/
@@ -50,3 +51,7 @@ temp/
 # python backend
 python-backend/venv
 python-backend/.env
+
+python-backend/pytest_cache
+python-backend/app/services/__pycache__
+

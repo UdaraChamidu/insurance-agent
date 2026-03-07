@@ -178,6 +178,14 @@ class AudioService:
             0.58,
         )
         self.rag_stage_boost = self._read_non_negative_float_env("MEETING_RAG_STAGE_BOOST", 0.06)
+        self.progressive_assist_enabled = (
+            os.getenv("MEETING_PROGRESSIVE_ASSIST", "true").lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self.progressive_question_count = max(
+            1,
+            self._read_non_negative_int_env("MEETING_PROGRESSIVE_QUESTION_COUNT", 2),
+        )
         self.rag_min_score = self._read_non_negative_float_env("MEETING_RAG_MIN_SCORE", 0.62)
         self.rag_fallback_min_score = self._read_non_negative_float_env(
             "MEETING_RAG_FALLBACK_MIN_SCORE",
@@ -358,6 +366,138 @@ class AudioService:
             elif any(ch.isdigit() for ch in token):
                 tokens.add(token)
         return sorted(tokens)
+
+    async def _generate_query_embedding(self, text: str):
+        query_embed_fn = getattr(embedding_service, "generate_query_embedding", None)
+        if callable(query_embed_fn) and inspect.iscoroutinefunction(query_embed_fn):
+            try:
+                query_result = await query_embed_fn(text)
+                if query_result:
+                    return query_result
+            except Exception as query_embedding_error:
+                print(f"Query embedding fallback: {query_embedding_error}")
+        return await embedding_service.generate_embedding(text)
+
+    def _is_auto_request(self, request_origin: str) -> bool:
+        normalized = str(request_origin or "").strip().lower()
+        return normalized.startswith("auto")
+
+    def _build_progressive_message(self, intent_payload: Dict[str, Any]) -> str:
+        ask_next = [
+            str(item).strip()
+            for item in (intent_payload.get("must_ask_questions") or [])
+            if str(item).strip()
+        ][: self.progressive_question_count]
+        if not ask_next:
+            ask_next = [
+                "Can you confirm the product and policy context?",
+                "Can you confirm the state and effective date details?",
+            ][: self.progressive_question_count]
+
+        lines = [
+            "Ask next now:",
+            *[f"- {question}" for question in ask_next],
+            "Safe line: Let me verify the exact rule and citation before confirming.",
+        ]
+        return "\n".join(lines)
+
+    async def _emit_progressive_update(
+        self,
+        meeting_id: str,
+        text: str,
+        metadata: Dict[str, Any],
+        intent_payload: Dict[str, Any],
+    ) -> None:
+        if not self.progressive_assist_enabled:
+            return
+
+        request_origin = str(metadata.get("requestOrigin") or "manual")
+        transcript_stage = str(metadata.get("transcriptStage") or "")
+        if not self._is_auto_request(request_origin):
+            return
+        if transcript_stage == "draft":
+            return
+
+        latency_fields = self._build_ai_latency_fields(metadata)
+        progressive_message = self._build_progressive_message(intent_payload)
+        await manager.broadcast_to_admin(meeting_id, {
+            "type": "ai-suggestion",
+            "suggestion": progressive_message,
+            "relatedTo": text,
+            "citations": [],
+            "contextSourceMode": "progressive",
+            "transcriptStage": "draft",
+            **latency_fields,
+        })
+
+    async def _query_namespace_vector_hits(
+        self,
+        embedding: List[float],
+        namespace: str,
+        top_k: int,
+        filter_payload: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        try:
+            matches = await asyncio.to_thread(
+                pinecone_service.query,
+                embedding,
+                namespace,
+                top_k,
+                filter_payload or None,
+            )
+        except Exception as query_err:
+            print(f"Pinecone query failed for namespace '{namespace}': {query_err}")
+            return []
+
+        parsed_hits: List[Dict[str, Any]] = []
+        for match_obj in (matches or []):
+            parsed_hit = self._parse_match_hit(match_obj, namespace)
+            if parsed_hit:
+                parsed_hits.append(parsed_hit)
+        return parsed_hits
+
+    async def _query_vector_hits_parallel(
+        self,
+        embedding: List[float],
+        namespaces: List[str],
+        top_k_per_namespace: int,
+        filter_payload: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        tasks = [
+            self._query_namespace_vector_hits(
+                embedding=embedding,
+                namespace=ns,
+                top_k=top_k_per_namespace,
+                filter_payload=filter_payload,
+            )
+            for ns in namespaces
+        ]
+        if not tasks:
+            return []
+        groups = await asyncio.gather(*tasks, return_exceptions=True)
+        merged: List[Dict[str, Any]] = []
+        for group in groups:
+            if isinstance(group, Exception):
+                continue
+            merged.extend(group)
+        return merged
+
+    async def _query_keyword_hits(
+        self,
+        query_text: str,
+        top_k: int,
+        filter_payload: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        try:
+            return await asyncio.to_thread(
+                keyword_index_service.search,
+                query_text,
+                top_k,
+                filter_payload,
+            )
+        except Exception as keyword_err:
+            print(f"Keyword search failed: {keyword_err}")
+            return []
 
     def _parse_match_hit(self, match_obj: Any, namespace: str) -> Optional[Dict[str, Any]]:
         metadata = getattr(match_obj, "metadata", None)
@@ -1546,44 +1686,48 @@ class AudioService:
                 or intent_confidence < self.rag_intent_min_confidence
             )
 
-            embedding = await embedding_service.generate_embedding(redacted_text)
+            if self._is_latest_ai_request(meeting_id, user_id, request_sequence):
+                await self._emit_progressive_update(
+                    meeting_id=meeting_id,
+                    text=text,
+                    metadata=metadata,
+                    intent_payload=intent_payload,
+                )
+
+            embedding = await self._generate_query_embedding(redacted_text)
             if embedding:
                 if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
                     print(f"Skipping stale AI task before context lookup for {meeting_id}/{user_id}")
                     return
 
-                raw_vector_hits: List[Dict[str, Any]] = []
                 per_namespace_top_k = max(
                     self.rag_top_k_per_namespace,
                     int(self.rag_vector_top_k / max(len(namespaces), 1)),
                 )
-                for ns in namespaces:
-                    try:
-                        matches = pinecone_service.query(
-                            embedding,
-                            ns,
-                            top_k=per_namespace_top_k,
-                            filter=retrieval_filter or None,
-                        )
-                    except Exception as query_err:
-                        print(f"Pinecone query failed for namespace '{ns}': {query_err}")
-                        continue
-
-                    for match_obj in matches:
-                        parsed_hit = self._parse_match_hit(match_obj, ns)
-                        if parsed_hit:
-                            raw_vector_hits.append(parsed_hit)
+                vector_hits_task = asyncio.create_task(
+                    self._query_vector_hits_parallel(
+                        embedding=embedding,
+                        namespaces=namespaces,
+                        top_k_per_namespace=per_namespace_top_k,
+                        filter_payload=retrieval_filter,
+                    )
+                )
+                keyword_hits_task = asyncio.create_task(
+                    self._query_keyword_hits(
+                        query_text=redacted_text,
+                        top_k=self.rag_keyword_top_k,
+                        filter_payload=retrieval_filter,
+                    )
+                )
+                raw_vector_hits, keyword_hits_raw = await asyncio.gather(
+                    vector_hits_task,
+                    keyword_hits_task,
+                )
 
                 vector_hits = self._dedupe_rank_hits(
                     raw_vector_hits,
                     process_stage=context_flags.get("process_stage", ""),
                 )[: self.rag_vector_top_k]
-
-                keyword_hits_raw = keyword_index_service.search(
-                    redacted_text,
-                    top_k=self.rag_keyword_top_k,
-                    filter_payload=retrieval_filter,
-                )
 
                 fused_hits = self._fuse_hits(vector_hits, keyword_hits_raw, redacted_text)
                 ranked_hits = self._dedupe_rank_hits(
