@@ -7,6 +7,7 @@ import time
 import json
 import inspect
 import re
+from collections import OrderedDict
 import google.generativeai as genai
 import requests
 import websockets
@@ -216,7 +217,27 @@ class AudioService:
         self.SAMPLE_WIDTH = 2 # 16-bit
         # Process every ~6-8 seconds. 16kHz * 2 bytes * 8s = 256KB
         # Lowering to 10KB for testing
-        self.PROCESS_THRESHOLD = 10000 
+        self.PROCESS_THRESHOLD = 10000
+
+        # Embedding cache: normalized_text -> {"embedding": [...], "ts": float}
+        # LRU eviction at max 500 entries, TTL 300s
+        self._embedding_cache: OrderedDict = OrderedDict()
+        self._embedding_cache_ttl_s: int = 300
+        self._embedding_cache_max: int = 500
+
+        # Cohere reranker (optional — gracefully disabled if key/package missing)
+        self._cohere_client = None
+        cohere_api_key = os.getenv("COHERE_API_KEY", "").strip()
+        cohere_rerank_model = os.getenv("COHERE_RERANK_MODEL", "rerank-english-v3.0").strip()
+        self._cohere_rerank_model = cohere_rerank_model
+        self._cohere_rerank_top_n = max(1, self._read_non_negative_int_env("COHERE_RERANK_TOP_N", 8))
+        if cohere_api_key:
+            try:
+                import cohere as _cohere
+                self._cohere_client = _cohere.Client(cohere_api_key)
+                print(f"Cohere reranker enabled: model={cohere_rerank_model}")
+            except ImportError:
+                print("cohere package not installed — using token-overlap reranking fallback")
 
     def _get_buffer(self, meeting_id: str, user_id: str) -> bytearray:
         if meeting_id not in self.buffers:
@@ -367,16 +388,39 @@ class AudioService:
                 tokens.add(token)
         return sorted(tokens)
 
+    def _get_cached_embedding(self, normalized_text: str) -> Optional[List[float]]:
+        entry = self._embedding_cache.get(normalized_text)
+        if entry and (time.time() - entry["ts"]) < self._embedding_cache_ttl_s:
+            self._embedding_cache.move_to_end(normalized_text)
+            return entry["embedding"]
+        return None
+
+    def _set_cached_embedding(self, normalized_text: str, embedding: List[float]) -> None:
+        if normalized_text in self._embedding_cache:
+            self._embedding_cache.move_to_end(normalized_text)
+        self._embedding_cache[normalized_text] = {"embedding": embedding, "ts": time.time()}
+        while len(self._embedding_cache) > self._embedding_cache_max:
+            self._embedding_cache.popitem(last=False)
+
     async def _generate_query_embedding(self, text: str):
+        cache_key = self._normalize_request_text(text)
+        cached = self._get_cached_embedding(cache_key)
+        if cached is not None:
+            return cached
+
         query_embed_fn = getattr(embedding_service, "generate_query_embedding", None)
         if callable(query_embed_fn) and inspect.iscoroutinefunction(query_embed_fn):
             try:
                 query_result = await query_embed_fn(text)
                 if query_result:
+                    self._set_cached_embedding(cache_key, query_result)
                     return query_result
             except Exception as query_embedding_error:
                 print(f"Query embedding fallback: {query_embedding_error}")
-        return await embedding_service.generate_embedding(text)
+        embedding = await embedding_service.generate_embedding(text)
+        if embedding:
+            self._set_cached_embedding(cache_key, embedding)
+        return embedding
 
     def _is_auto_request(self, request_origin: str) -> bool:
         normalized = str(request_origin or "").strip().lower()
@@ -685,7 +729,8 @@ class AudioService:
         confidence = 0.55 * avg_score + 0.25 * source_factor + 0.20 * token_factor
         return max(0.0, min(1.0, confidence))
 
-    def _rerank_hits(self, query_text: str, hits: List[Dict[str, Any]], keep_top: int = 40) -> List[Dict[str, Any]]:
+    def _rerank_hits_token_overlap(self, query_text: str, hits: List[Dict[str, Any]], keep_top: int = 40) -> List[Dict[str, Any]]:
+        """Fast token-overlap reranker — used as fallback when Cohere is unavailable."""
         query_tokens = set(re.findall(r"[a-z0-9\-]+", query_text.lower()))
         if not query_tokens:
             return hits[:keep_top]
@@ -699,6 +744,45 @@ class AudioService:
             rescored.append(payload)
         rescored.sort(key=lambda item: item.get("score", 0.0), reverse=True)
         return rescored[: max(1, keep_top)]
+
+    async def _rerank_hits_async(self, query_text: str, hits: List[Dict[str, Any]], keep_top: int = 40) -> List[Dict[str, Any]]:
+        """
+        Rerank using Cohere cross-encoder when available, else token-overlap fallback.
+        Cohere cross-encoder reads query + chunk together — far more accurate than bi-encoder alone.
+        """
+        if not hits:
+            return hits
+
+        if self._cohere_client is None:
+            return self._rerank_hits_token_overlap(query_text, hits, keep_top)
+
+        candidates = hits[:min(len(hits), 40)]
+        documents = [str(h.get("text") or "") for h in candidates]
+        # Filter out empty docs to avoid Cohere API errors
+        valid_indices = [i for i, d in enumerate(documents) if d.strip()]
+        if not valid_indices:
+            return self._rerank_hits_token_overlap(query_text, hits, keep_top)
+
+        valid_docs = [documents[i] for i in valid_indices]
+        valid_candidates = [candidates[i] for i in valid_indices]
+
+        try:
+            result = await asyncio.to_thread(
+                self._cohere_client.rerank,
+                query=query_text,
+                documents=valid_docs,
+                model=self._cohere_rerank_model,
+                top_n=min(self._cohere_rerank_top_n, len(valid_docs)),
+            )
+            reranked: List[Dict[str, Any]] = []
+            for r in result.results:
+                payload = dict(valid_candidates[r.index])
+                payload["score"] = float(r.relevance_score)
+                reranked.append(payload)
+            return reranked
+        except Exception as cohere_err:
+            print(f"Cohere rerank failed, using token-overlap fallback: {cohere_err}")
+            return self._rerank_hits_token_overlap(query_text, hits, keep_top)
 
     def _create_noop_task(self) -> asyncio.Task:
         async def _noop():
@@ -1734,7 +1818,7 @@ class AudioService:
                     fused_hits,
                     process_stage=context_flags.get("process_stage", ""),
                 )
-                ranked_hits = self._rerank_hits(redacted_text, ranked_hits, keep_top=40)
+                ranked_hits = await self._rerank_hits_async(redacted_text, ranked_hits, keep_top=40)
 
                 verified_hits = [
                     hit for hit in ranked_hits
@@ -1869,7 +1953,7 @@ class AudioService:
                 })
                 return
 
-            retrieved_context = "\n\n".join(context_results[:3])
+            retrieved_context = "\n\n".join(context_results[:6])
 
             system_prompt = """
             You are a compliance-first AI insurance assistant.
@@ -1908,16 +1992,52 @@ class AudioService:
             """
 
             model = genai.GenerativeModel(self.ai_model_name)
-            response = await model.generate_content_async(system_prompt + user_prompt)
-            gemini_usage_tracker.record_response(
-                operation="meeting_ai_suggestion",
-                response_payload=response,
-                request_text=system_prompt + user_prompt,
-            )
+            full_prompt = system_prompt + user_prompt
+            suggestion = ""
+            # Stable stream key so the frontend updates the same suggestion entry
+            stream_turn_id = str(metadata.get("turnId") or f"ai-{int(time.time() * 1000)}")
+            stream_stage = "final"
+            # Minimum accumulated chars before each interim broadcast (~40 chars ≈ 1-2 sentences)
+            _STREAM_CHUNK_MIN = 40
 
-            suggestion = (response.text or "").strip()
-            if not suggestion:
-                suggestion = "I need a moment to verify the correct guidance before responding."
+            try:
+                accumulated = ""
+                last_broadcast_len = 0
+                stream_resp = await model.generate_content_async(full_prompt, stream=True)
+                async for chunk in stream_resp:
+                    delta = chunk.text or ""
+                    accumulated += delta
+                    if len(accumulated) - last_broadcast_len >= _STREAM_CHUNK_MIN:
+                        if self._is_latest_ai_request(meeting_id, user_id, request_sequence):
+                            await manager.broadcast_to_admin(meeting_id, {
+                                "type": "ai-suggestion",
+                                "suggestion": accumulated,
+                                "relatedTo": text,
+                                "citations": citations,
+                                "contextSourceMode": context_mode,
+                                "evidenceConfidence": evidence_confidence,
+                                "transcriptStage": stream_stage,
+                                "turnId": stream_turn_id,
+                                "streaming": True,
+                            })
+                        last_broadcast_len = len(accumulated)
+
+                suggestion = accumulated.strip() or "I need a moment to verify the correct guidance before responding."
+                gemini_usage_tracker.record_response(
+                    operation="meeting_ai_suggestion",
+                    response_payload=stream_resp,
+                    request_text=full_prompt,
+                )
+
+            except Exception as stream_err:
+                print(f"Gemini streaming failed, falling back to non-streaming: {stream_err}")
+                response = await model.generate_content_async(full_prompt)
+                gemini_usage_tracker.record_response(
+                    operation="meeting_ai_suggestion",
+                    response_payload=response,
+                    request_text=full_prompt,
+                )
+                suggestion = (response.text or "").strip() or "I need a moment to verify the correct guidance before responding."
 
             if not self._is_latest_ai_request(meeting_id, user_id, request_sequence):
                 print(f"Skipping stale AI suggestion for {meeting_id}/{user_id}")
@@ -1926,6 +2046,7 @@ class AudioService:
             latency_fields = self._build_ai_latency_fields(metadata)
             self._record_ai_latency_metrics(latency_fields)
 
+            # Final broadcast — complete text + citations
             await manager.broadcast_to_admin(meeting_id, {
                 "type": "ai-suggestion",
                 "suggestion": suggestion,
@@ -1933,6 +2054,8 @@ class AudioService:
                 "citations": citations,
                 "contextSourceMode": context_mode,
                 "evidenceConfidence": evidence_confidence,
+                "transcriptStage": stream_stage,
+                "turnId": stream_turn_id,
                 **latency_fields,
             })
 
