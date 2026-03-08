@@ -20,7 +20,11 @@ from app.services.llm.embeddings import embedding_service
 from app.services.llm.usage_tracker import gemini_usage_tracker
 from app.services.rag.audit_logger import rag_audit_logger
 from app.services.rag.intent_router import intent_router
-from app.services.rag.keyword_index import keyword_index_service
+_KEYWORD_BACKEND = os.getenv("KEYWORD_INDEX_BACKEND", "sqlite").lower()
+if _KEYWORD_BACKEND == "sqlite":
+    from app.services.rag.keyword_index_sqlite import sqlite_keyword_index_service as keyword_index_service
+else:
+    from app.services.rag.keyword_index import keyword_index_service
 from app.services.rag.redaction import redaction_service
 
 # Configure Gemini
@@ -80,11 +84,11 @@ class AudioService:
         )
         self.deepgram_endpointing_ms = self._read_non_negative_int_env(
             "MEETING_DEEPGRAM_ENDPOINTING_MS",
-            300,
+            150,  # reduced from 300ms for lower perceived latency
         )
         self.deepgram_utterance_end_ms = self._read_non_negative_int_env(
             "MEETING_DEEPGRAM_UTTERANCE_END_MS",
-            1000,
+            600,  # reduced from 1000ms for faster utterance detection
         )
         self.deepgram_emit_dedup_window_ms = self._read_non_negative_int_env(
             "MEETING_DEEPGRAM_EMIT_DEDUP_WINDOW_MS",
@@ -224,6 +228,14 @@ class AudioService:
         self._embedding_cache: OrderedDict = OrderedDict()
         self._embedding_cache_ttl_s: int = 300
         self._embedding_cache_max: int = 500
+
+        # Intent card semantic embeddings (pre-computed at startup for Phase 2A routing)
+        # Each entry: {"card": {...}, "embedding": [...], "_norm": float}
+        self._intent_embeddings: List[Dict[str, Any]] = []
+        self._intent_embeddings_loading: bool = False
+
+        # Deterministic disclaimer library (Phase 3A)
+        self._disclaimer_library: Dict[str, str] = self._load_disclaimer_library()
 
         # Cohere reranker (optional — gracefully disabled if key/package missing)
         self._cohere_client = None
@@ -378,6 +390,60 @@ class AudioService:
 
         return filter_payload
 
+    def _relax_retrieval_filter(self, filter_payload: Dict[str, Any], stage: int) -> Dict[str, Any]:
+        """Return a progressively relaxed copy of filter_payload.
+
+        stage 1: drop regulator + doc_type  (keep state + product_universe + carrier)
+        stage 2: drop product_universe too  (keep state + carrier)
+        stage 3: drop all filters           (unrestricted search)
+        """
+        relaxed = dict(filter_payload)
+        if stage >= 1:
+            relaxed.pop("regulator", None)
+            relaxed.pop("doc_type", None)
+        if stage >= 2:
+            relaxed.pop("product_universe", None)
+        if stage >= 3:
+            relaxed.clear()
+        return relaxed
+
+    async def _run_hybrid_retrieval(
+        self,
+        embedding: List[float],
+        namespaces: List[str],
+        filter_payload: Dict[str, Any],
+        redacted_text: str,
+        process_stage: str,
+    ) -> List[Dict[str, Any]]:
+        """Run parallel vector+keyword search, fuse, dedupe, and rerank. Returns ranked hits."""
+        per_namespace_top_k = max(
+            self.rag_top_k_per_namespace,
+            int(self.rag_vector_top_k / max(len(namespaces), 1)),
+        )
+        vector_hits_task = asyncio.create_task(
+            self._query_vector_hits_parallel(
+                embedding=embedding,
+                namespaces=namespaces,
+                top_k_per_namespace=per_namespace_top_k,
+                filter_payload=filter_payload,
+            )
+        )
+        keyword_hits_task = asyncio.create_task(
+            self._query_keyword_hits(
+                query_text=redacted_text,
+                top_k=self.rag_keyword_top_k,
+                filter_payload=filter_payload,
+            )
+        )
+        raw_vector_hits, keyword_hits_raw = await asyncio.gather(vector_hits_task, keyword_hits_task)
+        vector_hits = self._dedupe_rank_hits(
+            raw_vector_hits, process_stage=process_stage
+        )[: self.rag_vector_top_k]
+        fused_hits = self._fuse_hits(vector_hits, keyword_hits_raw, redacted_text)
+        ranked_hits = self._dedupe_rank_hits(fused_hits, process_stage=process_stage)
+        ranked_hits = await self._rerank_hits_async(redacted_text, ranked_hits, keep_top=40)
+        return ranked_hits
+
     def _extract_exact_tokens(self, query: str) -> List[str]:
         tokens = set()
         normalized = self._normalize_request_text(query)
@@ -401,6 +467,96 @@ class AudioService:
         self._embedding_cache[normalized_text] = {"embedding": embedding, "ts": time.time()}
         while len(self._embedding_cache) > self._embedding_cache_max:
             self._embedding_cache.popitem(last=False)
+
+    def _load_disclaimer_library(self) -> Dict[str, str]:
+        """Load versioned disclaimer texts from disclaimer_library.json."""
+        library_path = os.path.join(
+            os.path.dirname(__file__), "..", "rag", "disclaimer_library.json"
+        )
+        try:
+            with open(library_path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            result: Dict[str, str] = {}
+            for disc_id, entry in (data.get("disclaimers") or {}).items():
+                text = str(entry.get("text") or "").strip()
+                if text:
+                    result[disc_id] = text
+            print(f"Disclaimer library loaded: {len(result)} entries")
+            return result
+        except Exception as disc_err:
+            print(f"Disclaimer library load failed: {disc_err}")
+            return {}
+
+    def _resolve_disclaimers(self, required_ids: List[str]) -> List[str]:
+        """Return deterministic disclaimer texts for the given IDs (always include general_informational)."""
+        ids = list(required_ids or [])
+        if "general_informational" not in ids:
+            ids.append("general_informational")
+        texts: List[str] = []
+        for disc_id in ids:
+            text = self._disclaimer_library.get(disc_id)
+            if text:
+                texts.append(text)
+        return texts
+
+    async def _preload_intent_embeddings(self) -> None:
+        """Embed each intent card once at startup for semantic routing (Phase 2A)."""
+        cards = getattr(intent_router, "cards", [])
+        if not cards:
+            return
+        loaded: List[Dict[str, Any]] = []
+        for card in cards:
+            parts = [
+                str(card.get("intent_id", "")).replace("_", " ").lower(),
+                " ".join(str(k) for k in (card.get("keywords") or [])),
+                " ".join(str(q) for q in (card.get("must_ask_questions") or [])),
+            ]
+            text = " ".join(p for p in parts if p.strip())
+            if not text.strip():
+                continue
+            emb = await self._generate_query_embedding(text)
+            if emb:
+                norm = sum(x * x for x in emb) ** 0.5
+                loaded.append({"card": card, "embedding": emb, "_norm": norm})
+        self._intent_embeddings = loaded
+        print(f"Intent semantic embeddings preloaded: {len(loaded)} cards")
+
+    def _semantic_route_intent(
+        self, query_embedding: List[float], threshold: float = 0.55
+    ) -> Optional[Dict[str, Any]]:
+        """Return the best-matching intent card by cosine similarity, or None if below threshold."""
+        if not self._intent_embeddings or not query_embedding:
+            return None
+        q_norm = sum(x * x for x in query_embedding) ** 0.5
+        if q_norm == 0:
+            return None
+        best_sim = 0.0
+        best_card: Optional[Dict[str, Any]] = None
+        for entry in self._intent_embeddings:
+            c = entry["embedding"]
+            c_norm = entry["_norm"]
+            if c_norm == 0:
+                continue
+            dot = sum(a * b for a, b in zip(query_embedding, c))
+            sim = dot / (q_norm * c_norm)
+            if sim > best_sim:
+                best_sim = sim
+                best_card = entry["card"]
+        if best_sim < threshold or best_card is None:
+            return None
+        card = best_card
+        return {
+            "intent_id": str(card.get("intent_id") or "UNKNOWN"),
+            "confidence": float(min(best_sim, 1.0)),
+            "clarifying_questions": [],
+            "product_universe": str(card.get("product_universe") or "General"),
+            "primary_regulators": [str(v) for v in (card.get("primary_regulators") or []) if str(v).strip()],
+            "preferred_doc_types": [str(v) for v in (card.get("preferred_doc_types") or []) if str(v).strip()],
+            "required_disclaimers": [str(v) for v in (card.get("required_disclaimers") or []) if str(v).strip()],
+            "must_ask_questions": [str(v) for v in (card.get("must_ask_questions") or []) if str(v).strip()],
+            "escalation_triggers": [str(v) for v in (card.get("escalation_triggers") or []) if str(v).strip()],
+            "top_candidates": [{"intent_id": str(card.get("intent_id") or "UNKNOWN"), "confidence": float(min(best_sim, 1.0))}],
+        }
 
     async def _generate_query_embedding(self, text: str):
         cache_key = self._normalize_request_text(text)
@@ -1745,12 +1901,18 @@ class AudioService:
             if not is_draft_request:
                 self.save_transcript_to_db(meeting_id, user_id, text, "customer")
 
+            # Trigger intent embedding preload on first request (non-blocking)
+            if not self._intent_embeddings and not self._intent_embeddings_loading:
+                self._intent_embeddings_loading = True
+                asyncio.create_task(self._preload_intent_embeddings())
+
             context_mode = "none"
             context_results: List[str] = []
             citations: List[Dict[str, Any]] = []
             retrieval_filter: Dict[str, Any] = {}
             selected_hits: List[Dict[str, Any]] = []
             evidence_confidence = 0.0
+            active_filter_label = "strict"
             context_flags = self._extract_context_flags(metadata)
             redacted_text = redaction_service.redact(text)
             intent_payload = intent_router.route(redacted_text)
@@ -1784,66 +1946,76 @@ class AudioService:
                     print(f"Skipping stale AI task before context lookup for {meeting_id}/{user_id}")
                     return
 
-                per_namespace_top_k = max(
-                    self.rag_top_k_per_namespace,
-                    int(self.rag_vector_top_k / max(len(namespaces), 1)),
+                # Phase 2A: Semantic intent refinement — reuse query embedding to boost routing.
+                # Only overrides keyword routing if cosine similarity is meaningfully higher.
+                if self._intent_embeddings:
+                    semantic_result = self._semantic_route_intent(embedding)
+                    if semantic_result and semantic_result["confidence"] > intent_confidence + 0.10:
+                        intent_payload = semantic_result
+                        intent_confidence = semantic_result["confidence"]
+                        intent_needs_clarification = False
+                        retrieval_filter = self._build_retrieval_filter(context_flags, intent_payload)
+                        target_universe = (
+                            context_flags.get("product_universe")
+                            or str(intent_payload.get("product_universe") or "").strip()
+                        )
+                        namespaces = self._namespace_candidates_for_universe(target_universe)
+                        if not namespaces:
+                            namespaces = [ns for ns in self.rag_namespaces if ns]
+
+                # Build a progressive relaxation ladder for the retrieval filter.
+                # Start strict; widen only if evidence confidence is too low.
+                filter_stages: List[tuple] = [(retrieval_filter, "strict")]
+                if retrieval_filter.get("regulator") or retrieval_filter.get("doc_type"):
+                    filter_stages.append(
+                        (self._relax_retrieval_filter(retrieval_filter, 1), "relaxed_regulator")
+                    )
+                if retrieval_filter.get("product_universe"):
+                    filter_stages.append(
+                        (self._relax_retrieval_filter(retrieval_filter, 2), "relaxed_universe")
+                    )
+                filter_stages.append(
+                    (self._relax_retrieval_filter(retrieval_filter, 3), "no_filter")
                 )
-                vector_hits_task = asyncio.create_task(
-                    self._query_vector_hits_parallel(
+
+                active_filter_label = "strict"
+                process_stage_flag = context_flags.get("process_stage", "")
+                for stage_filter, stage_label in filter_stages:
+                    active_filter_label = stage_label
+                    ranked_hits = await self._run_hybrid_retrieval(
                         embedding=embedding,
                         namespaces=namespaces,
-                        top_k_per_namespace=per_namespace_top_k,
-                        filter_payload=retrieval_filter,
+                        filter_payload=stage_filter,
+                        redacted_text=redacted_text,
+                        process_stage=process_stage_flag,
                     )
-                )
-                keyword_hits_task = asyncio.create_task(
-                    self._query_keyword_hits(
-                        query_text=redacted_text,
-                        top_k=self.rag_keyword_top_k,
-                        filter_payload=retrieval_filter,
+
+                    verified_hits = [
+                        h for h in ranked_hits if float(h.get("score", 0.0)) >= self.rag_min_score
+                    ]
+                    fallback_hits = [
+                        h for h in ranked_hits if float(h.get("score", 0.0)) >= self.rag_fallback_min_score
+                    ]
+                    selected_hits = verified_hits if verified_hits else fallback_hits
+                    if verified_hits:
+                        context_mode = "verified"
+                    elif fallback_hits:
+                        context_mode = "fallback"
+                    else:
+                        context_mode = "unverified"
+
+                    evidence_confidence = self._compute_evidence_confidence(
+                        redacted_text,
+                        selected_hits if selected_hits else ranked_hits,
                     )
-                )
-                raw_vector_hits, keyword_hits_raw = await asyncio.gather(
-                    vector_hits_task,
-                    keyword_hits_task,
-                )
+                    if evidence_confidence >= self.rag_evidence_min_confidence:
+                        break  # Good evidence found — stop relaxing
 
-                vector_hits = self._dedupe_rank_hits(
-                    raw_vector_hits,
-                    process_stage=context_flags.get("process_stage", ""),
-                )[: self.rag_vector_top_k]
-
-                fused_hits = self._fuse_hits(vector_hits, keyword_hits_raw, redacted_text)
-                ranked_hits = self._dedupe_rank_hits(
-                    fused_hits,
-                    process_stage=context_flags.get("process_stage", ""),
-                )
-                ranked_hits = await self._rerank_hits_async(redacted_text, ranked_hits, keep_top=40)
-
-                verified_hits = [
-                    hit for hit in ranked_hits
-                    if float(hit.get("score", 0.0)) >= self.rag_min_score
-                ]
-                fallback_hits = [
-                    hit for hit in ranked_hits
-                    if float(hit.get("score", 0.0)) >= self.rag_fallback_min_score
-                ]
-
-                selected_hits = verified_hits if verified_hits else fallback_hits
-                if verified_hits:
-                    context_mode = "verified"
-                elif fallback_hits:
-                    context_mode = "fallback"
-                else:
-                    context_mode = "unverified"
-
-                evidence_confidence = self._compute_evidence_confidence(
-                    redacted_text,
-                    selected_hits if selected_hits else ranked_hits,
-                )
-                if evidence_confidence < self.rag_evidence_min_confidence:
                     selected_hits = []
                     context_mode = "weak_evidence"
+                    if stage_label == "no_filter":
+                        break  # Exhausted all relaxation stages
+                    print(f"RAG: weak evidence with filter={stage_label} (conf={evidence_confidence:.3f}), relaxing...")
 
                 if intent_needs_clarification and not selected_hits:
                     context_mode = "needs_clarification"
@@ -1983,12 +2155,10 @@ class AudioService:
 
             Intent:
             {intent_payload.get("intent_id")} (confidence={intent_confidence:.2f})
-            Required disclaimers (deterministic):
-            {", ".join(intent_payload.get("required_disclaimers") or []) or "general_informational"}
 
             Customer just said (redacted): "{redacted_text}"
 
-            Provide the final agent-assist response now.
+            Provide the final agent-assist response now. Do NOT include disclaimers — they are appended separately.
             """
 
             model = genai.GenerativeModel(self.ai_model_name)
@@ -2043,6 +2213,15 @@ class AudioService:
                 print(f"Skipping stale AI suggestion for {meeting_id}/{user_id}")
                 return
 
+            # Phase 3A: Append deterministic disclaimer texts (post-processing, not LLM-generated)
+            disclaimer_texts = self._resolve_disclaimers(
+                intent_payload.get("required_disclaimers") or []
+            )
+            if disclaimer_texts:
+                suggestion = suggestion + "\n\n---\n**Required Disclosures:**\n" + "\n".join(
+                    f"- {d}" for d in disclaimer_texts
+                )
+
             latency_fields = self._build_ai_latency_fields(metadata)
             self._record_ai_latency_metrics(latency_fields)
 
@@ -2068,6 +2247,7 @@ class AudioService:
                 "requestOrigin": metadata.get("requestOrigin"),
                 "router": intent_payload,
                 "filters": retrieval_filter,
+                "filterStageUsed": active_filter_label,
                 "retrievedChunkIds": [c.get("chunkId") for c in citations],
                 "retrievedScores": [c.get("score") for c in citations],
                 "citationsShown": citations,

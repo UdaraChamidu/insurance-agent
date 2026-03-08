@@ -1,11 +1,18 @@
 import hashlib
 from typing import Any, Dict, List, Optional
 
+import os
+
 from app.services.integrations.pinecone import pinecone_service
 from app.services.llm.embeddings import embedding_service
 from app.services.rag.chunking import chunking_service
-from app.services.rag.keyword_index import keyword_index_service
 from app.services.rag.processors import document_processor
+
+_KEYWORD_BACKEND = os.getenv("KEYWORD_INDEX_BACKEND", "sqlite").lower()
+if _KEYWORD_BACKEND == "sqlite":
+    from app.services.rag.keyword_index_sqlite import sqlite_keyword_index_service as keyword_index_service
+else:
+    from app.services.rag.keyword_index import keyword_index_service
 
 
 class IngestionOrchestrator:
@@ -147,6 +154,14 @@ class IngestionOrchestrator:
             sharepoint_url=sharepoint_url,
             last_modified=last_modified,
         )
+
+        # Phase 3D: Enforce LIVE_ASSIST vs TRAINING KB separation.
+        # Documents tagged TrainingReference must never enter the live-assist index.
+        authority_level = str(base_metadata.get("authority_level") or "").strip()
+        if authority_level == "TrainingReference":
+            namespace = "training-reference"
+            base_metadata["namespace"] = namespace
+            print(f"[3D] TrainingReference doc '{filename}' → forced to training-reference namespace")
 
         chunks = chunking_service.chunk_text(text, metadata=base_metadata)
         if not chunks:

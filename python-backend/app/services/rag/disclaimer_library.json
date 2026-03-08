@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "disclaimers": {
+    "general_informational": {
+      "id": "general_informational",
+      "version": "2026-01-v1",
+      "text": "This information is provided for general educational purposes only and does not constitute legal, tax, or financial advice. Coverage details, eligibility, and costs vary by plan and individual circumstances. Always verify current plan details and regulations before making enrollment decisions."
+    },
+    "medicare_marketing": {
+      "id": "medicare_marketing",
+      "version": "2026-01-v1",
+      "text": "We do not offer every plan available in your area. Please contact Medicare.gov, 1-800-MEDICARE, or your local State Health Insurance Assistance Program (SHIP) to get information on all of your options. Not connected with or endorsed by the U.S. government or the federal Medicare program."
+    },
+    "fl_recording_consent": {
+      "id": "fl_recording_consent",
+      "version": "2026-01-v1",
+      "text": "Florida law requires that all parties consent to the recording of this call. By continuing this conversation, you confirm your consent to being recorded. (§ 934.03, Fla. Stat.)"
+    },
+    "carrier_specific": {
+      "id": "carrier_specific",
+      "version": "2026-01-v1",
+      "text": "Plan benefits, premiums, and cost-sharing information may vary by plan and service area. Contact your carrier directly to verify current plan details before enrolling."
+    },
+    "scope_of_appointment": {
+      "id": "scope_of_appointment",
+      "version": "2026-01-v1",
+      "text": "A Scope of Appointment (SOA) must be completed and documented before discussing Medicare Advantage or Part D plan options. CMS regulations require SOA completion at least 48 hours before a scheduled appointment, except in walk-in situations."
+    }
+  }
+}
