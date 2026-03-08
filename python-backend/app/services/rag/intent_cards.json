@@ -7,7 +7,12 @@
     "required_disclaimers": ["general_informational"],
     "must_ask_questions": ["What was the move date?", "What is the new ZIP code?", "Do you have proof of move?"],
     "escalation_triggers": ["conflicting dates", "missing SEP proof"],
-    "keywords": ["sep", "move", "moved", "special enrollment", "zipcode", "address change"]
+    "keywords": [
+      "sep", "move", "moved", "relocate", "relocated",
+      "special enrollment", "zipcode", "address change",
+      "new city", "new state", "qualify sep", "loss of coverage",
+      "newborn", "baby", "married", "marketplace change"
+    ]
   },
   {
     "intent_id": "ACA_APTC_CSR",
@@ -17,7 +22,11 @@
     "required_disclaimers": ["general_informational"],
     "must_ask_questions": ["What is estimated annual income?", "Any household changes?", "Did you receive 1095-A?"],
     "escalation_triggers": ["tax reconciliation uncertainty"],
-    "keywords": ["aptc", "csr", "1095-a", "subsidy", "income", "reconciliation"]
+    "keywords": [
+      "aptc", "csr", "1095-a", "1095", "subsidy", "income", "reconciliation",
+      "premium tax credit", "income change", "subsidy change",
+      "federal poverty", "household income", "premium help"
+    ]
   },
   {
     "intent_id": "ACA_APPEAL_STEPS",
@@ -27,7 +36,11 @@
     "required_disclaimers": ["general_informational"],
     "must_ask_questions": ["What notice was received?", "When was notice date?", "Any supporting documents available?"],
     "escalation_triggers": ["appeal deadline near", "legal complaint"],
-    "keywords": ["appeal", "denial", "eligibility notice", "hearing", "deadline"]
+    "keywords": [
+      "appeal", "denial", "denied", "eligibility notice",
+      "hearing", "deadline", "denial notice", "appeal steps",
+      "appeal process", "marketplace denied", "reconsideration"
+    ]
   },
   {
     "intent_id": "MEDICARE_ENROLLMENT_PERIODS",
@@ -37,7 +50,12 @@
     "required_disclaimers": ["medicare_marketing", "general_informational"],
     "must_ask_questions": ["Are you in IEP, AEP, OEP, or SEP?", "What is your Medicare start date?", "Any recent qualifying event?"],
     "escalation_triggers": ["possible late enrollment penalty"],
-    "keywords": ["medicare", "iep", "aep", "oep", "sep", "part b", "enrollment period"]
+    "keywords": [
+      "medicare", "iep", "aep", "oep", "sep", "part b",
+      "enrollment period", "turning 65", "enroll medicare",
+      "late enrollment", "penalty", "enrollment window",
+      "medicare eligibility", "first time medicare"
+    ]
   },
   {
     "intent_id": "MEDICARE_MARKETING_DISCLAIMERS",
@@ -47,7 +65,11 @@
     "required_disclaimers": ["medicare_marketing"],
     "must_ask_questions": ["Was scope-of-appointment completed?", "Was recording consent disclosed if applicable?"],
     "escalation_triggers": ["unapproved marketing statement"],
-    "keywords": ["marketing", "soa", "scope of appointment", "cms disclaimer", "call recording"]
+    "keywords": [
+      "marketing", "soa", "scope of appointment", "cms disclaimer",
+      "call recording", "disclaimer", "disclosure", "cms rules",
+      "before talking", "required disclosure", "42 cfr", "certification"
+    ]
   },
   {
     "intent_id": "MEDIGAP_GI_RIGHTS",
@@ -57,7 +79,12 @@
     "required_disclaimers": ["general_informational"],
     "must_ask_questions": ["What event triggered GI rights?", "When did prior coverage end?"],
     "escalation_triggers": ["outside guaranteed issue window"],
-    "keywords": ["medigap", "guaranteed issue", "gi rights", "supplement", "open enrollment"]
+    "keywords": [
+      "medigap", "guaranteed issue", "gi rights", "supplement",
+      "underwriting", "no underwriting", "open enrollment",
+      "losing coverage", "plan leaving", "retiree coverage",
+      "medigap rights", "medical history"
+    ]
   },
   {
     "intent_id": "FL_RECORDING_CONSENT",
@@ -67,7 +94,11 @@
     "required_disclaimers": ["fl_recording_consent"],
     "must_ask_questions": ["Did all parties provide consent?"],
     "escalation_triggers": ["no consent", "state law conflict"],
-    "keywords": ["florida", "recording", "consent", "two-party consent", "call recording law"]
+    "keywords": [
+      "florida", "recording", "consent", "two-party consent",
+      "call recording law", "disclose recording", "florida statute",
+      "two party", "notify recording", "record call"
+    ]
   },
   {
     "intent_id": "FL_ADVERTISING_DO_DONTS",
@@ -77,7 +108,12 @@
     "required_disclaimers": ["general_informational"],
     "must_ask_questions": ["What exact wording is planned?"],
     "escalation_triggers": ["rebating", "misleading claim"],
-    "keywords": ["advertising", "rebate", "florida rules", "marketing claim", "unfair trade"]
+    "keywords": [
+      "advertising", "rebate", "rebating", "florida rules",
+      "marketing claim", "unfair trade", "gift card", "incentive",
+      "misleading", "florida compliance", "unfair trade practices",
+      "florida advertising", "florida dfs"
+    ]
   },
   {
     "intent_id": "CARRIER_ENROLLMENT_STEPS",
@@ -87,7 +123,10 @@
     "required_disclaimers": ["carrier_specific"],
     "must_ask_questions": ["Which carrier?", "Which product and state?"],
     "escalation_triggers": ["carrier rule conflict"],
-    "keywords": ["carrier", "fmo", "enrollment steps", "submission", "appointment status"]
+    "keywords": [
+      "carrier", "fmo", "enrollment steps", "submission", "appointment status",
+      "enroll member", "steps to enroll", "uhc", "humana", "aetna",
+      "carrier enrollment", "broker portal", "submit application"
+    ]
   }
 ]
-

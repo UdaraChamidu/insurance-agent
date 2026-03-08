@@ -78,6 +78,13 @@ async def startup_event():
     await document_poller.start()
     await appointment_reminder_poller.start()
 
+    # Phase 4C: Pre-warm the RAG pipeline so the first real request has no cold-start penalty
+    try:
+        from app.services.meeting.audio_service import audio_service
+        await audio_service.warmup()
+    except Exception as warmup_err:
+        print(f"RAG pre-warm skipped: {warmup_err}")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     from app.services.document.poller import document_poller

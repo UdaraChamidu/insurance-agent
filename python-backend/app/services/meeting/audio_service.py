@@ -176,7 +176,7 @@ class AudioService:
         )
         self.rag_intent_min_confidence = self._read_non_negative_float_env(
             "MEETING_RAG_INTENT_MIN_CONFIDENCE",
-            0.25,
+            0.22,  # aligned with intent_router threshold
         )
         self.rag_evidence_min_confidence = self._read_non_negative_float_env(
             "MEETING_RAG_EVIDENCE_MIN_CONFIDENCE",
@@ -1584,6 +1584,31 @@ class AudioService:
         self._record_latency_metric("requestToAiMs", latency_fields.get("requestToAiLatencyMs"))
         self._record_latency_metric("audioToAiMs", latency_fields.get("audioToAiLatencyMs"))
         self._record_latency_metric("transcriptionToAiMs", latency_fields.get("transcriptionToAiLatencyMs"))
+
+    async def warmup(self) -> None:
+        """Pre-warm the RAG pipeline at server startup (Phase 4C).
+
+        1. Calls the embedding model once so the first real request doesn't pay cold-start.
+        2. Pre-loads all intent card embeddings (otherwise loaded lazily on first request).
+        3. Verifies the disclaimer library is loaded.
+        """
+        try:
+            await self._generate_query_embedding("warmup insurance medicare enrollment")
+            print("Embedding model pre-warmed")
+        except Exception as warmup_embed_err:
+            print(f"Embedding warmup skipped: {warmup_embed_err}")
+
+        if not self._intent_embeddings and not self._intent_embeddings_loading:
+            self._intent_embeddings_loading = True
+            await self._preload_intent_embeddings()
+
+        if not self._disclaimer_library:
+            self._disclaimer_library = self._load_disclaimer_library()
+
+        print(
+            f"RAG pre-warm complete: {len(self._intent_embeddings)} intent embeddings, "
+            f"{len(self._disclaimer_library)} disclaimers"
+        )
 
     def get_latency_snapshot(self) -> Dict[str, Any]:
         return {

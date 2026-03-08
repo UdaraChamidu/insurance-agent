@@ -221,6 +221,31 @@ class IngestionOrchestrator:
         except Exception as keyword_error:
             print(f"Keyword index update failed for {filename}: {keyword_error}")
 
+        # Phase 4B: Register playbook dependency links so stale playbooks can be detected
+        # when a cited source doc is re-synced with a new etag.
+        doc_type = str(base_metadata.get("doc_type") or "").strip()
+        if doc_type == "Playbook" and _KEYWORD_BACKEND == "sqlite":
+            cited_doc_ids = [
+                str(v).strip()
+                for v in (normalized_file_metadata.get("citedDocIds") or [])
+                if str(v).strip()
+            ]
+            doc_etag = str(
+                normalized_file_metadata.get("etag")
+                or base_metadata.get("doc_version")
+                or ""
+            ).strip()
+            if cited_doc_ids:
+                try:
+                    for kc in keyword_chunks:
+                        keyword_index_service.register_playbook_deps(
+                            playbook_chunk_id=kc["chunk_id"],
+                            cited_doc_ids=cited_doc_ids,
+                            cited_doc_etag=doc_etag,
+                        )
+                except Exception as dep_err:
+                    print(f"Playbook dep registration failed for {filename}: {dep_err}")
+
         print(f"Successfully upserted {len(vectors)} chunks to Pinecone.")
         return len(chunks), len(vectors)
 

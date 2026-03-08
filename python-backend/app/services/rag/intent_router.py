@@ -72,7 +72,9 @@ class IntentRouter:
             score += 0.4 * len(query_tokens.intersection(exact_code_tokens))
             max_score += 0.4 * len(exact_code_tokens.intersection(set(k.lower() for k in keywords)))
 
-            confidence = score / max(max_score, 1.0)
+            # Cap denominator at 5.0 so larger keyword lists don't dilute confidence.
+            # Matching ~5 weighted keywords = full confidence.
+            confidence = min(1.0, score / max(min(max_score, 5.0), 1.0))
             scored.append({
                 "card": card,
                 "score": score,
@@ -89,7 +91,7 @@ class IntentRouter:
             for item in scored[:3]
         ]
 
-        if not best or best["confidence"] < 0.25:
+        if not best or best["confidence"] < 0.22:
             return {
                 "intent_id": "UNKNOWN",
                 "confidence": float(best["confidence"]) if best else 0.0,

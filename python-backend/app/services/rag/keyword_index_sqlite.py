@@ -47,6 +47,20 @@ class SQLiteKeywordIndexService:
                 content,
                 tokenize = 'porter unicode61'
             );
+
+            -- Phase 4B: Playbook dependency tracking
+            -- Tracks which source docs each playbook chunk cites, and their etag at ingestion.
+            -- When a cited doc changes, the playbook is flagged "Needs review".
+            CREATE TABLE IF NOT EXISTS playbook_deps (
+                playbook_chunk_id  TEXT NOT NULL,
+                cited_doc_id       TEXT NOT NULL,
+                cited_doc_etag     TEXT NOT NULL DEFAULT '',
+                needs_review       INTEGER NOT NULL DEFAULT 0,
+                updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (playbook_chunk_id, cited_doc_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_playbook_deps_cited
+                ON playbook_deps (cited_doc_id);
         """)
         conn.commit()
 
@@ -163,6 +177,82 @@ class SQLiteKeywordIndexService:
                 break
 
         return results
+
+    def register_playbook_deps(
+        self,
+        playbook_chunk_id: str,
+        cited_doc_ids: List[str],
+        cited_doc_etag: str = "",
+    ) -> None:
+        """Record which source docs a playbook chunk cites (Phase 4B)."""
+        if not playbook_chunk_id or not cited_doc_ids:
+            return
+        conn = self._connect()
+        for doc_id in cited_doc_ids:
+            conn.execute(
+                """
+                INSERT INTO playbook_deps (playbook_chunk_id, cited_doc_id, cited_doc_etag, needs_review, updated_at)
+                VALUES (?, ?, ?, 0, datetime('now'))
+                ON CONFLICT (playbook_chunk_id, cited_doc_id) DO UPDATE SET
+                    cited_doc_etag = excluded.cited_doc_etag,
+                    updated_at     = excluded.updated_at
+                """,
+                (playbook_chunk_id, doc_id, cited_doc_etag),
+            )
+        conn.commit()
+
+    def flag_stale_playbooks(self, updated_doc_ids: List[str]) -> List[str]:
+        """Mark playbooks that cite any of the updated docs as 'Needs review' (Phase 4B).
+
+        Returns the list of affected playbook_chunk_ids.
+        """
+        if not updated_doc_ids:
+            return []
+        conn = self._connect()
+        placeholders = ",".join("?" * len(updated_doc_ids))
+        conn.execute(
+            f"""
+            UPDATE playbook_deps
+            SET needs_review = 1, updated_at = datetime('now')
+            WHERE cited_doc_id IN ({placeholders})
+            """,
+            updated_doc_ids,
+        )
+        conn.commit()
+        rows = conn.execute(
+            f"""
+            SELECT DISTINCT playbook_chunk_id
+            FROM playbook_deps
+            WHERE cited_doc_id IN ({placeholders}) AND needs_review = 1
+            """,
+            updated_doc_ids,
+        ).fetchall()
+        stale = [row["playbook_chunk_id"] for row in rows]
+        if stale:
+            print(f"[4B] {len(stale)} playbook chunks need review after source doc update")
+        return stale
+
+    def get_playbooks_needing_review(self) -> List[Dict[str, Any]]:
+        """Return all playbook chunks currently flagged for review."""
+        conn = self._connect()
+        rows = conn.execute(
+            """
+            SELECT playbook_chunk_id, cited_doc_id, cited_doc_etag, updated_at
+            FROM playbook_deps
+            WHERE needs_review = 1
+            ORDER BY updated_at DESC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def clear_playbook_review_flag(self, playbook_chunk_id: str) -> None:
+        """Clear the 'Needs review' flag once a playbook has been updated."""
+        conn = self._connect()
+        conn.execute(
+            "UPDATE playbook_deps SET needs_review = 0 WHERE playbook_chunk_id = ?",
+            (playbook_chunk_id,),
+        )
+        conn.commit()
 
     def close(self) -> None:
         if self._conn:
