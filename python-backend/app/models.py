@@ -95,7 +95,7 @@ class Notification(Base):
     metadata_json = Column(JSON, nullable=True)
 
 
-class Appointment(Base):
+class Appointment(Base):                           
     __tablename__ = "Appointment"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -148,7 +148,7 @@ class AvailabilitySlot(Base):
     bufferMinutes = Column(Integer, default=10)
     isActive = Column(Boolean, default=True)
 
-
+                        
 class Document(Base):
     __tablename__ = "Document"
 
