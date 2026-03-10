@@ -9,7 +9,7 @@ It combines:
 - AI assist with RAG (Gemini + Pinecone),
 - meeting artifact storage (transcript, AI responses, summary),
 - admin workflows for leads, clients, and knowledge-base management.
-
+ 
 ## What This Project Solves
 
 Insurance consultations are time-sensitive and compliance-sensitive.  
