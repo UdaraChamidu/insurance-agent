@@ -1,7 +1,7 @@
 # Insurance AI Consultant Platform
 
 A full-stack meeting and sales-assist platform for insurance teams.
-
+ 
 It combines:
 - lead intake and appointment booking,
 - real-time client meetings (video + audio),
