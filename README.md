@@ -1,7 +1,7 @@
 # Insurance AI Consultant Platform
 
 A full-stack meeting and sales-assist platform for insurance teams.
-
+ 
 It combines:
 - lead intake and appointment booking,
 - real-time client meetings (video + audio),
@@ -9,7 +9,7 @@ It combines:
 - AI assist with RAG (Gemini + Pinecone),
 - meeting artifact storage (transcript, AI responses, summary),
 - admin workflows for leads, clients, and knowledge-base management.
-
+ 
 ## What This Project Solves
 
 Insurance consultations are time-sensitive and compliance-sensitive.  
