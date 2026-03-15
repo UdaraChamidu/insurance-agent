@@ -2,8 +2,11 @@
   "name": "insurance-ai-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "predev": "node scripts/generate-seo-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/generate-seo-assets.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

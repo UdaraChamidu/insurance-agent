@@ -1,0 +1,93 @@
+# Elite Deal Broker
+
+> Elite Deal Broker helps individuals and small businesses compare ACA Marketplace and SHOP health insurance options with broker-guided enrollment support.
+
+## Business summary
+Elite Deal Broker is a U.S. health insurance brokerage website focused only on ACA Marketplace insurance and SHOP health insurance for small businesses.
+
+## Focus areas
+- Affordable Care Act Marketplace
+- ACA enrollment assistance
+- Obamacare Marketplace
+- SHOP Marketplace
+- small business health insurance
+- small business health care tax credit
+
+## Public page summaries
+- /
+  Title: ACA Marketplace and SHOP Health Insurance Broker
+  Summary: Helping individuals and small businesses find affordable health insurance through the ACA Marketplace and SHOP.
+- /about-us
+  Title: About Us
+  Summary: Learn about Elite Deal Broker and how we help people navigate ACA Marketplace and SHOP enrollment.
+- /shop-health-insurance
+  Title: SHOP Health Insurance
+  Summary: Small business health insurance guidance built around the SHOP Marketplace.
+- /individual-health-insurance
+  Title: Individual Marketplace Insurance
+  Summary: ACA Marketplace insurance guidance for individuals and families.
+- /blog
+  Title: Blog
+  Summary: Articles about ACA Marketplace insurance and SHOP coverage.
+- /faq
+  Title: FAQ
+  Summary: Frequently asked questions about ACA Marketplace insurance and SHOP coverage.
+- /contact
+  Title: Contact
+  Summary: Request help with ACA Marketplace coverage or SHOP health insurance.
+
+## Article summaries
+- /blog/what-is-shop-health-insurance-for-small-businesses
+  Title: What Is SHOP Health Insurance for Small Businesses?
+  Category: SHOP Health Insurance
+  Keywords: SHOP health insurance, small business health insurance, SHOP Marketplace, small business ACA insurance
+  Summary: The SHOP Marketplace gives eligible small employers a structured way to compare group health plans, manage contributions, and evaluate whether a tax credit may apply.
+- /blog/how-the-affordable-care-act-marketplace-works
+  Title: How the Affordable Care Act Marketplace Works
+  Category: ACA Marketplace
+  Keywords: Affordable Care Act Marketplace, Obamacare Marketplace, ACA health insurance, individual health insurance marketplace
+  Summary: ACA Marketplace coverage gives individuals and families a place to compare qualified health plans, review subsidy eligibility, and enroll during valid enrollment periods.
+- /blog/how-small-businesses-can-save-on-health-insurance
+  Title: How Small Businesses Can Save on Health Insurance
+  Category: Small Business Health Insurance
+  Keywords: small business health insurance, SHOP Marketplace, small business ACA insurance, tax credits for small business health insurance
+  Summary: Small business health insurance savings usually come from smarter plan design and contribution planning, not from choosing the cheapest premium in isolation.
+- /blog/who-qualifies-for-aca-health-insurance
+  Title: Who Qualifies for ACA Health Insurance?
+  Category: ACA Marketplace
+  Keywords: who qualifies for ACA health insurance, ACA health insurance, Obamacare Marketplace, individual health insurance marketplace
+  Summary: ACA Marketplace insurance is designed for individuals and families who need personal coverage, but timing and application details determine how and when you can enroll.
+- /blog/benefits-of-using-an-insurance-broker-for-enrollment
+  Title: Benefits of Using an Insurance Broker for Enrollment
+  Category: Enrollment Assistance
+  Keywords: health insurance broker, ACA enrollment assistance, SHOP health insurance broker, insurance broker for enrollment
+  Summary: The main value of a broker is not just access to plans. It is the ability to turn a confusing enrollment process into a clear comparison with defined next steps.
+- /blog/common-aca-marketplace-questions-answered
+  Title: Common ACA Marketplace Questions Answered
+  Category: ACA Marketplace
+  Keywords: common ACA Marketplace questions, Obamacare Marketplace questions, ACA enrollment assistance, ACA health insurance
+  Summary: Most ACA questions come down to four themes: when you can enroll, how subsidies work, which plan features matter most, and where broker guidance fits in.
+- /blog/small-business-health-insurance-requirements
+  Title: Small Business Health Insurance Requirements Explained
+  Category: SHOP Health Insurance
+  Keywords: small business health insurance requirements, SHOP Marketplace requirements, small business ACA insurance, health insurance for small businesses
+  Summary: Small business health insurance requirements usually center on employer size, contribution planning, participation rules, and market-specific enrollment details.
+- /blog/how-to-choose-the-right-aca-plan
+  Title: How to Choose the Right ACA Plan
+  Category: ACA Marketplace
+  Keywords: choose the right ACA plan, ACA Marketplace insurance, Obamacare Marketplace plan comparison, ACA enrollment assistance
+  Summary: The right ACA plan balances premium, deductible exposure, provider access, and prescription coverage rather than over-optimizing for one metric.
+- /blog/tax-credits-for-small-business-health-insurance
+  Title: Tax Credits for Small Business Health Insurance
+  Category: SHOP Health Insurance
+  Keywords: tax credits for small business health insurance, small business health care tax credit, SHOP Marketplace, small business ACA insurance
+  Summary: The small business health care tax credit can change the economics of offering coverage, which is why employers should review it before finalizing a SHOP plan.
+- /blog/individual-vs-small-business-health-insurance-plans
+  Title: Individual vs Small Business Health Insurance Plans
+  Category: Coverage Strategy
+  Keywords: individual vs small business health insurance, ACA Marketplace insurance, SHOP health insurance, small business health insurance
+  Summary: The right path depends on who needs coverage, how premiums will be paid, and whether you are shopping for personal insurance or an employer-sponsored benefit.
+
+## Contact
+- /contact: request ACA Marketplace or SHOP guidance
+

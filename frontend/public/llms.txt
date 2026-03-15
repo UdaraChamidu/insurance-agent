@@ -1,0 +1,36 @@
+# Elite Deal Broker
+
+> Elite Deal Broker is a U.S. health insurance brokerage website focused only on ACA Marketplace insurance and SHOP health insurance for small businesses.
+
+## Primary focus
+- ACA Marketplace insurance for individuals and families
+- SHOP health insurance for small businesses
+- Broker-guided enrollment assistance and plan comparison
+
+## Key pages
+- /: homepage and service overview
+- /about-us: About Us - Learn about Elite Deal Broker and how we help people navigate ACA Marketplace and SHOP enrollment.
+- /shop-health-insurance: SHOP Health Insurance - Small business health insurance guidance built around the SHOP Marketplace.
+- /individual-health-insurance: Individual Marketplace Insurance - ACA Marketplace insurance guidance for individuals and families.
+- /blog: Blog - Articles about ACA Marketplace insurance and SHOP coverage.
+- /faq: FAQ - Frequently asked questions about ACA Marketplace insurance and SHOP coverage.
+- /contact: Contact - Request help with ACA Marketplace coverage or SHOP health insurance.
+
+## Articles
+- /blog/what-is-shop-health-insurance-for-small-businesses: What Is SHOP Health Insurance for Small Businesses? - The SHOP Marketplace gives eligible small employers a structured way to compare group health plans, manage contributions, and evaluate whether a tax credit may apply.
+- /blog/how-the-affordable-care-act-marketplace-works: How the Affordable Care Act Marketplace Works - ACA Marketplace coverage gives individuals and families a place to compare qualified health plans, review subsidy eligibility, and enroll during valid enrollment periods.
+- /blog/how-small-businesses-can-save-on-health-insurance: How Small Businesses Can Save on Health Insurance - Small business health insurance savings usually come from smarter plan design and contribution planning, not from choosing the cheapest premium in isolation.
+- /blog/who-qualifies-for-aca-health-insurance: Who Qualifies for ACA Health Insurance? - ACA Marketplace insurance is designed for individuals and families who need personal coverage, but timing and application details determine how and when you can enroll.
+- /blog/benefits-of-using-an-insurance-broker-for-enrollment: Benefits of Using an Insurance Broker for Enrollment - The main value of a broker is not just access to plans. It is the ability to turn a confusing enrollment process into a clear comparison with defined next steps.
+- /blog/common-aca-marketplace-questions-answered: Common ACA Marketplace Questions Answered - Most ACA questions come down to four themes: when you can enroll, how subsidies work, which plan features matter most, and where broker guidance fits in.
+- /blog/small-business-health-insurance-requirements: Small Business Health Insurance Requirements Explained - Small business health insurance requirements usually center on employer size, contribution planning, participation rules, and market-specific enrollment details.
+- /blog/how-to-choose-the-right-aca-plan: How to Choose the Right ACA Plan - The right ACA plan balances premium, deductible exposure, provider access, and prescription coverage rather than over-optimizing for one metric.
+- /blog/tax-credits-for-small-business-health-insurance: Tax Credits for Small Business Health Insurance - The small business health care tax credit can change the economics of offering coverage, which is why employers should review it before finalizing a SHOP plan.
+- /blog/individual-vs-small-business-health-insurance-plans: Individual vs Small Business Health Insurance Plans - The right path depends on who needs coverage, how premiums will be paid, and whether you are shopping for personal insurance or an employer-sponsored benefit.
+
+## Non-public routes
+- /admin/
+- /meeting
+- /schedule
+- /appointment/manage/
+

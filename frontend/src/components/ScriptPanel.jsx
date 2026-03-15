@@ -2,47 +2,36 @@ import React from 'react';
 import { Shield, AlertTriangle, FileText } from 'lucide-react';
 
 const SCRIPTS = {
-  medicare: {
-    title: 'Medicare Compliance Script',
-    intro: "Hello, my name is [Name] and I am a licensed sales agent. I am not employed by Medicare or the federal government.",
-    disclaimer: "We do not offer every plan available in your area. Any information we provide is limited to those plans we do offer in your area. Please contact Medicare.gov or 1-800-MEDICARE to get information on all of your options.",
-    checklist: [
-      "Confirm they have Medicare Parts A & B",
-      "Ask about current coverage",
-      "Check if they receive Extra Help (LIS)",
-      "Verify doctor and prescription preferences"
-    ]
-  },
   aca: {
-    title: 'ACA / Health Insurance Script',
-    intro: "Hello, I'm a licensed agent looking to help you find the best health coverage for your needs.",
-    disclaimer: "I can help you enroll in a Marketplace plan. Eligibility for subsidies depends on your income and household size.",
+    title: 'ACA Marketplace Script',
+    intro: "Hello, I'm here to help you review Marketplace coverage options and the enrollment steps that apply to your situation.",
+    disclaimer: 'Eligibility for Marketplace subsidies depends on your household and application details through the official enrollment process.',
     checklist: [
-      "Ask about household income (for subsidy)",
-      "Confirm zip code",
-      "Check for qualifying life events if outside Open Enrollment",
-      "Ask about preferred doctors/hospitals"
+      'Ask about household income considerations',
+      'Confirm zip code and state',
+      'Check for qualifying life events if outside Open Enrollment',
+      'Ask about preferred doctors, hospitals, and prescriptions'
     ]
   },
-  life: {
-    title: 'Life Insurance Script',
-    intro: "Hi, I'm a licensed field underwriter. My job is to verify your information and see what plans you qualify for.",
-    disclaimer: "Policy issuance depends on answers to health questions and underwriting approval.",
+  shop: {
+    title: 'SHOP Small Business Script',
+    intro: "Hello, I'm here to help you review small business health insurance options and whether SHOP is the right fit for your team.",
+    disclaimer: 'Eligibility, participation, and tax credit considerations depend on the employer setup and the market rules that apply.',
     checklist: [
-      "Confirm age and smoking status",
-      "Ask about beneficiary needs",
-      "Ask about current health conditions",
-      "Determine budget range"
+      'Confirm business size and employee count',
+      'Ask about current group coverage or renewal timing',
+      'Review employer contribution goals',
+      'Ask about provider or plan priorities for employees'
     ]
   },
   default: {
     title: 'General Consultation Script',
-    intro: "Hello, how can I help you today?",
-    disclaimer: "I am a licensed insurance agent.",
+    intro: 'Hello, how can I help you with ACA Marketplace or SHOP coverage today?',
+    disclaimer: 'We focus on ACA Marketplace and SHOP health insurance guidance.',
     checklist: [
-      "Identify client needs",
-      "Confirm contact information",
-      "Explain process"
+      'Identify whether the request is individual or small business',
+      'Confirm contact information',
+      'Explain the next enrollment steps'
     ]
   }
 };

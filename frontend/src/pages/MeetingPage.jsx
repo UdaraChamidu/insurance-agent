@@ -1739,7 +1739,7 @@ export default function MeetingPage() {
             <p className="text-gray-600">
               {role === 'client'
                 ? "You're about to join your scheduled video meeting."
-                : "You're about to join a video consultation with SecureLife Insurance."}
+                : "You're about to join a video consultation with Elite Deal Broker."}
             </p>
           </div>
 

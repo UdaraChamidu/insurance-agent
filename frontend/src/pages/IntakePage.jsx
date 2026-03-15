@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Shield, MapPin, AlertCircle, ArrowRight, Check, User, Mail, Phone, Loader, Upload, X, FileText } from 'lucide-react';
+import { Shield, MapPin, ArrowRight, Check, User, Mail, Phone, Loader, Upload, X, FileText } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/network';
 
 const API_URL = getApiBaseUrl();
@@ -14,7 +14,7 @@ export default function IntakePage() {
 
   // Form State
   const [formData, setFormData] = useState({
-    productType: '', // aca, medicare, life, etc.
+    productType: '', // aca or shop
     state: 'FL',
     triggers: [],
     firstName: '',
@@ -185,14 +185,12 @@ export default function IntakePage() {
         {step === 1 && (
           <div className="animate-fadeIn">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">How can we help you today?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Select the type of coverage you are looking for.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Select the type of coverage support you need.</p>
             
             <div className="grid grid-cols-1 gap-3">
               {[
-                { id: 'aca', label: 'Health Insurance (ACA/Obamacare)', icon: Shield },
-                { id: 'medicare', label: 'Medicare (65+)', icon: User },
-                { id: 'life', label: 'Life Insurance', icon: Check },
-                { id: 'dental', label: 'Dental / Vision', icon: AlertCircle },
+                { id: 'aca', label: 'Individual ACA Marketplace Insurance', icon: Shield },
+                { id: 'shop', label: 'SHOP Small Business Health Insurance', icon: FileText },
               ].map((option) => (
                 <button
                   key={option.id}
@@ -223,7 +221,7 @@ export default function IntakePage() {
         {step === 2 && (
           <div className="animate-fadeIn">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Where do you live?</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">We are licensed in Florida and select other states.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Choose the state connected to your ACA or SHOP request.</p>
             
             <div className="space-y-4">
                <div>
@@ -258,11 +256,11 @@ export default function IntakePage() {
             
             <div className="space-y-3 mb-8">
               {[
-                { id: 'turning_65', label: 'Turning 65 soon' },
                 { id: 'losing_coverage', label: 'Losing employer coverage' },
                 { id: 'moved', label: 'Recently moved' },
-                { id: 'chronic', label: 'Managing a chronic condition' },
-                { id: 'medicaid', label: 'Have Medicaid / LIS' }
+                { id: 'self_employed', label: 'Self-employed or buying for myself' },
+                { id: 'small_business', label: 'Shopping for a small business team' },
+                { id: 'renewal_review', label: 'Reviewing current coverage options' }
               ].map((trigger) => (
                 <button
                   key={trigger.id}

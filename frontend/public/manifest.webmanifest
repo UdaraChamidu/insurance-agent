@@ -1,0 +1,21 @@
+{
+  "name": "Elite Deal Broker",
+  "short_name": "Elite Deal Broker",
+  "description": "Elite Deal Broker helps individuals and small businesses compare ACA Marketplace and SHOP health insurance options with broker-guided enrollment support.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4efe6",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

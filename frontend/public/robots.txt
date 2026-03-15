@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /meeting
+Disallow: /schedule
+Disallow: /appointment/manage/
+
+Sitemap: https://www.elitedealbroker.com/sitemap.xml
+Host: www.elitedealbroker.com

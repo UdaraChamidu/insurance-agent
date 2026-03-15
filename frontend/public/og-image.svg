@@ -1,0 +1,16 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="48" fill="#0F172A"/>
+  <circle cx="180" cy="120" r="180" fill="#0F766E" fill-opacity="0.35"/>
+  <circle cx="1040" cy="520" r="210" fill="#F97316" fill-opacity="0.2"/>
+  <rect x="78" y="82" width="176" height="176" rx="36" fill="#0F766E"/>
+  <path d="M166 129L110 153V221C110 272 149 320 166 332C183 320 222 272 222 221V153L166 129Z" fill="white"/>
+  <text fill="white" font-family="Space Grotesk, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="-1.8">
+    <tspan x="78" y="382">Elite Deal Broker</tspan>
+  </text>
+  <text fill="#D1FAE5" font-family="Space Grotesk, Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="0.6">
+    <tspan x="78" y="438">ACA Marketplace and SHOP Health Insurance</tspan>
+  </text>
+  <text fill="#E2E8F0" font-family="Source Serif 4, Georgia, serif" font-size="30">
+    <tspan x="78" y="506">Broker-guided enrollment assistance for individuals and small businesses.</tspan>
+  </text>
+</svg>
