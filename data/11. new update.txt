@@ -1,0 +1,376 @@
+================================================================================
+  INSURANCE AI CONSULTANT - PROJECT STATUS & ACTION PLAN
+  Last Updated: 2026-03-17
+================================================================================
+
+
+================================================================================
+  SECTION 1: CLIENT REQUIREMENTS SUMMARY (March 2026)
+================================================================================
+
+The client has shifted focus from individual ACA marketplace enrollment to
+GROUP HEALTH INSURANCE business, working with Warner Pacific as the quoting
+and market-access partner.
+
+KEY CLIENT STATEMENTS:
+----------------------
+1. RAG (AI Knowledge Base) is a LONG-TERM goal, NOT urgent for now.
+2. Client wants to know if these 4 features are COMPLETE:
+   - Website
+   - Booking
+   - WebRTC (Phone)
+   - CRM
+3. Client has defined a new workflow focused on employer/group insurance.
+4. Client identified specific missing pieces that need to be built.
+
+
+================================================================================
+  SECTION 2: CLIENT'S DEFINED CORE STACK
+================================================================================
+
+The client considers these as the essential tools to launch:
+
+  1. Phone system (Twilio/WebRTC)
+  2. CRM (track prospects, follow-ups, groups, renewals, notes)
+  3. Website + booking (credibility + lead capture)
+  4. Social media + marketing (lead generation) [outside this project]
+  5. Email/calendar/business workspace [outside this project]
+  6. Secure document collection (receive census/forms safely)
+  7. Basic intake process (employer info, census, current coverage, renewal date)
+  8. Simple compliance/documentation process (notes, permissions, timestamps)
+
+
+================================================================================
+  SECTION 3: CURRENT FEATURE STATUS
+================================================================================
+
++-------------------------+----------------+----------------------------------------+
+| Feature                 | Status         | Notes                                  |
++-------------------------+----------------+----------------------------------------+
+| Website (Public Pages)  | DONE           | Home, contact, FAQ pages exist.        |
+|                         |                | May need content update for group      |
+|                         |                | insurance focus instead of individual   |
+|                         |                | ACA marketplace.                       |
++-------------------------+----------------+----------------------------------------+
+| Booking System          | DONE           | Scheduling with availability slots,    |
+|                         |                | timezone support, booking refs,        |
+|                         |                | manage tokens for reschedule/cancel.   |
++-------------------------+----------------+----------------------------------------+
+| WebRTC / Phone          | BUILT          | WebRTC audio/video + Deepgram STT      |
+|                         |                | implemented. Needs production stability |
+|                         |                | testing. Check if it works reliably    |
+|                         |                | in real-world usage.                   |
++-------------------------+----------------+----------------------------------------+
+| CRM / Lead Management   | PARTIAL        | Basic lead model exists with simple    |
+|                         |                | pipeline (new > quoted > enrolled >    |
+|                         |                | lost). NEEDS MAJOR REDESIGN for group  |
+|                         |                | insurance workflow (10 stages).        |
++-------------------------+----------------+----------------------------------------+
+| Employer Intake Form    | NOT BUILT      | Client needs a dedicated form to       |
+|                         |                | capture employer/group details.        |
++-------------------------+----------------+----------------------------------------+
+| Census Collection       | NOT BUILT      | Template/form for collecting employee  |
+|                         |                | census data from employers.            |
++-------------------------+----------------+----------------------------------------+
+| Email/SMS Templates     | PARTIAL        | Basic email confirmation + Twilio SMS  |
+|                         |                | exists but NO pre-built templates for  |
+|                         |                | the group workflow stages.             |
++-------------------------+----------------+----------------------------------------+
+| Document Organization   | PARTIAL        | SharePoint sync + Supabase storage     |
+|                         |                | exists. Needs organized folder         |
+|                         |                | structure per client/case.             |
++-------------------------+----------------+----------------------------------------+
+| Secure File Collection  | PARTIAL        | Client doc upload endpoint exists      |
+|                         |                | (client_docs.py). Needs a public-     |
+|                         |                | facing secure upload portal for        |
+|                         |                | employers to submit census/forms.      |
++-------------------------+----------------+----------------------------------------+
+| RAG / AI Knowledge Base | BUILT          | Fully implemented (Gemini + Pinecone + |
+|                         |                | hybrid search). CLIENT SAYS NOT URGENT |
+|                         |                | - deprioritize this.                   |
++-------------------------+----------------+----------------------------------------+
+| Meeting AI Suggestions  | BUILT          | Real-time AI suggestions during calls. |
+|                         |                | Deprioritize per client instruction.   |
++-------------------------+----------------+----------------------------------------+
+
+
+================================================================================
+  SECTION 4: WHAT THE CLIENT NEEDS BUILT (MISSING PIECES)
+================================================================================
+
+--- 4.1: EMPLOYER INTAKE FORM ---
+A public-facing form to capture group employer details:
+  - Company name
+  - Contact person (name, email, phone)
+  - Number of employees (total)
+  - Number of eligible employees
+  - State
+  - Industry / SIC code
+  - Renewal date
+  - Current carrier / plan name
+  - Contribution strategy (employer pays %, employee pays %)
+  - Benefits needed (medical, dental, vision, life, disability, etc.)
+
+IMPLEMENTATION:
+  - New frontend page: /employer-intake or /group-intake
+  - New backend model: EmployerLead or GroupLead
+  - New API endpoint: POST /api/leads/employer
+  - Store in Supabase database
+  - Connect to CRM pipeline
+
+
+--- 4.2: CENSUS COLLECTION TEMPLATE ---
+A way for employers to submit employee census data:
+  - Employee name
+  - Date of birth
+  - Gender
+  - Zip code
+  - Dependents (spouse, children with DOBs)
+  - Tobacco use
+  - Current coverage (waive/enroll)
+
+IMPLEMENTATION OPTIONS:
+  - Option A: Downloadable CSV/Excel template + secure upload
+  - Option B: Online form where employer enters rows
+  - Option C: Both (template download + upload portal)
+  - Secure file upload to Supabase storage
+  - Link census to the employer lead record
+
+
+--- 4.3: GROUP-SPECIFIC CRM PIPELINE ---
+Current pipeline: new > appointment_booked > quoted > enrolled > lost
+Client needs a 10-stage pipeline for group cases:
+
+  Stage 1:  new_lead           - Lead comes in
+  Stage 2:  contacted          - First outreach made
+  Stage 3:  discovery_scheduled - Discovery call booked
+  Stage 4:  census_requested   - Census form sent to employer
+  Stage 5:  census_received    - Census data received back
+  Stage 6:  sent_to_warner     - Case sent to Warner Pacific for quoting
+  Stage 7:  quotes_received    - Quotes back from Warner Pacific
+  Stage 8:  proposal_presented - Options presented to employer
+  Stage 9:  closed_won         - Deal closed, onboarding begins
+  Stage 9b: closed_lost        - Deal lost (with reason tracking)
+  Stage 10: renewal_followup   - Renewal tracking and follow-up
+
+IMPLEMENTATION:
+  - Update Lead model pipeline_status enum
+  - Update frontend pipeline UI (drag-and-drop board or list view)
+  - Add pipeline stage change history/timestamps
+  - Add notes per stage transition
+  - Add renewal date tracking and reminders
+
+
+--- 4.4: EMAIL/SMS FOLLOW-UP TEMPLATES ---
+Pre-built message templates for the group workflow:
+
+  Template 1: FIRST OUTREACH
+    - Introduction, who you are, what you offer
+    - Call to action: book a discovery call
+
+  Template 2: MISSED CALL
+    - "Sorry I missed you" follow-up
+    - Reschedule link
+
+  Template 3: BOOKING CONFIRMATION
+    - Confirm date/time/timezone
+    - What to prepare (employee count, current plan info)
+
+  Template 4: CENSUS REQUEST
+    - Explain what census data is needed
+    - Attach or link to census template
+    - Deadline for submission
+
+  Template 5: FOLLOW-UP AFTER QUOTE
+    - Summary of options presented
+    - Next steps
+    - Call to action: schedule decision meeting
+
+  Template 6: RENEWAL REVIEW OUTREACH
+    - Upcoming renewal notice
+    - Offer to review current plan
+    - Book renewal consultation
+
+IMPLEMENTATION:
+  - New database model: MessageTemplate
+  - Admin UI to view/edit templates
+  - Variables support: {{company_name}}, {{contact_name}}, {{date}}, etc.
+  - Integration with existing email (SMTP) and SMS (Twilio) services
+  - Trigger templates from CRM pipeline stage changes
+
+
+--- 4.5: DOCUMENT ORGANIZATION ---
+Client needs organized folder structure per case:
+
+  /Prospecting       - New leads, initial documents
+  /Active Quotes     - Cases being quoted with Warner Pacific
+  /Sold Groups       - Closed deals, onboarding docs
+  /Renewals          - Renewal tracking documents
+  /Compliance-Docs   - Permissions, timestamps, compliance records
+
+IMPLEMENTATION:
+  - Create folder structure in Supabase storage per employer lead
+  - Auto-create folders when a new employer lead is created
+  - Move documents between folders as pipeline stage changes
+  - Admin UI to browse/manage document folders
+  - Link documents to specific employer leads
+
+
+--- 4.6: SECURE FILE COLLECTION PORTAL ---
+A public-facing page where employers can securely upload documents:
+  - Census spreadsheets
+  - Current plan documents
+  - Employee forms
+  - Business entity documents
+
+IMPLEMENTATION:
+  - New public page: /upload/:token (secured by unique token per employer)
+  - File type validation (PDF, Excel, CSV, images)
+  - File size limits
+  - Upload progress indicator
+  - Confirmation email after upload
+  - Files stored in Supabase storage under employer's folder
+  - Notification to admin when files are uploaded
+
+
+================================================================================
+  SECTION 5: PRIORITY ORDER (WHAT TO BUILD FIRST)
+================================================================================
+
+PRIORITY 1 - IMMEDIATE (Answer client + core workflow)
+------------------------------------------------------
+  [ ] Reply to client with status of Website, Booking, WebRTC, CRM
+  [ ] Redesign CRM pipeline for group cases (10 stages)
+  [ ] Build Employer Intake Form (public page + backend)
+  [ ] Update website content for group insurance focus
+
+PRIORITY 2 - NEXT (Operational workflow)
+----------------------------------------
+  [ ] Build Census Collection template + upload
+  [ ] Create Email/SMS follow-up templates (6 templates)
+  [ ] Build Secure File Collection portal (public upload page)
+  [ ] Add document folder organization
+
+PRIORITY 3 - LATER (Enhancement)
+---------------------------------
+  [ ] Pipeline stage change history and timestamps
+  [ ] Renewal date tracking with automated reminders
+  [ ] CRM reporting/analytics dashboard
+  [ ] Pipeline drag-and-drop board UI
+
+DEPRIORITIZED (Client said not urgent)
+--------------------------------------
+  [ ] RAG system improvements
+  [ ] AI meeting suggestion refinements
+  [ ] SharePoint document polling enhancements
+  [ ] Advanced AI features
+
+
+================================================================================
+  SECTION 6: EXISTING TECH STACK REFERENCE
+================================================================================
+
+FRONTEND:
+  - React 18 + Vite 5 + Tailwind CSS 3
+  - React Router 6 (lazy-loaded routes)
+  - WebRTC (SimplePeer) for audio/video
+  - WebSockets for real-time communication
+  - Deployed on: Vercel
+
+BACKEND:
+  - FastAPI 0.109 + Uvicorn
+  - SQLAlchemy 2.0 (ORM)
+  - Pydantic 2.6 (validation)
+  - Python 3.10+
+  - Deployed on: Railway
+
+AI/INTEGRATIONS:
+  - Gemini 2.5-flash (LLM + embeddings) [DEPRIORITIZED]
+  - Pinecone (vector DB for RAG) [DEPRIORITIZED]
+  - Deepgram Nova-3 (speech-to-text)
+  - SharePoint (document source)
+  - GoHighLevel (CRM integration)
+  - Twilio (SMS/voice)
+  - SMTP (email)
+
+DATABASE:
+  - Supabase (PostgreSQL + file storage)
+  - SQLite (local keyword index fallback)
+
+
+================================================================================
+  SECTION 7: KEY FILE LOCATIONS
+================================================================================
+
+FRONTEND:
+  frontend/src/App.jsx                        - Main router
+  frontend/src/pages/MeetingPage.jsx          - Meeting UI
+  frontend/src/pages/HomePage.jsx             - Public home page
+  frontend/src/pages/SchedulePage.jsx         - Booking page
+  frontend/src/pages/ContactPage.jsx          - Contact/intake form
+  frontend/src/components/AdminLayout.jsx     - Admin navigation
+  frontend/src/services/meetingService.js     - WebRTC client
+
+BACKEND:
+  python-backend/app/main.py                  - FastAPI entry point
+  python-backend/app/models.py                - Database models
+  python-backend/app/api/v1/endpoints/leads.py      - Lead endpoints
+  python-backend/app/api/v1/endpoints/meetings.py   - Meeting endpoints
+  python-backend/app/api/v1/endpoints/bookings.py   - Booking endpoints
+  python-backend/app/api/v1/endpoints/scheduling.py - Scheduling endpoints
+  python-backend/app/api/v1/endpoints/documents.py  - Document endpoints
+  python-backend/app/api/v1/endpoints/client_docs.py - Client doc uploads
+  python-backend/app/api/v1/endpoints/communications.py - Email/SMS
+  python-backend/app/services/meeting/audio_service.py  - STT + AI
+  python-backend/app/services/rag/orchestrator.py       - RAG pipeline
+  python-backend/app/services/integrations/twilio.py    - Twilio SMS
+  python-backend/app/services/integrations/email.py     - SMTP email
+
+CONFIG:
+  python-backend/.env.example                 - Environment variables
+  python-backend/requirements.txt             - Python dependencies
+  frontend/package.json                       - Frontend dependencies
+
+
+================================================================================
+  SECTION 8: DATABASE MODELS (CURRENT)
+================================================================================
+
+  Lead         - id, firstName, lastName, email, phone, productType, state,
+                 triggers, pipelineStatus, utmSource, notes
+  Session      - id, leadId, status, startTime, endTime, disposition, notes,
+                 planName, premium, callSummary, complianceFlags, actionItems
+  Transcript   - id, sessionId, role, content, timestamp
+  Appointment  - id, leadId, date, startTime, endTime, timezone,
+                 durationMinutes, meetingId, bookingRef, manageToken, status
+  AvailabilitySlot - id, dayOfWeek, startTime, endTime, timezone, isActive
+  Document     - id, leadId, filename, filePath, fileType, fileSize
+  Notification - id, type, title, message, isRead, metadata_json
+
+
+================================================================================
+  SECTION 9: NEW MODELS NEEDED
+================================================================================
+
+  EmployerLead     - Company details, contact person, employee counts, state,
+                     industry, renewal date, carrier, contribution strategy,
+                     benefits needed, pipeline status (10 stages)
+
+  CensusEntry      - employerLeadId, employeeName, dob, gender, zip,
+                     dependents (JSON), tobaccoUse, coverageElection
+
+  MessageTemplate  - name, type (email/sms), subject, body, variables,
+                     triggerStage, isActive
+
+  PipelineHistory  - leadId, fromStage, toStage, changedAt, changedBy, notes
+
+  DocumentFolder   - employerLeadId, folderName, folderPath, stage
+
+
+================================================================================
+  END OF DOCUMENT
+================================================================================
+  Use this file as the single source of truth for project status,
+  client requirements, and implementation planning.
+  Update this file as tasks are completed.
+================================================================================
