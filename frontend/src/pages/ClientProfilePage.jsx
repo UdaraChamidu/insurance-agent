@@ -1,29 +1,67 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, User, Mail, Phone, MapPin, Calendar, Clock,
-  FileText, MessageSquare, Shield, CheckCircle, AlertCircle,
-  Loader, Edit2, Save, X, Video, ChevronDown, Download, RefreshCw
+  ArrowLeft, Mail, Phone, MapPin, Calendar,
+  FileText, MessageSquare, AlertCircle,
+  Loader, Edit2, Save, X, Video, Download, RefreshCw,
+  Building2
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 import { getApiBaseUrl } from '../utils/network';
 
 const API_URL = getApiBaseUrl();
 
-const PIPELINE_STAGES = ['new', 'appointment_booked', 'quoted', 'enrolled', 'lost'];
-const PIPELINE_LABELS = {
+// Individual pipeline
+const INDIVIDUAL_STAGES = ['new', 'appointment_booked', 'quoted', 'enrolled', 'lost'];
+const INDIVIDUAL_LABELS = {
   new: 'New Lead',
   appointment_booked: 'Appointment Booked',
   quoted: 'Quoted',
   enrolled: 'Enrolled',
   lost: 'Lost',
 };
+
+// Group pipeline
+const GROUP_STAGES = [
+  'new_lead', 'contacted', 'discovery_scheduled', 'census_requested',
+  'census_received', 'sent_to_warner', 'quotes_received',
+  'proposal_presented', 'closed_won', 'closed_lost', 'renewal_followup',
+];
+const GROUP_LABELS = {
+  new_lead: 'New Lead',
+  contacted: 'Contacted',
+  discovery_scheduled: 'Discovery Scheduled',
+  census_requested: 'Census Requested',
+  census_received: 'Census Received',
+  sent_to_warner: 'Sent to Warner Pacific',
+  quotes_received: 'Quotes Received',
+  proposal_presented: 'Proposal Presented',
+  closed_won: 'Closed Won',
+  closed_lost: 'Closed Lost',
+  renewal_followup: 'Renewal Follow-up',
+};
+
+const ALL_LABELS = { ...INDIVIDUAL_LABELS, ...GROUP_LABELS };
+
 const PIPELINE_COLORS = {
+  // Individual
   new: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
   appointment_booked: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
   quoted: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
   enrolled: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
   lost: 'bg-red-500/10 text-red-400 border-red-500/30',
+  // Group
+  new_lead: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  contacted: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
+  discovery_scheduled: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  census_requested: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+  census_received: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+  sent_to_warner: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+  quotes_received: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+  proposal_presented: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
+  closed_won: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+  closed_lost: 'bg-red-500/10 text-red-400 border-red-500/30',
+  renewal_followup: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
 };
 
 const DISPOSITION_LABELS = {
@@ -265,16 +303,23 @@ export default function ClientProfilePage() {
         <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
         <p className="text-gray-400 text-lg">Lead not found</p>
         <button onClick={() => navigate('/admin/leads')} className="text-blue-400 hover:text-blue-300 mt-2 text-sm">
-          â† Back to Clients
+          ← Back to Clients
         </button>
       </div>
     );
   }
 
-  const name = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unknown';
-  const initials = `${(lead.firstName || '?')[0]}${(lead.lastName || '?')[0]}`.toUpperCase();
-  const currentStage = lead.pipelineStatus || 'new';
+  const isGroup = (lead.leadType || 'individual') === 'group';
+  const name = isGroup && lead.companyName
+    ? lead.companyName
+    : `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unknown';
+  const initials = isGroup
+    ? (lead.companyName || 'G')[0].toUpperCase()
+    : `${(lead.firstName || '?')[0]}${(lead.lastName || '?')[0]}`.toUpperCase();
+  const currentStage = lead.pipelineStatus || (isGroup ? 'new_lead' : 'new');
   const stageColor = PIPELINE_COLORS[currentStage] || PIPELINE_COLORS.new;
+  const pipelineStages = isGroup ? GROUP_STAGES : INDIVIDUAL_STAGES;
+  const lostStages = isGroup ? ['closed_lost'] : ['lost'];
   const artifactTranscriptions = Array.isArray(meetingArtifacts?.transcriptions) ? meetingArtifacts.transcriptions : [];
   const artifactAiResponses = Array.isArray(meetingArtifacts?.aiResponses) ? meetingArtifacts.aiResponses : [];
   const artifactFullChat = Array.isArray(meetingArtifacts?.fullChat) ? meetingArtifacts.fullChat : [];
@@ -347,22 +392,22 @@ export default function ClientProfilePage() {
           {/* Pipeline Status */}
           <div className="flex flex-col items-end gap-2">
             <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border ${stageColor}`}>
-              {PIPELINE_LABELS[currentStage]}
+              {ALL_LABELS[currentStage] || currentStage.replaceAll('_', ' ')}
             </span>
-            {lead.productType && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                {lead.productType.toUpperCase()}
-              </span>
-            )}
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              isGroup ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+            }`}>
+              {isGroup ? 'GROUP' : (lead.productType?.toUpperCase() || 'INDIVIDUAL')}
+            </span>
           </div>
         </div>
 
         {/* Pipeline Progress Bar */}
         <div className="mt-6 flex items-center gap-1">
-          {PIPELINE_STAGES.filter(s => s !== 'lost').map((stage, idx) => {
-            const stageIdx = PIPELINE_STAGES.indexOf(currentStage);
-            const thisIdx = PIPELINE_STAGES.indexOf(stage);
-            const isActive = thisIdx <= stageIdx && currentStage !== 'lost';
+          {pipelineStages.filter(s => !lostStages.includes(s)).map((stage) => {
+            const stageIdx = pipelineStages.indexOf(currentStage);
+            const thisIdx = pipelineStages.indexOf(stage);
+            const isActive = thisIdx <= stageIdx && !lostStages.includes(currentStage);
             return (
               <button
                 key={stage}
@@ -370,7 +415,7 @@ export default function ClientProfilePage() {
                 className={`flex-1 h-2 rounded-full transition-all cursor-pointer hover:opacity-80 ${
                   isActive ? 'bg-blue-500' : 'bg-white/10'
                 }`}
-                title={PIPELINE_LABELS[stage]}
+                title={ALL_LABELS[stage] || stage}
               />
             );
           })}
@@ -399,24 +444,57 @@ export default function ClientProfilePage() {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Details Card */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Lead Details</h3>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+              {isGroup ? 'Employer / Group Details' : 'Lead Details'}
+            </h3>
             <div className="space-y-3">
-              <InfoRow label="Created" value={lead.createdAt ? new Date(lead.createdAt).toLocaleString() : 'â€”'} />
-              <InfoRow label="Product" value={lead.productType?.toUpperCase() || 'N/A'} />
-              <InfoRow label="State" value={lead.state || 'N/A'} />
-              <InfoRow label="UTM Source" value={lead.utmSource || 'â€”'} />
-              <InfoRow label="UTM Campaign" value={lead.utmCampaign || 'â€”'} />
-              {lead.triggers && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Triggers</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(Array.isArray(lead.triggers) ? lead.triggers : []).map((t, i) => (
-                      <span key={i} className="px-2 py-0.5 text-xs bg-white/5 border border-white/10 rounded text-gray-300">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              <InfoRow label="Created" value={lead.createdAt ? new Date(lead.createdAt).toLocaleString() : '-'} />
+              <InfoRow label="Type" value={isGroup ? 'Group / Employer' : 'Individual'} />
+              {isGroup ? (
+                <>
+                  <InfoRow label="Company" value={lead.companyName || '-'} />
+                  <InfoRow label="Contact Person" value={lead.contactPerson || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || '-'} />
+                  <InfoRow label="State" value={lead.state || '-'} />
+                  <InfoRow label="Industry" value={lead.industry || '-'} />
+                  <InfoRow label="Total Employees" value={lead.numEmployees ?? '-'} />
+                  <InfoRow label="Eligible Employees" value={lead.numEligible ?? '-'} />
+                  <InfoRow label="Current Carrier" value={lead.currentCarrier || '-'} />
+                  <InfoRow label="Current Plan" value={lead.currentPlan || '-'} />
+                  <InfoRow label="Renewal Date" value={lead.renewalDate || '-'} />
+                  <InfoRow label="Contribution" value={lead.contributionStrategy || '-'} />
+                  {lead.benefitsNeeded && Array.isArray(lead.benefitsNeeded) && lead.benefitsNeeded.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Benefits Needed</p>
+                      <div className="flex flex-wrap gap-1">
+                        {lead.benefitsNeeded.map((b, i) => (
+                          <span key={i} className="px-2 py-0.5 text-xs bg-teal-500/10 border border-teal-500/20 rounded text-teal-300">
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {lead.groupNotes && <InfoRow label="Notes" value={lead.groupNotes} />}
+                </>
+              ) : (
+                <>
+                  <InfoRow label="Product" value={lead.productType?.toUpperCase() || 'N/A'} />
+                  <InfoRow label="State" value={lead.state || 'N/A'} />
+                  <InfoRow label="UTM Source" value={lead.utmSource || '-'} />
+                  <InfoRow label="UTM Campaign" value={lead.utmCampaign || '-'} />
+                  {lead.triggers && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Triggers</p>
+                      <div className="flex flex-wrap gap-1">
+                        {(Array.isArray(lead.triggers) ? lead.triggers : []).map((t, i) => (
+                          <span key={i} className="px-2 py-0.5 text-xs bg-white/5 border border-white/10 rounded text-gray-300">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -603,7 +681,7 @@ export default function ClientProfilePage() {
                   <div>
                     <p className="text-white font-medium">{bookingsService.formatDate(apt.date)}</p>
                     <p className="text-gray-400 text-sm">
-                      {bookingsService.formatTime(apt.startTime)} â€“ {bookingsService.formatTime(apt.endTime)} ({apt.timezone})
+                      {bookingsService.formatTime(apt.startTime)} — {bookingsService.formatTime(apt.endTime)} ({apt.timezone})
                     </p>
                   </div>
                 </div>
@@ -648,7 +726,7 @@ export default function ClientProfilePage() {
                   <div>
                      <p className="text-white font-medium">{doc.filename}</p>
                      <p className="text-xs text-gray-400">
-                        {new Date(doc.createdAt).toLocaleDateString()} â€¢ {(doc.fileSize / 1024).toFixed(0)} KB
+                        {new Date(doc.createdAt).toLocaleDateString()} • {(doc.fileSize / 1024).toFixed(0)} KB
                      </p>
                   </div>
                 </div>

@@ -9,8 +9,9 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
 from app.core.supabase import supabase
-from app.models import Lead, Session as DbSession, Transcript, Appointment, Document
-from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate
+from app.models import Lead, Session as DbSession, Transcript, Appointment, Document, PipelineHistory
+from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate, EmployerLeadCreate
+from app.schemas.common import INDIVIDUAL_PIPELINE_STAGES, GROUP_PIPELINE_STAGES, ALL_PIPELINE_STAGES
 from app.services.integrations.ghl import ghl_service
 from pydantic import BaseModel
 
@@ -122,10 +123,11 @@ def _extract_signed_url(signed_url_payload: Any) -> Optional[str]:
 
 
 def _serialize_lead(lead: Lead) -> Dict[str, Any]:
-    return {
+    data = {
         "id": lead.id,
         "createdAt": lead.createdAt,
         "updatedAt": lead.updatedAt,
+        "leadType": lead.leadType or "individual",
         "productType": lead.productType,
         "state": lead.state,
         "triggers": lead.triggers,
@@ -139,7 +141,20 @@ def _serialize_lead(lead: Lead) -> Dict[str, Any]:
         "utmTerm": lead.utmTerm,
         "utmContent": lead.utmContent,
         "pipelineStatus": lead.pipelineStatus or "new",
+        # Employer / Group fields
+        "companyName": lead.companyName,
+        "contactPerson": lead.contactPerson,
+        "numEmployees": lead.numEmployees,
+        "numEligible": lead.numEligible,
+        "industry": lead.industry,
+        "renewalDate": lead.renewalDate.isoformat() if lead.renewalDate else None,
+        "currentCarrier": lead.currentCarrier,
+        "currentPlan": lead.currentPlan,
+        "contributionStrategy": lead.contributionStrategy,
+        "benefitsNeeded": lead.benefitsNeeded,
+        "groupNotes": lead.groupNotes,
     }
+    return data
 
 
 # Background Task Functions
@@ -318,6 +333,7 @@ async def get_leads(
             session = lead.session
             leads_list.append({
                 "id": lead.id,
+                "leadType": lead.leadType or "individual",
                 "firstName": lead.firstName,
                 "lastName": lead.lastName,
                 "email": lead.email,
@@ -326,6 +342,7 @@ async def get_leads(
                 "state": lead.state,
                 "pipelineStatus": lead.pipelineStatus or "new",
                 "createdAt": lead.createdAt,
+                "companyName": lead.companyName,
                 # Session lifecycle status (new, completed, etc.) kept for compatibility.
                 "status": session.status if session else "new",
                 "disposition": session.disposition if session else None
@@ -487,19 +504,35 @@ async def update_lead_pipeline_status(
     db: Session = Depends(get_db),
 ):
     """
-    Update lead pipeline status (new, appointment_booked, quoted, enrolled, lost)
+    Update lead pipeline status.
+    Individual stages: new, appointment_booked, quoted, enrolled, lost
+    Group stages: new_lead, contacted, discovery_scheduled, census_requested,
+                  census_received, sent_to_warner, quotes_received,
+                  proposal_presented, closed_won, closed_lost, renewal_followup
     """
     try:
-        allowed = {"new", "appointment_booked", "quoted", "enrolled", "lost"}
         next_status = (update.pipelineStatus or "").strip().lower()
-        if next_status not in allowed:
+        if next_status not in ALL_PIPELINE_STAGES:
             raise HTTPException(status_code=400, detail="Invalid pipeline status")
 
         lead = db.query(Lead).filter(Lead.id == lead_id).first()
         if not lead:
             raise HTTPException(status_code=404, detail="Lead not found")
 
+        previous_status = lead.pipelineStatus
+
         lead.pipelineStatus = next_status
+        db.flush()
+
+        # Record pipeline history
+        history = PipelineHistory(
+            id=str(uuid.uuid4()),
+            leadId=lead_id,
+            fromStage=previous_status,
+            toStage=next_status,
+            notes=getattr(update, "notes", None),
+        )
+        db.add(history)
         db.commit()
         db.refresh(lead)
 
@@ -508,6 +541,7 @@ async def update_lead_pipeline_status(
             "lead": {
                 "id": lead.id,
                 "pipelineStatus": lead.pipelineStatus or "new",
+                "previousStatus": previous_status,
             }
         }
     except HTTPException:
@@ -910,4 +944,138 @@ async def download_meeting_artifacts_csv(
         raise
     except Exception as e:
         print(f"Error downloading meeting artifacts CSV: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =====================================================================
+# EMPLOYER / GROUP LEAD ENDPOINTS
+# =====================================================================
+
+@router.post("/employer-intake", response_model=Dict[str, Any])
+async def create_employer_lead(
+    lead_in: EmployerLeadCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Intake form for group/employer leads.
+    Creates a lead with leadType='group' and pipeline starting at 'new_lead'.
+    """
+    try:
+        lead_id = str(uuid.uuid4())
+
+        renewal_date_parsed = None
+        if lead_in.renewal_date:
+            try:
+                from datetime import date as date_type
+                renewal_date_parsed = date_type.fromisoformat(lead_in.renewal_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid renewalDate format. Use YYYY-MM-DD")
+
+        db_lead = Lead(
+            id=lead_id,
+            leadType="group",
+            pipelineStatus="new_lead",
+            # Contact
+            firstName=lead_in.first_name,
+            lastName=lead_in.last_name,
+            email=lead_in.email,
+            phone=lead_in.phone,
+            # Company
+            companyName=lead_in.company_name,
+            contactPerson=lead_in.contact_person,
+            numEmployees=lead_in.num_employees,
+            numEligible=lead_in.num_eligible,
+            state=lead_in.state,
+            industry=lead_in.industry,
+            renewalDate=renewal_date_parsed,
+            currentCarrier=lead_in.current_carrier,
+            currentPlan=lead_in.current_plan,
+            contributionStrategy=lead_in.contribution_strategy,
+            benefitsNeeded=lead_in.benefits_needed,
+            groupNotes=lead_in.group_notes,
+            # Marketing
+            utmSource=lead_in.utm_source,
+            utmMedium=lead_in.utm_medium,
+            utmCampaign=lead_in.utm_campaign,
+            # Set productType for compatibility
+            productType="group",
+        )
+        db.add(db_lead)
+        db.flush()
+
+        # Record initial pipeline entry
+        history = PipelineHistory(
+            id=str(uuid.uuid4()),
+            leadId=lead_id,
+            fromStage=None,
+            toStage="new_lead",
+        )
+        db.add(history)
+
+        db.commit()
+        db.refresh(db_lead)
+
+        # Notification
+        from app.services.notification_service import notification_service
+        contact_name = lead_in.contact_person or f"{lead_in.first_name or ''} {lead_in.last_name or ''}".strip()
+        background_tasks.add_task(
+            notification_service.create_notification,
+            type="lead",
+            title="New Group Lead",
+            message=f"{lead_in.company_name} - {contact_name} ({lead_in.num_employees or '?'} employees)",
+            metadata={"leadId": lead_id, "leadType": "group"},
+        )
+
+        return {
+            "success": True,
+            "leadId": lead_id,
+            "leadType": "group",
+            "companyName": lead_in.company_name,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error in employer lead intake: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{lead_id}/pipeline-history", response_model=List[Dict[str, Any]])
+async def get_pipeline_history(
+    lead_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get the full pipeline stage change history for a lead.
+    """
+    try:
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        history = (
+            db.query(PipelineHistory)
+            .filter(PipelineHistory.leadId == lead_id)
+            .order_by(PipelineHistory.changedAt.asc())
+            .all()
+        )
+
+        return [
+            {
+                "id": h.id,
+                "leadId": h.leadId,
+                "fromStage": h.fromStage,
+                "toStage": h.toStage,
+                "notes": h.notes,
+                "changedAt": h.changedAt.isoformat() if h.changedAt else None,
+            }
+            for h in history
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching pipeline history: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

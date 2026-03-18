@@ -20,12 +20,12 @@ export default function FaqPage() {
   return (
     <>
       <Seo
-        description="Frequently asked questions about ACA Marketplace insurance, SHOP small business coverage, broker support, tax credits, and enrollment assistance."
+        description="Frequently asked questions about employer group health insurance, renewals, tax credits, broker support, and individual ACA help."
         keywords={[
-          'ACA Marketplace FAQ',
-          'SHOP health insurance questions',
+          'group health insurance FAQ',
+          'employee benefits FAQ',
           'small business health insurance FAQ',
-          'ACA enrollment assistance questions',
+          'ACA help questions',
         ]}
         path="/faq"
         structuredData={[
@@ -34,7 +34,7 @@ export default function FaqPage() {
             path: '/faq',
             title: 'FAQ',
             description:
-              'Frequently asked questions about ACA Marketplace insurance, SHOP small business coverage, broker support, tax credits, and enrollment assistance.',
+              'Frequently asked questions about employer group health insurance, renewals, tax credits, broker support, and individual ACA help.',
           }),
           buildBreadcrumbSchema(breadcrumbs),
           buildFaqSchema(faqItems),
@@ -45,11 +45,11 @@ export default function FaqPage() {
       <Breadcrumbs items={breadcrumbs} />
       <PageHero
         eyebrow="Frequently Asked Questions"
-        title="Answers to the ACA Marketplace and SHOP questions people ask most."
-        description="These questions are written to support searchers who are still sorting out how Marketplace enrollment, broker support, SHOP eligibility, and small business tax credits fit together."
+        title="Answers to the employer, group coverage, and ACA questions people ask most."
+        description="These questions are written to support employers reviewing group coverage, renewals, tax credits, and broker support, while still keeping individual ACA topics available where they matter."
         highlights={[
           `${faqItems.length} common questions`,
-          'Built for searchers still comparing options',
+          'Built for employers and individual searchers',
           'Linked to service and contact pages',
         ]}
       />
@@ -62,14 +62,14 @@ export default function FaqPage() {
         <div className="cta-glow-border rounded-[2rem] border border-slate-200 bg-white px-6 py-10 shadow-[0_30px_80px_rgba(15,23,42,0.06)] sm:px-10">
           <h2 className="section-title">Still need help applying this to your situation?</h2>
           <p className="body-copy mt-4 max-w-3xl text-slate-700">
-            Move into the next step through the <Link className="link-accent" to="/contact">contact page</Link>, or go deeper with the service guides for <Link className="link-accent" to="/individual-health-insurance">individual Marketplace coverage</Link> and <Link className="link-accent" to="/shop-health-insurance">SHOP health insurance</Link>.
+            Move into the next step through the <Link className="link-accent" to="/contact">path selector</Link>, use the <Link className="link-accent" to="/employer-intake">employer intake</Link> for group cases, or go deeper with the service guides for <Link className="link-accent" to="/individual-health-insurance">individual Marketplace coverage</Link> and <Link className="link-accent" to="/shop-health-insurance">employer coverage guidance</Link>.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link className="btn-primary" to="/contact">
-              Ask for Help
+              Choose Coverage Path
             </Link>
-            <Link className="btn-secondary" to="/blog">
-              Read More Articles
+            <Link className="btn-secondary" to="/employer-intake">
+              Start Employer Intake
             </Link>
           </div>
         </div>

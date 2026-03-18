@@ -1,6 +1,6 @@
 ================================================================================
   INSURANCE AI CONSULTANT - PROJECT STATUS & ACTION PLAN
-  Last Updated: 2026-03-17
+  Last Updated: 2026-03-18
 ================================================================================
 
 
@@ -47,10 +47,11 @@ The client considers these as the essential tools to launch:
 +-------------------------+----------------+----------------------------------------+
 | Feature                 | Status         | Notes                                  |
 +-------------------------+----------------+----------------------------------------+
-| Website (Public Pages)  | DONE           | Home, contact, FAQ pages exist.        |
-|                         |                | May need content update for group      |
-|                         |                | insurance focus instead of individual   |
-|                         |                | ACA marketplace.                       |
+| Website (Public Pages)  | DONE           | Core public pages now reflect the      |
+|                         |                | employer/group insurance focus. Home,  |
+|                         |                | About, FAQ, contact routing, layout    |
+|                         |                | CTAs, SEO copy, and employer guidance  |
+|                         |                | pages were refreshed on 2026-03-18.    |
 +-------------------------+----------------+----------------------------------------+
 | Booking System          | DONE           | Scheduling with availability slots,    |
 |                         |                | timezone support, booking refs,        |
@@ -61,13 +62,17 @@ The client considers these as the essential tools to launch:
 |                         |                | testing. Check if it works reliably    |
 |                         |                | in real-world usage.                   |
 +-------------------------+----------------+----------------------------------------+
-| CRM / Lead Management   | PARTIAL        | Basic lead model exists with simple    |
-|                         |                | pipeline (new > quoted > enrolled >    |
-|                         |                | lost). NEEDS MAJOR REDESIGN for group  |
-|                         |                | insurance workflow (10 stages).        |
+| CRM / Lead Management   | PARTIAL        | Group CRM redesign is done: 10-stage   |
+|                         |                | pipeline, employer fields, history,    |
+|                         |                | filters, and client profile updates.   |
+|                         |                | Remaining work is census upload,       |
+|                         |                | templates, renewals, and reporting.    |
 +-------------------------+----------------+----------------------------------------+
-| Employer Intake Form    | NOT BUILT      | Client needs a dedicated form to       |
-|                         |                | capture employer/group details.        |
+| Employer Intake Form    | DONE           | Public /employer-intake page built and |
+|                         |                | connected to POST /api/leads/          |
+|                         |                | employer-intake. Group leads now flow  |
+|                         |                | into the CRM and can continue to       |
+|                         |                | scheduling.                            |
 +-------------------------+----------------+----------------------------------------+
 | Census Collection       | NOT BUILT      | Template/form for collecting employee  |
 |                         |                | census data from employers.            |
@@ -112,11 +117,13 @@ A public-facing form to capture group employer details:
   - Benefits needed (medical, dental, vision, life, disability, etc.)
 
 IMPLEMENTATION:
-  - New frontend page: /employer-intake or /group-intake
-  - New backend model: EmployerLead or GroupLead
-  - New API endpoint: POST /api/leads/employer
-  - Store in Supabase database
-  - Connect to CRM pipeline
+  - [DONE 2026-03-18] New frontend page: /employer-intake
+  - [DONE 2026-03-18] Alias route: /group-intake -> /employer-intake
+  - [DONE 2026-03-18] Existing backend endpoint used: POST /api/leads/employer-intake
+  - [DONE 2026-03-18] Store in Supabase database
+  - [DONE 2026-03-18] Connect to CRM pipeline
+  - [DONE 2026-03-18] Public CTA links added from SHOP page and Contact page
+  - [DONE 2026-03-18] Saves leadId for direct handoff into scheduling
 
 
 --- 4.2: CENSUS COLLECTION TEMPLATE ---
@@ -239,10 +246,29 @@ IMPLEMENTATION:
 
 PRIORITY 1 - IMMEDIATE (Answer client + core workflow)
 ------------------------------------------------------
-  [ ] Reply to client with status of Website, Booking, WebRTC, CRM
-  [ ] Redesign CRM pipeline for group cases (10 stages)
-  [ ] Build Employer Intake Form (public page + backend)
-  [ ] Update website content for group insurance focus
+  [x] Reply to client with status of Website, Booking, WebRTC, CRM
+  [x] Redesign CRM pipeline for group cases (10 stages) -- DONE 2026-03-17
+      - Lead model extended with employer/group fields
+      - PipelineHistory model added for stage tracking
+      - 10-stage group pipeline implemented (backend + frontend)
+      - Employer intake API endpoint: POST /api/leads/employer-intake
+      - Pipeline history API endpoint: GET /api/leads/{id}/pipeline-history
+      - LeadsPage updated with type filter (All/Individual/Group)
+      - ClientProfilePage updated with dynamic pipeline + employer details
+      - leadsService.js updated with new API methods
+  [x] Build Employer Intake Form (public page + backend) -- DONE 2026-03-18
+      - New page: /employer-intake
+      - Alias route: /group-intake
+      - Connected to existing POST /api/leads/employer-intake endpoint
+      - SHOP page + Contact page now point employers to the dedicated form
+      - Submission stores currentLeadId and can continue directly to scheduling
+  [x] Update website content for group insurance focus -- DONE 2026-03-18
+      - /contact is now a chooser page by default
+      - /contact?coverage=aca shows the individual-only request form
+      - /contact?coverage=shop redirects to /employer-intake
+      - Home page now separates employer intake from individual ACA requests
+      - About, FAQ, SHOP/employer guide, shared layout CTAs, and SEO copy were updated
+      - Public site messaging now reflects employer/group insurance first, with a separate ACA path
 
 PRIORITY 2 - NEXT (Operational workflow)
 ----------------------------------------
@@ -253,7 +279,7 @@ PRIORITY 2 - NEXT (Operational workflow)
 
 PRIORITY 3 - LATER (Enhancement)
 ---------------------------------
-  [ ] Pipeline stage change history and timestamps
+  [x] Pipeline stage change history and timestamps -- DONE 2026-03-17
   [ ] Renewal date tracking with automated reminders
   [ ] CRM reporting/analytics dashboard
   [ ] Pipeline drag-and-drop board UI
@@ -304,6 +330,7 @@ DATABASE:
 
 FRONTEND:
   frontend/src/App.jsx                        - Main router
+  frontend/src/pages/EmployerIntakePage.jsx   - Public employer/group intake page
   frontend/src/pages/MeetingPage.jsx          - Meeting UI
   frontend/src/pages/HomePage.jsx             - Public home page
   frontend/src/pages/SchedulePage.jsx         - Booking page

@@ -4,21 +4,20 @@ export const seoConfig = {
   titleSuffix: 'Elite Deal Broker',
   domain: 'www.elitedealbroker.com',
   siteUrl: 'https://www.elitedealbroker.com',
-  defaultTitle: 'ACA Marketplace and SHOP Health Insurance Broker',
+  defaultTitle: 'Group Health Insurance and Employee Benefits Broker',
   defaultDescription:
-    'Elite Deal Broker helps individuals and small businesses compare ACA Marketplace and SHOP health insurance options with broker-guided enrollment support.',
+    'Elite Deal Broker helps employers review group health insurance, renewals, employee benefits strategy, and supports individual ACA Marketplace cases when needed.',
   ogImage: '/og-image.svg',
   locale: 'en_US',
   language: 'en-US',
   contactPath: '/contact',
   focusAreas: [
-    'Affordable Care Act Marketplace',
-    'ACA enrollment assistance',
-    'Obamacare Marketplace',
-    'SHOP Marketplace',
+    'group health insurance',
+    'employee benefits strategy',
     'small business health insurance',
-    'small business health care tax credit',
+    'renewal planning',
+    'ACA Marketplace support',
   ],
   llmsSummary:
-    'Elite Deal Broker is a U.S. health insurance brokerage website focused only on ACA Marketplace insurance and SHOP health insurance for small businesses.',
+    'Elite Deal Broker is a U.S. health insurance brokerage website focused on employer group health insurance, employee benefits review, renewals, and a separate path for individual ACA Marketplace support.',
 };

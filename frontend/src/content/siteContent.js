@@ -6,10 +6,10 @@ export const navigationItems = [
     description: 'Mission, process, and how the brokerage works.',
   },
   {
-    label: 'SHOP Health Insurance',
-    shortLabel: 'SHOP',
+    label: 'Employer Benefits',
+    shortLabel: 'Employer',
     to: '/shop-health-insurance',
-    description: 'Guidance for small employers reviewing SHOP coverage.',
+    description: 'Group health insurance and benefits guidance for employers.',
   },
   {
     label: 'Individual Marketplace',
@@ -21,40 +21,40 @@ export const navigationItems = [
     label: 'Blog',
     shortLabel: 'Blog',
     to: '/blog',
-    description: 'Articles about ACA enrollment, SHOP, and tax credits.',
+    description: 'Articles about group health, renewals, ACA support, and tax credits.',
   },
   {
     label: 'FAQ',
     shortLabel: 'FAQ',
     to: '/faq',
-    description: 'Quick answers to common ACA and SHOP questions.',
+    description: 'Quick answers about employer benefits, renewals, ACA support, and next steps.',
   },
   {
     label: 'Contact',
     shortLabel: 'Contact',
     to: '/contact',
-    description: 'Start the request and scheduling flow.',
+    description: 'Choose the right starting path for individual or employer coverage.',
   },
 ];
 
 export const homepageHighlights = [
   {
-    title: 'Individual Marketplace Insurance',
+    title: 'Employer Benefits Review',
+    description:
+      'Group health insurance guidance for employers reviewing contribution strategy, renewal timing, employee census readiness, and practical quoting workflow.',
+    href: '/employer-intake',
+  },
+  {
+    title: 'Individual Marketplace Support',
     description:
       'Broker-guided ACA Marketplace enrollment for people who need individual or family coverage, premium tax credit guidance, and year-round qualifying event support.',
     href: '/individual-health-insurance',
   },
   {
-    title: 'SHOP Health Insurance',
+    title: 'Employer Coverage Guide',
     description:
-      'Small business health insurance guidance for employers comparing SHOP Marketplace options, contribution strategies, and enrollment timelines.',
+      'Use the employer service page to understand group coverage, contribution planning, tax-credit context, and next-step preparation.',
     href: '/shop-health-insurance',
-  },
-  {
-    title: 'Enrollment Assistance',
-    description:
-      'Help understanding plan metal levels, provider networks, prescription formularies, and what documentation is useful before you enroll.',
-    href: '/contact',
   },
 ];
 
@@ -188,19 +188,19 @@ export const faqItems = [
       'ACA enrollment assistance means practical help understanding plan options, the application workflow, common documentation needs, and the deadlines tied to open enrollment or special enrollment periods.',
   },
   {
-    question: 'How do I get started with ACA or SHOP help?',
+    question: 'How do I get started with individual or employer coverage help?',
     answer:
-      'Start on the contact page, tell us whether you need individual Marketplace coverage or small business SHOP guidance, and share a few details so the next enrollment steps are clear.',
+      'Start on the contact page to choose the right path. Individual and family cases use the shorter ACA request form, while employer and group cases move into the dedicated employer intake.',
   },
 ];
 
 export const aboutFaqItems = faqItems.slice(0, 6);
 
 export const aboutTrustSignals = [
-  'Focused exclusively on ACA Marketplace and SHOP health insurance guidance',
-  'Clear explanations for individuals, families, and small business owners',
-  'Plan comparison support centered on budget, provider access, and enrollment timing',
-  'Internal process designed to keep client questions, next steps, and follow-up organized',
+  'Group-first public journey with a separate employer intake workflow',
+  'Clear explanations for employers reviewing benefits, renewals, and contribution strategy',
+  'Support for both employer group coverage and individual ACA cases without mixing the workflows',
+  'Internal process designed to keep intake, follow-up, documents, and next steps organized',
 ];
 
 export const shopBenefits = [

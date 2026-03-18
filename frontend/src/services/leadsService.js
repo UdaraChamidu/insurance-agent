@@ -82,6 +82,50 @@ class LeadsService {
       throw error;
     }
   }
+
+  /**
+   * Create a new group/employer lead via the employer intake form.
+   */
+  async createEmployerLead(data) {
+    try {
+      return await fetchJsonWithRetry(`${API_URL}/api/leads/employer-intake`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      console.error('Error creating employer lead:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update pipeline status for a lead (individual or group).
+   */
+  async updatePipelineStatus(leadId, pipelineStatus) {
+    try {
+      return await fetchJsonWithRetry(`${API_URL}/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipelineStatus }),
+      });
+    } catch (error) {
+      console.error('Error updating pipeline status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pipeline stage change history for a lead.
+   */
+  async getPipelineHistory(leadId) {
+    try {
+      return await fetchJsonWithRetry(`${API_URL}/api/leads/${leadId}/pipeline-history`);
+    } catch (error) {
+      console.error('Error fetching pipeline history:', error);
+      throw error;
+    }
+  }
 }
 
 export default new LeadsService();

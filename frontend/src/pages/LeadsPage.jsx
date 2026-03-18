@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, Phone, Mail, Clock, ArrowRight,
-  Loader, RefreshCw, Trash2
+import {
+  Search, Phone, Mail, ArrowRight,
+  Loader, RefreshCw, Trash2, Building2, User
 } from 'lucide-react';
 import leadsService from '../services/leadsService';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -10,20 +10,49 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 // In-memory cache to keep list between page navigations
 let leadsCache = null;
 
-const PIPELINE_STAGES = [
+// Individual pipeline stages (original)
+const INDIVIDUAL_PIPELINE_STAGES = [
   { key: 'new', label: 'New', color: 'blue' },
-  { key: 'appointment_booked', label: 'Appt booked', color: 'amber' },
+  { key: 'appointment_booked', label: 'Appt Booked', color: 'amber' },
   { key: 'quoted', label: 'Quoted', color: 'purple' },
   { key: 'enrolled', label: 'Enrolled', color: 'emerald' },
   { key: 'lost', label: 'Lost', color: 'red' },
 ];
 
+// Group/employer pipeline stages (new)
+const GROUP_PIPELINE_STAGES = [
+  { key: 'new_lead', label: 'New Lead', color: 'blue' },
+  { key: 'contacted', label: 'Contacted', color: 'sky' },
+  { key: 'discovery_scheduled', label: 'Discovery', color: 'amber' },
+  { key: 'census_requested', label: 'Census Req.', color: 'orange' },
+  { key: 'census_received', label: 'Census Rcvd', color: 'yellow' },
+  { key: 'sent_to_warner', label: 'Sent to Warner', color: 'indigo' },
+  { key: 'quotes_received', label: 'Quotes Rcvd', color: 'purple' },
+  { key: 'proposal_presented', label: 'Proposal', color: 'violet' },
+  { key: 'closed_won', label: 'Closed Won', color: 'emerald' },
+  { key: 'closed_lost', label: 'Closed Lost', color: 'red' },
+  { key: 'renewal_followup', label: 'Renewal', color: 'teal' },
+];
+
 const STAGE_COLORS = {
-  new:          { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
+  // Individual
+  new:                { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
   appointment_booked: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
-  quoted:       { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
-  enrolled:     { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
-  lost:         { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
+  quoted:             { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+  enrolled:           { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  lost:               { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
+  // Group
+  new_lead:           { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
+  contacted:          { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', dot: 'bg-sky-500' },
+  discovery_scheduled:{ bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+  census_requested:   { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-500' },
+  census_received:    { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', dot: 'bg-yellow-500' },
+  sent_to_warner:     { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
+  quotes_received:    { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+  proposal_presented: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/30', dot: 'bg-violet-500' },
+  closed_won:         { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  closed_lost:        { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
+  renewal_followup:   { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/30', dot: 'bg-teal-500' },
 };
 
 export default function LeadsPage() {
@@ -35,6 +64,7 @@ export default function LeadsPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingLeadId, setDeletingLeadId] = useState(null);
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'individual', 'group'
 
   useEffect(() => {
     if (Array.isArray(leadsCache)) {
@@ -82,7 +112,19 @@ export default function LeadsPage() {
     }
   };
 
+  // Determine which pipeline stages to show based on type filter
+  const visibleStages = typeFilter === 'group'
+    ? GROUP_PIPELINE_STAGES
+    : typeFilter === 'individual'
+      ? INDIVIDUAL_PIPELINE_STAGES
+      : [...INDIVIDUAL_PIPELINE_STAGES, ...GROUP_PIPELINE_STAGES];
+
   const filteredLeads = leads
+    .filter(lead => {
+      if (typeFilter === 'group') return (lead.leadType || 'individual') === 'group';
+      if (typeFilter === 'individual') return (lead.leadType || 'individual') === 'individual';
+      return true;
+    })
     .filter(lead => {
       if (!searchTerm) return true;
       const q = searchTerm.toLowerCase();
@@ -90,12 +132,13 @@ export default function LeadsPage() {
         lead.firstName?.toLowerCase().includes(q) ||
         lead.lastName?.toLowerCase().includes(q) ||
         lead.email?.toLowerCase().includes(q) ||
-        lead.phone?.includes(q)
+        lead.phone?.includes(q) ||
+        lead.companyName?.toLowerCase().includes(q)
       );
     })
     .filter(lead => (stageFilter === 'all' ? true : (lead.pipelineStatus || 'new') === stageFilter));
 
-  const stageCounts = PIPELINE_STAGES.reduce((acc, stage) => {
+  const stageCounts = visibleStages.reduce((acc, stage) => {
     acc[stage.key] = leads.filter(lead => (lead.pipelineStatus || 'new') === stage.key).length;
     return acc;
   }, {});
@@ -140,12 +183,34 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Lead Type Filter */}
+      <div className="flex gap-2 items-center">
+        {[
+          { key: 'all', label: 'All Leads', icon: null },
+          { key: 'individual', label: 'Individual', icon: User },
+          { key: 'group', label: 'Group / Employer', icon: Building2 },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => { setTypeFilter(key); setStageFilter('all'); }}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+              typeFilter === key
+                ? 'bg-blue-600 text-white border-blue-500'
+                : 'border-white/20 text-gray-300 hover:border-white/40 hover:text-white'
+            }`}
+          >
+            {Icon && <Icon className="w-4 h-4" />}
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Stage Filter */}
       <div className="flex flex-wrap gap-2">
-        {['all', ...PIPELINE_STAGES.map(s => s.key)].map(stage => {
+        {['all', ...visibleStages.map(s => s.key)].map(stage => {
           const isActive = stageFilter === stage;
-          const label = stage === 'all' ? 'All' : PIPELINE_STAGES.find(s => s.key === stage)?.label || stage;
-          const count = stage === 'all' ? leads.length : stageCounts[stage] || 0;
+          const label = stage === 'all' ? 'All' : visibleStages.find(s => s.key === stage)?.label || stage;
+          const count = stage === 'all' ? filteredLeads.length : stageCounts[stage] || 0;
           return (
             <button
               key={stage}
@@ -233,12 +298,26 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400 text-xs font-bold">
-                          {(lead.firstName || '?')[0]}{(lead.lastName || '?')[0]}
+                        <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold ${
+                          lead.leadType === 'group' ? 'bg-teal-600/20 text-teal-400' : 'bg-blue-600/20 text-blue-400'
+                        }`}>
+                          {lead.leadType === 'group'
+                            ? <Building2 className="w-4 h-4" />
+                            : <>{(lead.firstName || '?')[0]}{(lead.lastName || '?')[0]}</>
+                          }
                         </div>
                         <div>
-                          <p className="font-medium text-white">{lead.firstName} {lead.lastName}</p>
-                          {lead.state && <p className="text-xs text-gray-500">{lead.state}</p>}
+                          {lead.leadType === 'group' && lead.companyName ? (
+                            <>
+                              <p className="font-medium text-white">{lead.companyName}</p>
+                              <p className="text-xs text-gray-500">{lead.firstName} {lead.lastName}{lead.state ? ` · ${lead.state}` : ''}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-medium text-white">{lead.firstName} {lead.lastName}</p>
+                              {lead.state && <p className="text-xs text-gray-500">{lead.state}</p>}
+                            </>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -268,7 +347,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${stage.bg} ${stage.text} border ${stage.border}`}>
-                        {(lead.pipelineStatus || 'new').replace('_', ' ').toUpperCase()}
+                        {(lead.pipelineStatus || 'new').replaceAll('_', ' ').toUpperCase()}
                       </span>
                     </td>
                     <td className="px-6 py-4">

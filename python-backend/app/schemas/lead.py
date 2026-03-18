@@ -31,6 +31,51 @@ class Lead(LeadBase, TimestampSchema):
 
     model_config = ConfigDict(populate_by_name=True)
 
+
+# --- EMPLOYER / GROUP LEAD SCHEMAS ---
+
+class EmployerLeadCreate(BaseModel):
+    """Intake form for group/employer leads."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    # Contact person
+    first_name: Optional[str] = Field(None, alias="firstName")
+    last_name: Optional[str] = Field(None, alias="lastName")
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
+    # Company details
+    company_name: str = Field(..., alias="companyName")
+    contact_person: Optional[str] = Field(None, alias="contactPerson")
+    num_employees: Optional[int] = Field(None, alias="numEmployees")
+    num_eligible: Optional[int] = Field(None, alias="numEligible")
+    state: Optional[str] = None
+    industry: Optional[str] = None
+    renewal_date: Optional[str] = Field(None, alias="renewalDate")  # YYYY-MM-DD
+    current_carrier: Optional[str] = Field(None, alias="currentCarrier")
+    current_plan: Optional[str] = Field(None, alias="currentPlan")
+    contribution_strategy: Optional[str] = Field(None, alias="contributionStrategy")
+    benefits_needed: Optional[List[str]] = Field(None, alias="benefitsNeeded")
+    group_notes: Optional[str] = Field(None, alias="groupNotes")
+
+    # Marketing
+    utm_source: Optional[str] = Field(None, alias="utmSource")
+    utm_medium: Optional[str] = Field(None, alias="utmMedium")
+    utm_campaign: Optional[str] = Field(None, alias="utmCampaign")
+
+
+# --- PIPELINE HISTORY SCHEMA ---
+
+class PipelineHistoryEntry(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    lead_id: str = Field(..., alias="leadId")
+    from_stage: Optional[str] = Field(None, alias="fromStage")
+    to_stage: str = Field(..., alias="toStage")
+    notes: Optional[str] = None
+    changed_at: Optional[str] = Field(None, alias="changedAt")
+
 # --- SESSION SCHEMAS ---
 
 class SessionBase(BaseModel):

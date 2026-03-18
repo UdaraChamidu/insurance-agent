@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer, Date
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -10,18 +10,21 @@ class Lead(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     createdAt = Column(DateTime, default=datetime.utcnow)
     updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Intake Fields
+
+    # Lead type: "individual" (original ACA flow) or "group" (employer/group flow)
+    leadType = Column(String, default="individual")
+
+    # Intake Fields (individual)
     productType = Column(String, nullable=True)
     state = Column(String, nullable=True)
     triggers = Column(JSON, nullable=True)
-    
+
     # Contact Info
     firstName = Column(String, nullable=True)
     lastName = Column(String, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
-    
+
     # Marketing
     utmSource = Column(String, nullable=True)
     utmMedium = Column(String, nullable=True)
@@ -29,13 +32,31 @@ class Lead(Base):
     utmTerm = Column(String, nullable=True)
     utmContent = Column(String, nullable=True)
 
-    # Pipeline status: new, appointment_booked, quoted, enrolled, lost
+    # Pipeline status
+    # Individual: new, appointment_booked, quoted, enrolled, lost
+    # Group: new_lead, contacted, discovery_scheduled, census_requested,
+    #        census_received, sent_to_warner, quotes_received,
+    #        proposal_presented, closed_won, closed_lost, renewal_followup
     pipelineStatus = Column(String, default="new")
-    
+
+    # --- Employer / Group Fields ---
+    companyName = Column(String, nullable=True)
+    contactPerson = Column(String, nullable=True)
+    numEmployees = Column(Integer, nullable=True)
+    numEligible = Column(Integer, nullable=True)
+    industry = Column(String, nullable=True)
+    renewalDate = Column(Date, nullable=True)
+    currentCarrier = Column(String, nullable=True)
+    currentPlan = Column(String, nullable=True)
+    contributionStrategy = Column(String, nullable=True)
+    benefitsNeeded = Column(JSON, nullable=True)  # e.g. ["medical","dental","vision"]
+    groupNotes = Column(Text, nullable=True)
+
     # Relation to Session
     session = relationship("Session", uselist=False, back_populates="lead")
     appointments = relationship("Appointment", back_populates="lead")
     documents = relationship("Document", back_populates="lead")
+    pipelineHistory = relationship("PipelineHistory", back_populates="lead", order_by="PipelineHistory.changedAt")
 
 class Session(Base):
     __tablename__ = "Session"
@@ -163,5 +184,19 @@ class Document(Base):
     fileSize = Column(Integer, default=0)
     
     description = Column(String, nullable=True) # Notes from user
-    
+
     lead = relationship("Lead", back_populates="documents")
+
+
+class PipelineHistory(Base):
+    __tablename__ = "PipelineHistory"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    changedAt = Column(DateTime, default=datetime.utcnow)
+
+    leadId = Column(String, ForeignKey("Lead.id"), nullable=False)
+    fromStage = Column(String, nullable=True)
+    toStage = Column(String, nullable=False)
+    notes = Column(Text, nullable=True)
+
+    lead = relationship("Lead", back_populates="pipelineHistory")

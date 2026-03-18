@@ -13,9 +13,9 @@ const serviceShortcuts = [
     icon: UserRound,
   },
   {
-    title: 'Small Business SHOP',
-    description: 'SHOP-focused help for employers reviewing team coverage.',
-    to: '/shop-health-insurance',
+    title: 'Employer Intake',
+    description: 'Start the employer and group coverage workflow directly.',
+    to: '/employer-intake',
     icon: Building2,
   },
 ];
@@ -57,7 +57,7 @@ export default function PublicLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
-  const showMobileActionBar = location.pathname !== '/contact' && !isMenuOpen;
+  const showMobileActionBar = !['/contact', '/employer-intake'].includes(location.pathname) && !isMenuOpen;
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -114,7 +114,7 @@ export default function PublicLayout() {
                   Elite Deal Broker
                 </p>
                 <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-blue-600/80">
-                  ACA &amp; SHOP Brokerage
+                  Employer Benefits Brokerage
                 </p>
               </div>
             </Link>
@@ -137,7 +137,7 @@ export default function PublicLayout() {
                 View FAQs
               </Link>
               <Link className="btn-primary" to="/contact">
-                Talk to a Broker
+                Start Here
               </Link>
             </div>
 
@@ -193,7 +193,7 @@ export default function PublicLayout() {
                   View FAQs
                 </Link>
                 <Link className="btn-primary justify-center text-center" to="/contact">
-                  Talk to a Broker
+                  Start Here
                 </Link>
               </div>
 
@@ -221,7 +221,7 @@ export default function PublicLayout() {
               View FAQ
             </Link>
             <Link className="btn-primary flex-1 justify-center px-4 py-3" to="/contact">
-              Talk to a Broker
+              Start Here
             </Link>
           </div>
         </div>
@@ -232,15 +232,18 @@ export default function PublicLayout() {
           <div>
             <p className="eyebrow text-blue-200">Elite Deal Broker</p>
             <h2 className="font-display text-3xl text-white">
-              ACA Marketplace and SHOP health insurance guidance without the noise.
+              Group health insurance and employer benefits guidance without the noise.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-8 text-slate-300">
-              We help individuals, families, and small businesses understand the enrollment
-              process, compare plan structures, and move forward with more clarity.
+              We help employers review group coverage, renewal timing, and next steps with more
+              clarity, while keeping a separate path available for individual ACA support.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-primary" to="/contact">
-                Request Enrollment Help
+                Choose Coverage Path
+              </Link>
+              <Link className="btn-secondary" to="/employer-intake">
+                Employer Intake
               </Link>
               <Link className="inline-flex items-center gap-2 text-sm font-semibold text-blue-200 transition hover:text-white" to="/blog">
                 Read the resource center
@@ -283,7 +286,7 @@ export default function PublicLayout() {
 
         <div className="border-t border-white/10">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 text-sm text-slate-400 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <p>Focused exclusively on ACA Marketplace insurance and SHOP health insurance.</p>
+            <p>Focused on employer group health insurance, renewals, and a separate ACA support path.</p>
             <p>&copy; {new Date().getFullYear()} Elite Deal Broker. All rights reserved.</p>
           </div>
         </div>

@@ -14,7 +14,7 @@ const stateOptions = [
   'AL', 'AZ', 'CA', 'CO', 'FL', 'GA', 'IL', 'NC', 'NJ', 'NY', 'OH', 'PA', 'SC', 'TN', 'TX', 'VA',
 ];
 
-export default function ContactForm({ initialProductType = 'aca', compact = false }) {
+export default function ContactForm({ initialProductType = 'aca', compact = false, lockProductType = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -34,6 +34,10 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
     formData.productType === 'shop'
       ? ['Small business review', 'SHOP-focused routing', 'Scheduling available after submission']
       : ['Individual Marketplace help', 'ACA-focused routing', 'Scheduling available after submission'];
+
+  const submitLabel = lockProductType
+    ? (formData.productType === 'shop' ? 'Request SHOP Guidance' : 'Request ACA Help')
+    : 'Request ACA or SHOP Help';
 
   useEffect(() => {
     if (initialProductType) {
@@ -151,11 +155,14 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
       <div className="rounded-[1.75rem] border border-blue-100 bg-blue-50/70 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75)]">
         <p className="eyebrow">Request Form</p>
         <h3 className="font-display text-2xl font-bold text-slate-950">
-          Start with a few basics so we can route your request correctly.
+          {lockProductType
+            ? 'Start with a few basics so we can prepare your individual coverage request.'
+            : 'Start with a few basics so we can route your request correctly.'}
         </h3>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          Choose the coverage type, share the best contact details, and add any timing or enrollment
-          notes that will help us understand your situation.
+          {lockProductType
+            ? 'Share the best contact details and any timing or enrollment notes that will help us understand your individual Marketplace situation.'
+            : 'Choose the coverage type, share the best contact details, and add any timing or enrollment notes that will help us understand your situation.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {formGuidance.map((item) => (
@@ -174,19 +181,25 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               <label className="label" htmlFor="productType">
                 Coverage Type
               </label>
-              <select
-                className="input"
-                id="productType"
-                onChange={updateField('productType')}
-                required
-                value={formData.productType}
-              >
-                {coverageOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              {lockProductType ? (
+                <div className="input flex items-center bg-slate-50 text-slate-700">
+                  {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual ACA Marketplace'}
+                </div>
+              ) : (
+                <select
+                  className="input"
+                  id="productType"
+                  onChange={updateField('productType')}
+                  required
+                  value={formData.productType}
+                >
+                  {coverageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="label" htmlFor="state">
@@ -271,7 +284,9 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
             className="input min-h-[140px] resize-y"
             id="notes"
             onChange={updateField('notes')}
-            placeholder="Tell us whether you need ACA Marketplace enrollment help, SHOP plan guidance, or both."
+            placeholder={lockProductType
+              ? 'Tell us about your ACA Marketplace question, enrollment timing, current coverage, or what kind of help you need.'
+              : 'Tell us whether you need ACA Marketplace enrollment help, SHOP plan guidance, or both.'}
             value={formData.notes}
           />
         </div>
@@ -292,7 +307,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
             ) : (
               <span className="inline-flex items-center gap-2">
                 <Send className="h-4 w-4" />
-                Request ACA or SHOP Help
+                {submitLabel}
               </span>
             )}
           </button>

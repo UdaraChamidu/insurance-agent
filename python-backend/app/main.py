@@ -44,7 +44,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def startup_event():
     # Create any new database tables
     from app.core.database import engine, Base
-    from app.models import Lead, Session, Transcript, Notification, Appointment, AvailabilitySlot
+    from app.models import Lead, Session, Transcript, Notification, Appointment, AvailabilitySlot, PipelineHistory
     Base.metadata.create_all(bind=engine)
 
     # Add missing columns to existing tables (create_all won't alter existing tables)
@@ -61,6 +61,19 @@ async def startup_event():
             ("Session", "citationsBundleLink", "VARCHAR"),
             ("Session", "complianceFlags", "JSONB"), # Postgres JSONB is better, but sqlalchemy JSON maps to JSON usually. Using JSON for broader compat if needed but usually text/json is fine. Let's stick to generic types for safety in raw SQL if we don't know dialect perfectly, but JSON usually works in PG.
             ("Session", "actionItems", "JSONB"),
+            # Group/Employer lead fields
+            ("Lead", "leadType", "VARCHAR DEFAULT 'individual'"),
+            ("Lead", "companyName", "VARCHAR"),
+            ("Lead", "contactPerson", "VARCHAR"),
+            ("Lead", "numEmployees", "INTEGER"),
+            ("Lead", "numEligible", "INTEGER"),
+            ("Lead", "industry", "VARCHAR"),
+            ("Lead", "renewalDate", "DATE"),
+            ("Lead", "currentCarrier", "VARCHAR"),
+            ("Lead", "currentPlan", "VARCHAR"),
+            ("Lead", "contributionStrategy", "VARCHAR"),
+            ("Lead", "benefitsNeeded", "JSONB"),
+            ("Lead", "groupNotes", "TEXT"),
         ]
         for table, column, col_type in migrations:
             try:

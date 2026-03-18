@@ -1,6 +1,6 @@
 # Elite Deal Broker
 
-> Elite Deal Broker is a U.S. health insurance brokerage website focused only on ACA Marketplace insurance and SHOP health insurance for small businesses.
+> Elite Deal Broker is a U.S. health insurance brokerage website focused on employer group health insurance, employee benefits review, renewals, and a separate path for individual ACA Marketplace support.
 
 ## Primary focus
 - ACA Marketplace insurance for individuals and families

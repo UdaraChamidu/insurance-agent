@@ -7,28 +7,28 @@ import { buildBreadcrumbSchema, buildOrganizationSchema, buildServiceSchema } fr
 
 const sections = [
   {
-    title: 'What is SHOP?',
-    text: 'SHOP stands for Small Business Health Options Program. It is the ACA pathway built for eligible small employers that want to offer group health insurance and compare plans within a more structured small-group framework.',
+    title: 'Employer coverage review',
+    text: 'Many employer cases start before plan comparison. The first job is to understand company size, current setup, renewal timing, contribution goals, and what the business is actually trying to fix or improve.',
   },
   {
-    title: 'Who qualifies',
-    text: 'Eligibility depends on business structure, workforce size, and market rules. The first step is to confirm whether your company fits the SHOP path before comparing plans in detail.',
+    title: 'Where SHOP fits',
+    text: 'SHOP can still be part of the conversation for eligible small employers, but it is not the only lens. The broader goal is to find the most practical group strategy for the business, not force every employer into one path.',
   },
   {
-    title: 'Benefits for small businesses',
-    text: 'SHOP can help employers organize benefit comparisons, create a clearer contribution strategy, and support a more formal employee health insurance offering.',
+    title: 'Benefits strategy',
+    text: 'A strong employer benefits review looks at employee counts, participation expectations, contribution structure, provider access, plan usability, and the timing around renewals or new offerings.',
   },
   {
     title: 'Tax credit opportunities',
-    text: 'Some employers may qualify for the small business health care tax credit. That possibility should be part of the strategy conversation early because it can materially change how the business evaluates cost.',
+    text: 'Small business tax credits may still matter for some employers, and that should be part of the planning conversation early. It can change how the business evaluates cost and whether SHOP deserves a closer review.',
   },
   {
     title: 'Why use a broker',
-    text: 'A broker helps translate quotes into decisions. That includes comparing plan value, contribution structure, participation expectations, provider access, and timing.',
+    text: 'A broker helps turn scattered information into a structured decision. That includes comparing plan value, contribution structure, participation expectations, provider access, and the next operational steps.',
   },
   {
-    title: 'Enrollment assistance',
-    text: 'We help small businesses gather information, compare practical options, and keep enrollment moving with less confusion and fewer avoidable mistakes.',
+    title: 'Next-step workflow',
+    text: 'We help employers gather the right intake details, move into quoting or discovery cleanly, and keep the case moving with less confusion and fewer avoidable mistakes.',
   },
 ];
 
@@ -39,23 +39,23 @@ export default function ShopHealthInsurancePage() {
   ];
 
   const serviceSchema = buildServiceSchema({
-    name: 'SHOP Health Insurance Broker Guidance',
+    name: 'Employer Health Insurance and Benefits Guidance',
     path: '/shop-health-insurance',
     description:
-      'Detailed guidance on SHOP Marketplace coverage, small business ACA insurance, tax credits, and broker-led enrollment assistance.',
-    serviceType: 'SHOP Marketplace and small business health insurance guidance',
-    audience: 'Small business owners and employers',
+      'Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and broker-led next steps.',
+    serviceType: 'Employer group health insurance and benefits guidance',
+    audience: 'Employers, owners, and operations leaders reviewing employee benefits',
   });
 
   return (
     <>
       <Seo
-        description="Detailed guidance on SHOP Marketplace coverage, small business ACA insurance, tax credits, and broker-led enrollment assistance."
+        description="Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and broker-led next steps."
         keywords={[
+          'group health insurance for employers',
+          'employee benefits review',
           'small business health insurance',
-          'SHOP Marketplace',
-          'small business ACA insurance',
-          'health insurance for small businesses',
+          'benefits renewal planning',
         ]}
         path="/shop-health-insurance"
         structuredData={[
@@ -63,23 +63,23 @@ export default function ShopHealthInsurancePage() {
           buildBreadcrumbSchema(breadcrumbs),
           serviceSchema,
         ]}
-        title="SHOP Health Insurance"
+        title="Employer Health Insurance Guidance"
       />
 
       <Breadcrumbs items={breadcrumbs} />
       <PageHero
-        eyebrow="SHOP Health Insurance"
-        title="Small business health insurance guidance built around the SHOP Marketplace."
-        description="If you are evaluating health insurance for a small business, SHOP deserves a structured review. We help employers compare ACA-compliant options, think through contribution strategy, and move toward enrollment with a clearer plan."
+        eyebrow="Employer Health Insurance"
+        title="Employer health insurance guidance built for group coverage, renewals, and next-step clarity."
+        description="If you are evaluating health insurance for a business, the first step is not just quoting. We help employers organize the intake details, think through contribution strategy, review whether SHOP is relevant, and move toward the right group coverage path."
         highlights={[
-          'Small employer decision support',
-          'SHOP eligibility and fit',
-          'Contribution and tax credit context',
+          'Employer and group coverage review',
+          'Renewal and contribution context',
+          'SHOP considered where relevant',
         ]}
         actions={
           <>
-            <Link className="btn-primary" to="/contact?coverage=shop">
-              Request SHOP Guidance
+            <Link className="btn-primary" to="/employer-intake">
+              Start Employer Intake
             </Link>
             <Link className="btn-secondary" to="/blog/tax-credits-for-small-business-health-insurance">
               Read about tax credits
@@ -91,7 +91,7 @@ export default function ShopHealthInsurancePage() {
       <section className="section-pad grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <p className="eyebrow">Key Benefits</p>
-          <h2 className="section-title mt-2">Why employers evaluate SHOP coverage</h2>
+          <h2 className="section-title mt-2">Why employers need a structured benefits review</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {shopBenefits.map((item, index) => (
@@ -117,7 +117,7 @@ export default function ShopHealthInsurancePage() {
       <section className="section-pad">
         <div className="rounded-[2rem] border border-slate-200 bg-white px-6 py-10 shadow-[0_30px_80px_rgba(15,23,42,0.06)] sm:px-10">
           <p className="eyebrow">Internal Resources</p>
-          <h2 className="section-title mt-2">Keep researching before you enroll.</h2>
+          <h2 className="section-title mt-2">Keep researching before you move into quotes or renewal decisions.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/what-is-shop-health-insurance-for-small-businesses">
               What is SHOP health insurance?
@@ -125,8 +125,8 @@ export default function ShopHealthInsurancePage() {
             <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/how-small-businesses-can-save-on-health-insurance">
               How small businesses can save on coverage
             </Link>
-            <Link className="gradient-border rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100 hover:scale-[1.02]" to="/contact?coverage=shop">
-              Start a small business review
+            <Link className="gradient-border rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100 hover:scale-[1.02]" to="/employer-intake">
+              Start the employer intake
             </Link>
           </div>
         </div>
