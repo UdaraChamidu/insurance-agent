@@ -1,7 +1,6 @@
 import { Building2, ShieldCheck, Users } from 'lucide-react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
-import ContactForm from '../components/ContactForm';
 import PageHero from '../components/PageHero';
 import Seo from '../components/Seo';
 import { termDefinitions } from '../content/siteContent';
@@ -23,6 +22,13 @@ function buildPath(basePath, searchParams, coverageValue = null) {
   const query = nextParams.toString();
   return query ? `${basePath}?${query}` : basePath;
 }
+
+const individualPreviewFields = [
+  'State and preferred contact details',
+  'Enrollment timing or recent coverage change',
+  'Marketplace, subsidy, provider, or prescription questions',
+  'Personal or family coverage only',
+];
 
 const employerPreviewFields = [
   'Company name and state',
@@ -77,7 +83,7 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Start Here"
         title="See the forms clearly and choose the right path without guessing."
-        description="ACA means Affordable Care Act Marketplace coverage for individuals and families. SHOP means Small Business Health Options Program for eligible small employers. Use the individual request form for personal coverage, and use the employer intake for group benefits, renewal reviews, and quoting."
+        description="ACA means Affordable Care Act Marketplace coverage for individuals and families. SHOP means Small Business Health Options Program for eligible small employers. Start with the individual intake for personal coverage, or use the employer intake for group benefits, renewal reviews, and quoting."
         highlights={[
           'Separate paths for individuals and employers',
           'Cleaner CRM routing',
@@ -86,7 +92,7 @@ export default function ContactPage() {
         actions={(
           <>
             <Link className="btn-primary" to={individualPath}>
-              Enroll Now
+              Open Individual Intake
             </Link>
             <Link className="btn-secondary" to={employerPath}>
               Start Employer Intake
@@ -113,12 +119,41 @@ export default function ContactPage() {
         )}
       />
 
-      <section className="section-pad grid gap-8 lg:grid-cols-[1.02fr_0.98fr]">
-        <div id="individual-form" className="lg:sticky lg:top-28 pulse-glow">
-          <ContactForm compact={false} initialProductType="aca" lockProductType />
-        </div>
+      <section className="section-pad">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <article className="surface-card gradient-border">
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                style={{ background: 'var(--brand)' }}
+              >
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="eyebrow">Individual / Family Coverage</p>
+                <h2 className="section-title mt-2">Open the individual intake for personal ACA help.</h2>
+              </div>
+            </div>
+            <p className="body-copy mt-4 text-slate-700">
+              Choose this path if the coverage is for you or your family. It is the right fit for Affordable Care Act Marketplace questions, subsidy research, provider checks, prescription concerns, and enrollment timing.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {individualPreviewFields.map((item) => (
+                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="btn-primary" to={individualPath}>
+                Open Individual Intake
+              </Link>
+              <Link className="btn-secondary" to="/individual-health-insurance">
+                Review Individual Coverage Guide
+              </Link>
+            </div>
+          </article>
 
-        <div className="space-y-6">
           <article className="surface-card gradient-border">
             <div className="flex items-start gap-4">
               <div
@@ -129,11 +164,11 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="eyebrow">Employer / Small Business Coverage</p>
-                <h2 className="section-title mt-2">See the employer intake before you start.</h2>
+                <h2 className="section-title mt-2">Open the employer intake for group coverage cases.</h2>
               </div>
             </div>
             <p className="body-copy mt-4 text-slate-700">
-              If the request involves a company, employee benefits, renewal timing, or group coverage quotes, the employer intake is the right form.
+              Choose this path if the request involves a company, employee benefits, renewal timing, or group coverage quotes. It keeps employer cases in the correct workflow from the beginning.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {employerPreviewFields.map((item) => (
@@ -146,25 +181,9 @@ export default function ContactPage() {
               <Link className="btn-primary" to={employerPath}>
                 Start Employer Intake
               </Link>
-              <Link className="btn-secondary" to="/schedule">
-                Schedule a Meeting
+              <Link className="btn-secondary" to="/shop-health-insurance">
+                Review Employer Coverage Guide
               </Link>
-            </div>
-          </article>
-
-          <article className="surface-card">
-            <p className="eyebrow">Why This Changed</p>
-            <h2 className="section-title mt-2">The forms are separate so users do not get routed into the wrong workflow.</h2>
-            <div className="mt-6 space-y-3">
-              {[
-                'Employer cases need more detail than a short general request form can capture.',
-                'The dedicated employer intake feeds the group pipeline directly.',
-                'The individual request form stays available for Affordable Care Act Marketplace support.',
-              ].map((item) => (
-                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
-                  {item}
-                </div>
-              ))}
             </div>
           </article>
         </div>
@@ -175,14 +194,22 @@ export default function ContactPage() {
           <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div>
               <p className="eyebrow">Quick Rule</p>
-              <h2 className="section-title mt-2">If it involves a company, use the employer intake.</h2>
+              <h2 className="section-title mt-2">Choose based on who needs the coverage.</h2>
               <p className="body-copy mt-4 text-slate-700">
-                Employer cases usually need company details, employee counts, current carrier
-                context, and renewal timing. That is why the employer path no longer uses the same
-                short request form as individual ACA support.
+                If the coverage is for a person or family, open the individual intake. If the
+                coverage is for a company, team, or employee benefits review, open the employer
+                intake. Keeping those two starts separate makes follow-up much cleaner.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="soft-panel">
+                <ShieldCheck className="h-5 w-5 text-[var(--brand-dark)]" />
+                <p className="mt-3 font-semibold text-slate-950">Use individual intake for:</p>
+                <p className="mt-2 text-sm leading-7 text-slate-700">
+                  ACA Marketplace questions, family coverage, subsidy-related research, or personal
+                  enrollment timing after losing coverage.
+                </p>
+              </div>
               <div className="soft-panel">
                 <Users className="h-5 w-5 text-[var(--brand-dark)]" />
                 <p className="mt-3 font-semibold text-slate-950">Use employer intake for:</p>
@@ -191,22 +218,14 @@ export default function ContactPage() {
                   and business coverage questions.
                 </p>
               </div>
-              <div className="soft-panel">
-                <ShieldCheck className="h-5 w-5 text-[var(--brand-dark)]" />
-                <p className="mt-3 font-semibold text-slate-950">Use individual request form for:</p>
-                <p className="mt-2 text-sm leading-7 text-slate-700">
-                  ACA Marketplace questions, family coverage, subsidy-related research, or personal
-                  enrollment timing after losing coverage.
-                </p>
-              </div>
             </div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link className="btn-primary" to={individualPath}>
-              Enroll Now
+              Open Individual Intake
             </Link>
             <Link className="btn-secondary" to={employerPath}>
-              Start Employer Intake
+              Open Employer Intake
             </Link>
             <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
