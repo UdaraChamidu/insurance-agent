@@ -180,11 +180,11 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
         <div>
           <p className="label mb-3">Coverage details</p>
           <div className="grid gap-5 md:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <label className="label" htmlFor="productType">
+            
+              {/* <label className="label" htmlFor="productType">
                 Coverage Type
-              </label>
-              {lockProductType ? (
+              </label> */}
+              {/* {lockProductType ? (
                 <div className="input flex items-center bg-slate-50 text-slate-700">
                   {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual / Family Coverage'}
                 </div>
@@ -208,8 +208,8 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
                     coverage if you are reviewing benefits for a company.
                   </p>
                 </>
-              )}
-            </div>
+              )} */}
+            
             <div>
               <label className="label" htmlFor="state">
                 State

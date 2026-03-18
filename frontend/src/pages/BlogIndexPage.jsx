@@ -167,8 +167,8 @@ export default function BlogIndexPage() {
         </div>
       </section>
 
-      <section className="section-pad">
-        <article className="cta-glow-border rounded-[2rem] border border-blue-200 bg-[linear-gradient(135deg,#1e3a8a,#2563eb,#38bdf8)] px-6 py-10 text-white shadow-[0_30px_80px_rgba(37,99,235,0.26)] sm:px-10">
+      <section className="section-pad ">
+        <article className="cta-glow-border rounded-[2rem] border border-blue-200 bg-red-900 px-6 py-10 text-white shadow-[0_30px_80px_rgba(37,99,235,0.26)] sm:px-10">
           <p className="eyebrow text-blue-100">Featured Article</p>
           <h2 className="font-display text-4xl text-white">{featuredPost.title}</h2>
           <p className="mt-4 max-w-3xl text-base leading-8 text-blue-50">{featuredPost.excerpt}</p>

@@ -225,7 +225,7 @@ export default function EmployerIntakePage() {
         <div>
           <p className="label mb-3">Company details</p>
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="md:col-span-2">
+            {/* <div className="md:col-span-2">
               <label className="label" htmlFor="companyName">
                 Company Name
               </label>
@@ -237,7 +237,7 @@ export default function EmployerIntakePage() {
                 type="text"
                 value={formData.companyName}
               />
-            </div>
+            </div> */}
             <div>
               <label className="label" htmlFor="state">
                 State
