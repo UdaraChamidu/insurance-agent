@@ -96,7 +96,7 @@ export default function HomePage() {
         <div className="page-reveal surface-card">
           <p className="eyebrow">Elite Deal Broker</p>
           <h1 className="display-title max-w-4xl">
-            A broker-led starting point for employer health insurance, benefits review, and renewal planning.
+            A clear starting point for employer health insurance, benefits review, and renewal planning.
           </h1>
           <p className="body-copy mt-6 max-w-3xl text-lg text-slate-700">
             Elite Deal Broker is now positioned around employer and group health insurance work first.

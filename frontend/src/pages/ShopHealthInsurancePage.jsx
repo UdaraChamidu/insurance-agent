@@ -42,7 +42,7 @@ export default function ShopHealthInsurancePage() {
     name: 'Employer Health Insurance and Benefits Guidance',
     path: '/shop-health-insurance',
     description:
-      'Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and broker-led next steps.',
+      'Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and clear next steps.',
     serviceType: 'Employer group health insurance and benefits guidance',
     audience: 'Employers, owners, and operations leaders reviewing employee benefits',
   });
@@ -50,7 +50,7 @@ export default function ShopHealthInsurancePage() {
   return (
     <>
       <Seo
-        description="Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and broker-led next steps."
+        description="Detailed guidance on employer group health insurance, benefits review, renewal planning, tax-credit context, and clear next steps."
         keywords={[
           'group health insurance for employers',
           'employee benefits review',

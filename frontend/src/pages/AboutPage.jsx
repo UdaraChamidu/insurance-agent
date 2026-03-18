@@ -89,7 +89,7 @@ export default function AboutPage() {
 
         <article className="rounded-[2rem] border border-blue-100 bg-blue-50/75 p-6 shadow-[0_24px_60px_rgba(37,99,235,0.08)] sm:p-8">
           <p className="eyebrow">Insurance Expertise</p>
-          <h2 className="section-title mt-2">Broker-led support for real enrollment decisions.</h2>
+          <h2 className="section-title mt-2">Practical support for real enrollment decisions.</h2>
           <p className="body-copy mt-4">
             We help clients sort through deductibles, networks, plan design tradeoffs, employer
             contribution questions, and enrollment timing. For employer cases, that often means
