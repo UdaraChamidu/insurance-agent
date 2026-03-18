@@ -72,6 +72,24 @@ export default function IndividualIntakePage() {
             </Link>
           </>
         )}
+        children={(
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="soft-panel">
+              <p className="font-semibold text-slate-950">Have these basics ready</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                Your state, the best contact details to reach you, and any enrollment timing details
+                that affect when you need coverage.
+              </p>
+            </div>
+            <div className="soft-panel">
+              <p className="font-semibold text-slate-950">Best use for this form</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                Personal or family coverage questions, ACA Marketplace help, subsidy research,
+                provider checks, prescription concerns, or lost coverage timing.
+              </p>
+            </div>
+          </div>
+        )}
         aside={(
           <div id="individual-form" className="pulse-glow lg:sticky lg:top-28">
             <ContactForm compact={false} initialProductType="aca" lockProductType />

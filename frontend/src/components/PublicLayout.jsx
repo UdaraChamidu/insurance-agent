@@ -130,13 +130,13 @@ export default function PublicLayout() {
             </nav>
 
             <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
-              <Link
+              {/* <Link
                 className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
                 to="/schedule"
               >
                 <CalendarDays className="h-4 w-4" />
                 Schedule a Meeting
-              </Link>
+              </Link> */}
               <Link
                 className="inline-flex items-center gap-2 whitespace-nowrap px-2 py-2 text-sm font-semibold text-slate-600 transition hover:text-[var(--brand-dark)]"
                 to="/admin/login"

@@ -94,8 +94,8 @@ export default function ContactPage() {
             <Link className="btn-primary" to={individualPath}>
               Open Individual Intake
             </Link>
-            <Link className="btn-secondary" to={employerPath}>
-              Start Employer Intake
+            <Link className="btn-primary" to={employerPath}>
+              Open Employer Intake
             </Link>
             <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
@@ -179,7 +179,7 @@ export default function ContactPage() {
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-primary" to={employerPath}>
-                Start Employer Intake
+                Open Employer Intake
               </Link>
               <Link className="btn-secondary" to="/shop-health-insurance">
                 Review Employer Coverage Guide

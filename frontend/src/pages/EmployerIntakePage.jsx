@@ -539,6 +539,24 @@ export default function EmployerIntakePage() {
             </Link>
           </>
         )}
+        children={(
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="soft-panel">
+              <p className="font-semibold text-slate-950">Have these basics ready</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                Company details, your best contact information, approximate employee counts, current
+                coverage context, and renewal timing.
+              </p>
+            </div>
+            <div className="soft-panel">
+              <p className="font-semibold text-slate-950">What happens next</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                The group case is created in the CRM, stays in the employer workflow, and can move
+                forward into census collection or scheduling without re-entry.
+              </p>
+            </div>
+          </div>
+        )}
         aside={employerForm}
       />
 
