@@ -3,7 +3,6 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs';
 import PageHero from '../components/PageHero';
 import Seo from '../components/Seo';
-import { termDefinitions } from '../content/siteContent';
 import {
   buildBreadcrumbSchema,
   buildContactPageSchema,
@@ -83,7 +82,7 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Start Here"
         title="See the forms clearly and choose the right path without guessing."
-        description="ACA means Affordable Care Act Marketplace coverage for individuals and families. SHOP means Small Business Health Options Program for eligible small employers. Start with the individual intake for personal coverage, or use the employer intake for group benefits, renewal reviews, and quoting."
+        description="Start with the individual intake for personal or family coverage, or use the employer intake for company benefits, renewal reviews, and group coverage questions."
         highlights={[
           'Separate paths for individuals and employers',
           'Cleaner CRM routing',
@@ -104,14 +103,15 @@ export default function ContactPage() {
         )}
         aside={(
           <div>
-            <p className="eyebrow">What The Terms Mean</p>
+            <p className="eyebrow">How To Choose Quickly</p>
             <div className="mt-4 space-y-3">
-              {termDefinitions.map((item) => (
-                <div key={item.term} className="soft-panel text-sm leading-7 text-slate-700">
-                  <p className="font-display text-base font-bold text-slate-950">
-                    {item.term} = {item.label}
-                  </p>
-                  <p className="mt-2">{item.description}</p>
+              {[
+                'Choose individual intake if the coverage is for you, your spouse, or your family.',
+                'Choose employer intake if the request is for a company, team, or employee benefits review.',
+                'If you are still unsure, schedule a meeting and the case can be routed for you.',
+              ].map((item) => (
+                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                  {item}
                 </div>
               ))}
             </div>
@@ -131,11 +131,11 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="eyebrow">Individual / Family Coverage</p>
-                <h2 className="section-title mt-2">Open the individual intake for personal ACA help.</h2>
+                <h2 className="section-title mt-2">Open the individual intake for personal or family coverage.</h2>
               </div>
             </div>
             <p className="body-copy mt-4 text-slate-700">
-              Choose this path if the coverage is for you or your family. It is the right fit for Affordable Care Act Marketplace questions, subsidy research, provider checks, prescription concerns, and enrollment timing.
+              Choose this path if the coverage is for you or your family. It is the right fit for plan comparison, monthly cost questions, provider checks, prescription concerns, and enrollment timing.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {individualPreviewFields.map((item) => (
@@ -206,8 +206,8 @@ export default function ContactPage() {
                 <ShieldCheck className="h-5 w-5 text-[var(--brand-dark)]" />
                 <p className="mt-3 font-semibold text-slate-950">Use individual intake for:</p>
                 <p className="mt-2 text-sm leading-7 text-slate-700">
-                  ACA Marketplace questions, family coverage, subsidy-related research, or personal
-                  enrollment timing after losing coverage.
+                  personal or family coverage questions, comparing plan options, provider checks,
+                  prescription questions, or replacing lost coverage.
                 </p>
               </div>
               <div className="soft-panel">

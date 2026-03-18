@@ -6,8 +6,8 @@ import { getApiBaseUrl } from '../utils/network';
 const API_URL = getApiBaseUrl();
 
 const coverageOptions = [
-  { value: 'aca', label: 'Individual / Family Coverage (Affordable Care Act Marketplace)' },
-  { value: 'shop', label: 'Employer / Small Business Coverage (SHOP)' },
+  { value: 'aca', label: 'Individual / Family Coverage' },
+  { value: 'shop', label: 'Employer / Small Business Coverage' },
 ];
 
 const stateOptions = [
@@ -32,11 +32,11 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
 
   const formGuidance =
     formData.productType === 'shop'
-      ? ['Small business review', 'SHOP guidance in plain language', 'Scheduling available after submission']
-      : ['Individual Marketplace help', 'Affordable Care Act coverage guidance', 'Scheduling available after submission'];
+      ? ['Small business review', 'Employer coverage questions', 'Scheduling available after submission']
+      : ['Personal coverage help', 'Plan comparison support', 'Scheduling available after submission'];
 
   const submitLabel = lockProductType
-    ? (formData.productType === 'shop' ? 'Request SHOP Guidance' : 'Request ACA Help')
+    ? (formData.productType === 'shop' ? 'Request Employer Coverage Help' : 'Request Personal Coverage Help')
     : 'Start Here';
 
   useEffect(() => {
@@ -164,7 +164,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
         </h3>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           {lockProductType
-            ? 'Share the best contact details and any timing or enrollment notes that will help us understand your individual Marketplace situation.'
+            ? 'Share the best contact details and any timing or enrollment notes that will help us understand your personal coverage situation.'
             : 'Choose the coverage type, share the best contact details, and add any timing or enrollment notes that will help us understand your situation.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -186,7 +186,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               </label>
               {lockProductType ? (
                 <div className="input flex items-center bg-slate-50 text-slate-700">
-                  {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual / Family Coverage (Affordable Care Act Marketplace)'}
+                  {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual / Family Coverage'}
                 </div>
               ) : (
                 <>
@@ -204,8 +204,8 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
                     ))}
                   </select>
                   <p className="mt-2 text-xs leading-6 text-slate-500">
-                    ACA means individual or family Marketplace coverage. SHOP means Small Business
-                    Health Options Program for eligible employers.
+                    Choose personal or family coverage for your own insurance needs, or employer
+                    coverage if you are reviewing benefits for a company.
                   </p>
                 </>
               )}
@@ -294,8 +294,8 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               id="notes"
               onChange={updateField('notes')}
               placeholder={lockProductType
-                ? 'Tell us about your Affordable Care Act Marketplace question, enrollment timing, current coverage, or the help you need.'
-                : 'Tell us whether you need Affordable Care Act Marketplace help, SHOP plan guidance, or both.'}
+                ? 'Tell us about your coverage question, enrollment timing, current coverage, or the help you need.'
+                : 'Tell us whether you need personal coverage help, employer coverage help, or both.'}
               value={formData.notes}
             />
         </div>

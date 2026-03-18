@@ -7,8 +7,8 @@ import { buildBreadcrumbSchema, buildOrganizationSchema, buildServiceSchema } fr
 
 const sections = [
   {
-    title: 'What is the Affordable Care Act?',
-    text: 'The Affordable Care Act created the individual Marketplace where people and families can compare qualified health plans and enroll in ACA-compliant coverage.',
+    title: 'What this coverage path is for',
+    text: 'This path is for people and families who need their own health coverage and want a clearer way to compare plan options.',
   },
   {
     title: 'How enrollment works',
@@ -64,9 +64,9 @@ export default function IndividualHealthInsurancePage() {
 
       <Breadcrumbs items={breadcrumbs} />
       <PageHero
-        eyebrow="Individual Marketplace Insurance"
-        title="ACA Marketplace insurance guidance for individuals and families."
-        description="If you need personal health coverage, the individual Marketplace is where Affordable Care Act (ACA) plans are compared and where subsidy eligibility is reviewed. We help you understand the process, the tradeoffs between plans, and what to do next."
+        eyebrow="Individual Health Coverage"
+        title="Guidance for individual and family health coverage."
+        description="If you need personal health coverage, this page helps you understand plan comparison, enrollment timing, provider fit, prescription questions, and what to do next."
         highlights={[
           'Built for individuals and families',
           'Enrollment timing support',
@@ -89,8 +89,8 @@ export default function IndividualHealthInsurancePage() {
 
       <section className="section-pad grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
-          <p className="eyebrow">Marketplace Benefits</p>
-          <h2 className="section-title mt-2">Why individuals start with the ACA Marketplace</h2>
+          <p className="eyebrow">Coverage Review</p>
+          <h2 className="section-title mt-2">What most people need to review before choosing a plan</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {acaBenefits.map((item, index) => (
@@ -124,10 +124,10 @@ export default function IndividualHealthInsurancePage() {
           <h2 className="section-title mt-2">Keep comparing before you apply.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/how-the-affordable-care-act-marketplace-works">
-              How the ACA Marketplace works
+              How the individual Marketplace works
             </Link>
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/who-qualifies-for-aca-health-insurance">
-              Who qualifies for ACA insurance
+              Who this coverage is for
             </Link>
             <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/individual-intake">
               Enroll Now

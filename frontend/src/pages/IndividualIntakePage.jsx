@@ -53,8 +53,8 @@ export default function IndividualIntakePage() {
       <Breadcrumbs items={breadcrumbs} />
       <PageHero
         eyebrow="Individual Intake"
-        title="Request ACA Marketplace help for individual or family coverage."
-        description="Use the short request form for personal coverage questions. ACA means Affordable Care Act Marketplace coverage for individuals and families. If you are reviewing benefits for a company or employer group, switch to the employer intake so the case starts in the right workflow."
+        title="Request help with individual or family health coverage."
+        description="Use the short request form for personal coverage questions. If you are reviewing benefits for a company or employer group, switch to the employer intake so the case starts in the right workflow."
         highlights={[
           'Individual and family coverage only',
           'Short request form',
@@ -84,8 +84,8 @@ export default function IndividualIntakePage() {
             <div className="soft-panel">
               <p className="font-semibold text-slate-950">Best use for this form</p>
               <p className="mt-2 text-sm leading-7 text-slate-700">
-                Personal or family coverage questions, ACA Marketplace help, subsidy research,
-                provider checks, prescription concerns, or lost coverage timing.
+                Personal or family coverage questions, plan comparison, monthly cost concerns,
+                provider checks, prescription questions, or lost coverage timing.
               </p>
             </div>
             <div className="surface-card sm:col-span-2">

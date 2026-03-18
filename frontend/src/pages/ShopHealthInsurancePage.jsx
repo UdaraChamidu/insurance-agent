@@ -70,11 +70,11 @@ export default function ShopHealthInsurancePage() {
       <PageHero
         eyebrow="Employer Health Insurance"
         title="Employer health insurance guidance built for group coverage, renewals, and next-step clarity."
-        description="If you are evaluating health insurance for a business, the first step is not just quoting. We help employers organize the intake details, think through contribution strategy, review whether the Small Business Health Options Program (SHOP) is relevant, and move toward the right group coverage path."
+        description="If you are evaluating health insurance for a business, the first step is not just quoting. We help employers organize the intake details, think through contribution strategy, review whether the small-business marketplace is relevant, and move toward the right group coverage path."
         highlights={[
           'Employer and group coverage review',
           'Renewal and contribution context',
-          'SHOP considered where relevant',
+          'Small-business marketplace reviewed where relevant',
         ]}
         actions={
           <>
@@ -128,7 +128,7 @@ export default function ShopHealthInsurancePage() {
           <h2 className="section-title mt-2">Keep researching before you move into quotes or renewal decisions.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/what-is-shop-health-insurance-for-small-businesses">
-              What is SHOP health insurance?
+              How the small-business marketplace works
             </Link>
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/how-small-businesses-can-save-on-health-insurance">
               How small businesses can save on coverage
