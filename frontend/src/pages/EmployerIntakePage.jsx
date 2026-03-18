@@ -208,6 +208,292 @@ export default function EmployerIntakePage() {
     );
   }
 
+  const employerForm = (
+    <form className="surface-card" onSubmit={handleSubmit}>
+      <div className="accent-panel">
+        <p className="eyebrow">Employer Details</p>
+        <h2 className="font-display text-2xl font-bold text-slate-950">
+          Open a group case with the information needed for the first review.
+        </h2>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          Complete the fields you have now. The key goal is to capture enough context to start
+          the employer workflow cleanly and avoid re-entering details later.
+        </p>
+      </div>
+
+      <div className="mt-8 grid gap-6">
+        <div>
+          <p className="label mb-3">Company details</p>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="companyName">
+                Company Name
+              </label>
+              <input
+                className="input"
+                id="companyName"
+                onChange={updateField('companyName')}
+                required
+                type="text"
+                value={formData.companyName}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="state">
+                State
+              </label>
+              <select
+                className="input"
+                id="state"
+                onChange={updateField('state')}
+                required
+                value={formData.state}
+              >
+                {stateOptions.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="industry">
+                Industry / SIC Code
+              </label>
+              <input
+                className="input"
+                id="industry"
+                onChange={updateField('industry')}
+                placeholder="Construction, hospitality, retail, SIC code, etc."
+                type="text"
+                value={formData.industry}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="numEmployees">
+                Total Employees
+              </label>
+              <input
+                className="input"
+                id="numEmployees"
+                min="1"
+                onChange={updateField('numEmployees')}
+                required
+                type="number"
+                value={formData.numEmployees}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="numEligible">
+                Eligible Employees
+              </label>
+              <input
+                className="input"
+                id="numEligible"
+                min="0"
+                onChange={updateField('numEligible')}
+                type="number"
+                value={formData.numEligible}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="label mb-3">Primary contact</p>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="contactPerson">
+                Contact Person
+              </label>
+              <input
+                className="input"
+                id="contactPerson"
+                onChange={updateField('contactPerson')}
+                placeholder="Full name or main benefits contact"
+                type="text"
+                value={formData.contactPerson}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="firstName">
+                First Name
+              </label>
+              <input
+                className="input"
+                id="firstName"
+                onChange={updateField('firstName')}
+                required
+                type="text"
+                value={formData.firstName}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="lastName">
+                Last Name
+              </label>
+              <input
+                className="input"
+                id="lastName"
+                onChange={updateField('lastName')}
+                required
+                type="text"
+                value={formData.lastName}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="email">
+                Email
+              </label>
+              <input
+                className="input"
+                id="email"
+                onChange={updateField('email')}
+                required
+                type="email"
+                value={formData.email}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="phone">
+                Phone
+              </label>
+              <input
+                className="input"
+                id="phone"
+                onChange={updateField('phone')}
+                type="tel"
+                value={formData.phone}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="label mb-3">Current benefits context</p>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="renewalDate">
+                Renewal Date
+              </label>
+              <input
+                className="input"
+                id="renewalDate"
+                onChange={updateField('renewalDate')}
+                type="date"
+                value={formData.renewalDate}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="currentCarrier">
+                Current Carrier
+              </label>
+              <input
+                className="input"
+                id="currentCarrier"
+                onChange={updateField('currentCarrier')}
+                placeholder="Current medical carrier"
+                type="text"
+                value={formData.currentCarrier}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="currentPlan">
+                Current Plan Name
+              </label>
+              <input
+                className="input"
+                id="currentPlan"
+                onChange={updateField('currentPlan')}
+                placeholder="Plan name, funding type, or current setup"
+                type="text"
+                value={formData.currentPlan}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="label" htmlFor="contributionStrategy">
+                Contribution Strategy
+              </label>
+              <textarea
+                className="input min-h-[120px] resize-y"
+                id="contributionStrategy"
+                onChange={updateField('contributionStrategy')}
+                placeholder="Example: employer pays 70% of employee-only medical, employees cover dependents."
+                value={formData.contributionStrategy}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="label mb-3">Benefits needed</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {benefitOptions.map((benefit) => {
+              const isSelected = formData.benefitsNeeded.includes(benefit);
+              const label = benefit.charAt(0).toUpperCase() + benefit.slice(1);
+
+              return (
+                <button
+                  key={benefit}
+                  aria-pressed={isSelected}
+                  className={`rounded-[1.25rem] border px-4 py-4 text-left text-sm font-medium transition ${
+                    isSelected
+                      ? 'border-[var(--brand-soft-strong)] bg-[var(--panel-soft)] text-[var(--brand-dark)]'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]'
+                  }`}
+                  onClick={() => toggleBenefit(benefit)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="groupNotes">
+            Notes
+          </label>
+          <textarea
+            className="input min-h-[160px] resize-y"
+            id="groupNotes"
+            onChange={updateField('groupNotes')}
+            placeholder="Anything helpful before the discovery call: current pain points, timing, benefits issues, participation concerns, or quote goals."
+            value={formData.groupNotes}
+          />
+        </div>
+
+        {error ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="space-y-3">
+          <button
+            className="btn-primary w-full justify-center"
+            disabled={loading}
+            type="submit"
+          >
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving employer intake
+              </span>
+            ) : (
+              'Submit Employer Intake'
+            )}
+          </button>
+          <p className="text-sm leading-7 text-slate-500">
+            After submission, the employer record is created in the CRM and can continue
+            directly into scheduling.
+          </p>
+        </div>
+      </div>
+    </form>
+  );
+
   return (
     <>
       <Seo
@@ -241,6 +527,8 @@ export default function EmployerIntakePage() {
           'Creates the CRM record automatically',
           'Ready for scheduling after submission',
         ]}
+        layoutClassName="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start"
+        asideClassName="border-0 bg-transparent p-0 shadow-none"
         actions={(
           <>
             <Link className="btn-primary" to="/schedule">
@@ -251,9 +539,10 @@ export default function EmployerIntakePage() {
             </Link>
           </>
         )}
+        aside={employerForm}
       />
 
-      <section className="section-pad grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
+      <section className="section-pad grid gap-8 lg:grid-cols-[0.86fr_1.14fr]">
         <div className="space-y-6">
           <article className="surface-card">
             <p className="eyebrow">What To Have Ready</p>
@@ -280,331 +569,47 @@ export default function EmployerIntakePage() {
               from the beginning.
             </p>
           </article>
-
-          <div className="grid gap-4">
-            {[
-              {
-                icon: Building2,
-                title: 'Company profile',
-                text: 'Capture the employer name, state, industry, and basic team size before quoting starts.',
-              },
-              {
-                icon: Users,
-                title: 'Benefits scope',
-                text: 'Identify whether the case involves medical, dental, vision, life, disability, or mixed benefits.',
-              },
-              {
-                icon: CalendarDays,
-                title: 'Renewal timing',
-                text: 'Log the current carrier and renewal date now so follow-up can happen on the right timeline.',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'Next-step ready',
-                text: 'Once submitted, the lead is saved to the group CRM and can move directly into scheduling.',
-              },
-            ].map((item, index) => (
-              <article
-                key={item.title}
-                className="soft-panel gradient-border reveal"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div
-                  className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
-                  style={{ background: 'var(--brand)' }}
-                >
-                  <item.icon className="h-5 w-5" />
-                </div>
-                <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
-                <p className="body-copy mt-3 text-slate-700">{item.text}</p>
-              </article>
-            ))}
-          </div>
         </div>
 
-        <form className="surface-card" onSubmit={handleSubmit}>
-          <div className="accent-panel">
-            <p className="eyebrow">Employer Details</p>
-            <h2 className="font-display text-2xl font-bold text-slate-950">
-              Open a group case with the information needed for the first review.
-            </h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              Complete the fields you have now. The key goal is to capture enough context to start
-              the employer workflow cleanly and avoid re-entering details later.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-6">
-            <div>
-              <p className="label mb-3">Company details</p>
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="label" htmlFor="companyName">
-                    Company Name
-                  </label>
-                  <input
-                    className="input"
-                    id="companyName"
-                    onChange={updateField('companyName')}
-                    required
-                    type="text"
-                    value={formData.companyName}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="state">
-                    State
-                  </label>
-                  <select
-                    className="input"
-                    id="state"
-                    onChange={updateField('state')}
-                    required
-                    value={formData.state}
-                  >
-                    {stateOptions.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label" htmlFor="industry">
-                    Industry / SIC Code
-                  </label>
-                  <input
-                    className="input"
-                    id="industry"
-                    onChange={updateField('industry')}
-                    placeholder="Construction, hospitality, retail, SIC code, etc."
-                    type="text"
-                    value={formData.industry}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="numEmployees">
-                    Total Employees
-                  </label>
-                  <input
-                    className="input"
-                    id="numEmployees"
-                    min="1"
-                    onChange={updateField('numEmployees')}
-                    required
-                    type="number"
-                    value={formData.numEmployees}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="numEligible">
-                    Eligible Employees
-                  </label>
-                  <input
-                    className="input"
-                    id="numEligible"
-                    min="0"
-                    onChange={updateField('numEligible')}
-                    type="number"
-                    value={formData.numEligible}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <p className="label mb-3">Primary contact</p>
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="label" htmlFor="contactPerson">
-                    Contact Person
-                  </label>
-                  <input
-                    className="input"
-                    id="contactPerson"
-                    onChange={updateField('contactPerson')}
-                    placeholder="Full name or main benefits contact"
-                    type="text"
-                    value={formData.contactPerson}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="firstName">
-                    First Name
-                  </label>
-                  <input
-                    className="input"
-                    id="firstName"
-                    onChange={updateField('firstName')}
-                    required
-                    type="text"
-                    value={formData.firstName}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="lastName">
-                    Last Name
-                  </label>
-                  <input
-                    className="input"
-                    id="lastName"
-                    onChange={updateField('lastName')}
-                    required
-                    type="text"
-                    value={formData.lastName}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="email">
-                    Email
-                  </label>
-                  <input
-                    className="input"
-                    id="email"
-                    onChange={updateField('email')}
-                    required
-                    type="email"
-                    value={formData.email}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="phone">
-                    Phone
-                  </label>
-                  <input
-                    className="input"
-                    id="phone"
-                    onChange={updateField('phone')}
-                    type="tel"
-                    value={formData.phone}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <p className="label mb-3">Current benefits context</p>
-              <div className="grid gap-5 md:grid-cols-2">
-                <div>
-                  <label className="label" htmlFor="renewalDate">
-                    Renewal Date
-                  </label>
-                  <input
-                    className="input"
-                    id="renewalDate"
-                    onChange={updateField('renewalDate')}
-                    type="date"
-                    value={formData.renewalDate}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="currentCarrier">
-                    Current Carrier
-                  </label>
-                  <input
-                    className="input"
-                    id="currentCarrier"
-                    onChange={updateField('currentCarrier')}
-                    placeholder="Current medical carrier"
-                    type="text"
-                    value={formData.currentCarrier}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label" htmlFor="currentPlan">
-                    Current Plan Name
-                  </label>
-                  <input
-                    className="input"
-                    id="currentPlan"
-                    onChange={updateField('currentPlan')}
-                    placeholder="Plan name, funding type, or current setup"
-                    type="text"
-                    value={formData.currentPlan}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label" htmlFor="contributionStrategy">
-                    Contribution Strategy
-                  </label>
-                  <textarea
-                    className="input min-h-[120px] resize-y"
-                    id="contributionStrategy"
-                    onChange={updateField('contributionStrategy')}
-                    placeholder="Example: employer pays 70% of employee-only medical, employees cover dependents."
-                    value={formData.contributionStrategy}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <p className="label mb-3">Benefits needed</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {benefitOptions.map((benefit) => {
-                  const isSelected = formData.benefitsNeeded.includes(benefit);
-                  const label = benefit.charAt(0).toUpperCase() + benefit.slice(1);
-
-                  return (
-                    <button
-                      key={benefit}
-                      aria-pressed={isSelected}
-                      className={`rounded-[1.25rem] border px-4 py-4 text-left text-sm font-medium transition ${
-                        isSelected
-                          ? 'border-[var(--brand-soft-strong)] bg-[var(--panel-soft)] text-[var(--brand-dark)]'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]'
-                      }`}
-                      onClick={() => toggleBenefit(benefit)}
-                      type="button"
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="groupNotes">
-                Notes
-              </label>
-              <textarea
-                className="input min-h-[160px] resize-y"
-                id="groupNotes"
-                onChange={updateField('groupNotes')}
-                placeholder="Anything helpful before the discovery call: current pain points, timing, benefits issues, participation concerns, or quote goals."
-                value={formData.groupNotes}
-              />
-            </div>
-
-            {error ? (
-              <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {error}
-              </p>
-            ) : null}
-
-            <div className="space-y-3">
-              <button
-                className="btn-primary w-full justify-center"
-                disabled={loading}
-                type="submit"
+        <div className="grid gap-4">
+          {[
+            {
+              icon: Building2,
+              title: 'Company profile',
+              text: 'Capture the employer name, state, industry, and basic team size before quoting starts.',
+            },
+            {
+              icon: Users,
+              title: 'Benefits scope',
+              text: 'Identify whether the case involves medical, dental, vision, life, disability, or mixed benefits.',
+            },
+            {
+              icon: CalendarDays,
+              title: 'Renewal timing',
+              text: 'Log the current carrier and renewal date now so follow-up can happen on the right timeline.',
+            },
+            {
+              icon: ShieldCheck,
+              title: 'Next-step ready',
+              text: 'Once submitted, the lead is saved to the group CRM and can move directly into scheduling.',
+            },
+          ].map((item, index) => (
+            <article
+              key={item.title}
+              className="soft-panel gradient-border reveal"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div
+                className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
+                style={{ background: 'var(--brand)' }}
               >
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving employer intake
-                  </span>
-                ) : (
-                  'Submit Employer Intake'
-                )}
-              </button>
-              <p className="text-sm leading-7 text-slate-500">
-                After submission, the employer record is created in the CRM and can continue
-                directly into scheduling.
-              </p>
-            </div>
-          </div>
-        </form>
+                <item.icon className="h-5 w-5" />
+              </div>
+              <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
+              <p className="body-copy mt-3 text-slate-700">{item.text}</p>
+            </article>
+          ))}
+        </div>
       </section>
     </>
   );

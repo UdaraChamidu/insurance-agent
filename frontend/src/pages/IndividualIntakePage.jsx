@@ -60,6 +60,8 @@ export default function IndividualIntakePage() {
           'Short request form',
           'Ready for scheduling after submission',
         ]}
+        layoutClassName="grid gap-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-start"
+        asideClassName="border-0 bg-transparent p-0 shadow-none"
         actions={(
           <>
             <Link className="btn-primary" to="/schedule">
@@ -70,13 +72,15 @@ export default function IndividualIntakePage() {
             </Link>
           </>
         )}
+        aside={(
+          <div id="individual-form" className="pulse-glow lg:sticky lg:top-28">
+            <ContactForm compact={false} initialProductType="aca" lockProductType />
+          </div>
+        )}
       />
 
-      <section className="section-pad grid gap-8 lg:grid-cols-[0.94fr_1.06fr]">
-        <div id="individual-form" className="pulse-glow lg:order-2 lg:sticky lg:top-28">
-          <ContactForm compact={false} initialProductType="aca" lockProductType />
-        </div>
-        <div className="space-y-6 lg:order-1">
+      <section className="section-pad grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
           <div className="surface-card">
             <p className="eyebrow">Before You Submit</p>
             <h2 className="section-title mt-2">The information that helps most</h2>

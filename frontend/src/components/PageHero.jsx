@@ -6,13 +6,15 @@ export default function PageHero({
   highlights = [],
   aside,
   children,
+  layoutClassName = 'grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start',
+  asideClassName = 'hero-aside-card',
 }) {
   const hasAside = Boolean(aside);
 
   return (
     <section className="page-reveal pb-8 pt-2">
       {/* Compact header layout */}
-      <div className={hasAside ? 'grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start' : ''}>
+      <div className={hasAside ? layoutClassName : ''}>
         <div>
           {eyebrow ? (
             <p className="eyebrow reveal">{eyebrow}</p>
@@ -45,7 +47,7 @@ export default function PageHero({
           ) : null}
         </div>
 
-        {aside ? <aside className="page-reveal stagger-1 hero-aside-card">{aside}</aside> : null}
+        {aside ? <aside className={`page-reveal stagger-1 ${asideClassName}`}>{aside}</aside> : null}
       </div>
 
       <div className="section-divider mt-8" />
