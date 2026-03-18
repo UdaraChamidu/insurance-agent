@@ -104,8 +104,8 @@ export default function PublicLayout() {
         <div className="navbar-accent-bar" />
 
         <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isScrolled ? 'py-2.5' : 'py-3.5'}`}>
-          <div className="flex items-center justify-between gap-6">
-            <Link className="group flex min-w-0 items-center gap-3" to="/">
+          <div className="flex items-center justify-between gap-4">
+            <Link className="group flex shrink-0 items-center gap-3" to="/">
               <div className="logo-glow overflow-hidden rounded-2xl border border-[var(--line)] bg-white p-1 transition-transform duration-300 group-hover:scale-105">
                 <img
                   alt="Elite Deal Broker logo"
@@ -114,10 +114,10 @@ export default function PublicLayout() {
                 />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-lg font-bold text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-public-display)' }}>
+                <p className="text-base font-bold leading-tight text-slate-900 tracking-tight xl:text-lg" style={{ fontFamily: 'var(--font-public-display)' }}>
                   Elite Deal Broker
                 </p>
-                <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--brand-dark)]">
+                <p className="mt-1 hidden text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--brand-dark)] 2xl:block">
                   Health Insurance Brokerage
                 </p>
               </div>
@@ -129,28 +129,22 @@ export default function PublicLayout() {
               </div>
             </nav>
 
-            <div className="hidden items-center gap-3 lg:flex">
+            <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
               <Link
-                className="btn-secondary px-4 py-2.5"
-                to="/contact?coverage=aca"
-              >
-                Enroll Now
-              </Link>
-              <Link
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
+                className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
                 to="/schedule"
               >
                 <CalendarDays className="h-4 w-4" />
                 Schedule a Meeting
               </Link>
               <Link
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]"
+                className="inline-flex items-center gap-2 whitespace-nowrap px-2 py-2 text-sm font-semibold text-slate-600 transition hover:text-[var(--brand-dark)]"
                 to="/admin/login"
               >
                 <LogIn className="h-4 w-4" />
-                Admin Login
+                Admin
               </Link>
-              <Link className="btn-primary" to="/contact">
+              <Link className="btn-primary whitespace-nowrap" to="/contact">
                 Start Here
               </Link>
             </div>
@@ -202,10 +196,7 @@ export default function PublicLayout() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Link className="btn-secondary justify-center text-center" to="/contact?coverage=aca">
-                  Enroll Now
-                </Link>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Link className="btn-secondary justify-center text-center" to="/schedule">
                   Schedule
                 </Link>
