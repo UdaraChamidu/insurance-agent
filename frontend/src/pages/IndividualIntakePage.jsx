@@ -70,34 +70,13 @@ export default function IndividualIntakePage() {
             </Link>
           </>
         )}
-        aside={(
-          <div>
-            <p className="eyebrow">Need Employer Help Instead?</p>
-            <div className="mt-4 space-y-3">
-              {[
-                'Employer and group cases use a separate intake with company details, employee counts, and renewal timing.',
-                'That intake creates the CRM case directly in the group pipeline.',
-                'Use the employer intake if you are gathering quotes for a business.',
-              ].map((item) => (
-                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
-                  {item}
-                </div>
-              ))}
-            </div>
-            <div className="mt-5">
-              <Link className="btn-secondary" to={employerPath}>
-                Open Employer Intake
-              </Link>
-            </div>
-          </div>
-        )}
       />
 
-      <section className="section-pad grid gap-8 lg:grid-cols-[1.06fr_0.94fr]">
-        <div id="individual-form" className="lg:sticky lg:top-28 pulse-glow">
+      <section className="section-pad grid gap-8 lg:grid-cols-[0.94fr_1.06fr]">
+        <div id="individual-form" className="pulse-glow lg:order-2 lg:sticky lg:top-28">
           <ContactForm compact={false} initialProductType="aca" lockProductType />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-6 lg:order-1">
           <div className="surface-card">
             <p className="eyebrow">Before You Submit</p>
             <h2 className="section-title mt-2">The information that helps most</h2>
@@ -124,14 +103,25 @@ export default function IndividualIntakePage() {
           </div>
 
           <div className="surface-card">
-            <p className="eyebrow">Plain Language</p>
-            <h2 className="section-title mt-2">ACA means personal or family Marketplace coverage.</h2>
+            <p className="eyebrow">Need Employer Help Instead?</p>
+            <h2 className="section-title mt-2">Use the employer intake if the request is for a company.</h2>
             <p className="body-copy mt-4 text-slate-700">
               If the request is for a business, an employer, or employee benefits, use the employer intake instead of this individual form.
             </p>
+            <div className="mt-6 space-y-3">
+              {[
+                'Employer and group cases use a separate intake with company details, employee counts, and renewal timing.',
+                'That intake creates the CRM case directly in the group pipeline.',
+                'Use the employer intake if you are gathering quotes for a business.',
+              ].map((item) => (
+                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-secondary" to={employerPath}>
-                Start Employer Intake
+                Open Employer Intake
               </Link>
               <Link className="btn-primary" to="/schedule">
                 Schedule a Meeting

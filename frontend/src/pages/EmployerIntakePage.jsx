@@ -251,10 +251,14 @@ export default function EmployerIntakePage() {
             </Link>
           </>
         )}
-        aside={(
-          <div>
+      />
+
+      <section className="section-pad grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
+        <div className="space-y-6">
+          <article className="surface-card">
             <p className="eyebrow">What To Have Ready</p>
-            <div className="mt-4 space-y-3">
+            <h2 className="section-title mt-2">Bring the basics and we can start from there.</h2>
+            <div className="mt-6 space-y-3">
               {[
                 'Basic company details and your best contact information.',
                 'Approximate employee counts and current coverage context.',
@@ -265,12 +269,8 @@ export default function EmployerIntakePage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      />
+          </article>
 
-      <section className="section-pad grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
-        <div className="space-y-6">
           <article className="surface-card">
             <p className="eyebrow">Why This Form Exists</p>
             <h2 className="section-title mt-2">A cleaner start for employer cases</h2>
