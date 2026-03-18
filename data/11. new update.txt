@@ -65,8 +65,8 @@ The client considers these as the essential tools to launch:
 | CRM / Lead Management   | PARTIAL        | Group CRM redesign is done: 10-stage   |
 |                         |                | pipeline, employer fields, history,    |
 |                         |                | filters, and client profile updates.   |
-|                         |                | Remaining work is census upload,       |
-|                         |                | templates, renewals, and reporting.    |
+|                         |                | Remaining work is templates, renewals, |
+|                         |                | reporting, and later workflow polish.  |
 +-------------------------+----------------+----------------------------------------+
 | Employer Intake Form    | DONE           | Public /employer-intake page built and |
 |                         |                | connected to POST /api/leads/          |
@@ -74,8 +74,10 @@ The client considers these as the essential tools to launch:
 |                         |                | into the CRM and can continue to       |
 |                         |                | scheduling.                            |
 +-------------------------+----------------+----------------------------------------+
-| Census Collection       | NOT BUILT      | Template/form for collecting employee  |
-|                         |                | census data from employers.            |
+| Census Collection       | DONE           | Public /employer-census page, CSV      |
+|                         |                | template download, census upload, and  |
+|                         |                | lead-linked document storage built on  |
+|                         |                | 2026-03-18.                            |
 +-------------------------+----------------+----------------------------------------+
 | Email/SMS Templates     | PARTIAL        | Basic email confirmation + Twilio SMS  |
 |                         |                | exists but NO pre-built templates for  |
@@ -85,10 +87,10 @@ The client considers these as the essential tools to launch:
 |                         |                | exists. Needs organized folder         |
 |                         |                | structure per client/case.             |
 +-------------------------+----------------+----------------------------------------+
-| Secure File Collection  | PARTIAL        | Client doc upload endpoint exists      |
-|                         |                | (client_docs.py). Needs a public-     |
-|                         |                | facing secure upload portal for        |
-|                         |                | employers to submit census/forms.      |
+| Secure File Collection  | PARTIAL        | Census upload page now exists for      |
+|                         |                | employer census files, but a broader   |
+|                         |                | secure token-based portal for other    |
+|                         |                | employer documents/forms is still open.|
 +-------------------------+----------------+----------------------------------------+
 | RAG / AI Knowledge Base | BUILT          | Fully implemented (Gemini + Pinecone + |
 |                         |                | hybrid search). CLIENT SAYS NOT URGENT |
@@ -142,6 +144,14 @@ IMPLEMENTATION OPTIONS:
   - Option C: Both (template download + upload portal)
   - Secure file upload to Supabase storage
   - Link census to the employer lead record
+
+IMPLEMENTATION:
+  - [DONE 2026-03-18] Public frontend page: /employer-census
+  - [DONE 2026-03-18] Alias route: /census-upload -> /employer-census
+  - [DONE 2026-03-18] Downloadable CSV template added for employer census prep
+  - [DONE 2026-03-18] Backend endpoint: POST /api/client-docs/upload-census
+  - [DONE 2026-03-18] Uploads stored under the employer lead's document path
+  - [DONE 2026-03-18] Successful uploads can advance pipeline to census_received
 
 
 --- 4.3: GROUP-SPECIFIC CRM PIPELINE ---
@@ -272,7 +282,12 @@ PRIORITY 1 - IMMEDIATE (Answer client + core workflow)
 
 PRIORITY 2 - NEXT (Operational workflow)
 ----------------------------------------
-  [ ] Build Census Collection template + upload
+  [x] Build Census Collection template + upload -- DONE 2026-03-18
+      - New public page: /employer-census
+      - Alias route: /census-upload
+      - Downloadable CSV template added
+      - Upload endpoint: POST /api/client-docs/upload-census
+      - Census files attach to employer leads and can update pipeline to census_received
   [ ] Create Email/SMS follow-up templates (6 templates)
   [ ] Build Secure File Collection portal (public upload page)
   [ ] Add document folder organization
@@ -330,6 +345,7 @@ DATABASE:
 
 FRONTEND:
   frontend/src/App.jsx                        - Main router
+  frontend/src/pages/EmployerCensusPage.jsx   - Public employer census page
   frontend/src/pages/EmployerIntakePage.jsx   - Public employer/group intake page
   frontend/src/pages/MeetingPage.jsx          - Meeting UI
   frontend/src/pages/HomePage.jsx             - Public home page

@@ -1,0 +1,2 @@
+employee_id,employee_first_name,employee_last_name,date_of_birth,gender,zip_code,tobacco_use,coverage_election,spouse_first_name,spouse_last_name,spouse_date_of_birth,child_1_first_name,child_1_last_name,child_1_date_of_birth,child_2_first_name,child_2_last_name,child_2_date_of_birth,notes
+E001,Alex,Smith,1987-04-12,M,33101,No,Employee + Spouse,Jordan,Smith,1988-09-22,,,,,,,"Replace this sample row with your actual census data"

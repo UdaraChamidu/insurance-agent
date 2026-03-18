@@ -180,7 +180,8 @@ export default function EmployerIntakePage() {
 
             <p className="body-copy mt-6 text-slate-700">
               The employer lead has been created and saved under the new group pipeline. You can
-              continue into scheduling now, or return to the site and come back later.
+              move into census collection now, continue into scheduling, or return to the site and
+              come back later.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -191,6 +192,9 @@ export default function EmployerIntakePage() {
               >
                 Continue to Scheduling
               </button>
+              <Link className="btn-secondary" to={`/employer-census?leadId=${successLead.id}`}>
+                Census Template &amp; Upload
+              </Link>
               <Link className="btn-secondary" to="/shop-health-insurance">
                 Review Group Coverage Info
               </Link>

@@ -57,7 +57,7 @@ export default function PublicLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
-  const showMobileActionBar = !['/contact', '/employer-intake'].includes(location.pathname) && !isMenuOpen;
+  const showMobileActionBar = !['/contact', '/employer-intake', '/employer-census'].includes(location.pathname) && !isMenuOpen;
 
   useEffect(() => {
     setIsMenuOpen(false);

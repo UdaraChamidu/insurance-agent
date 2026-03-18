@@ -14,6 +14,7 @@ const BookingsPage = lazy(() => import('./pages/BookingsPage'));
 const ClientProfilePage = lazy(() => import('./pages/ClientProfilePage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
+const EmployerCensusPage = lazy(() => import('./pages/EmployerCensusPage'));
 const EmployerIntakePage = lazy(() => import('./pages/EmployerIntakePage'));
 const FaqPage = lazy(() => import('./pages/FaqPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -89,11 +90,13 @@ function App() {
                 <Route element={<FaqPage />} path="/faq" />
                 <Route element={<ContactPage />} path="/contact" />
                 <Route element={<EmployerIntakePage />} path="/employer-intake" />
+                <Route element={<EmployerCensusPage />} path="/employer-census" />
                 <Route element={<NotFoundPage />} path="*" />
               </Route>
 
               <Route element={<Navigate to="/contact" replace />} path="/intake" />
               <Route element={<Navigate to="/employer-intake" replace />} path="/group-intake" />
+              <Route element={<Navigate to="/employer-census" replace />} path="/census-upload" />
               <Route element={<SchedulePage />} path="/schedule" />
               <Route element={<MeetingPage />} path="/meeting" />
               <Route element={<ManageAppointmentPage />} path="/appointment/manage/:token" />
