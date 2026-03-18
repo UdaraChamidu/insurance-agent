@@ -259,7 +259,7 @@ export default function EmployerCensusPage() {
         <section className="section-pad">
           <div className="surface-card max-w-3xl">
             <div className="flex items-center gap-3 text-slate-700">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--brand)]" />
               <span>Loading the employer census request...</span>
             </div>
           </div>
@@ -297,7 +297,7 @@ export default function EmployerCensusPage() {
                 </div>
                 <div className="soft-panel">
                   <p className="font-semibold text-slate-950">Current pipeline stage</p>
-                  <p className="mt-1 uppercase tracking-[0.14em] text-blue-700">{(lead.pipelineStatus || 'new_lead').replaceAll('_', ' ')}</p>
+                  <p className="mt-1 uppercase tracking-[0.14em] text-[var(--brand-dark)]">{(lead.pipelineStatus || 'new_lead').replaceAll('_', ' ')}</p>
                 </div>
                 <div className="soft-panel">
                   <p className="font-semibold text-slate-950">Contact person</p>
@@ -332,7 +332,10 @@ export default function EmployerCensusPage() {
                 ].map((item) => (
                   <div key={item.title} className="soft-panel">
                     <div className="flex items-start gap-3">
-                      <div className="icon-float flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.2)]">
+                      <div
+                        className="icon-float flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                        style={{ background: 'var(--brand)' }}
+                      >
                         <item.icon className="h-5 w-5" />
                       </div>
                       <div>
@@ -353,7 +356,7 @@ export default function EmployerCensusPage() {
           </div>
 
           <form className="surface-card" onSubmit={handleUpload}>
-            <div className="rounded-[1.75rem] border border-blue-100 bg-blue-50/70 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75)]">
+            <div className="accent-panel">
               <p className="eyebrow">Upload Census</p>
               <h2 className="font-display text-2xl font-bold text-slate-950">
                 Attach the completed census file to this employer case.
@@ -393,8 +396,11 @@ export default function EmployerCensusPage() {
 
               <label className="block">
                 <span className="label mb-3 block">Census file</span>
-                <div className="rounded-[1.75rem] border-2 border-dashed border-blue-200 bg-white px-6 py-10 text-center">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.2)]">
+                <div className="rounded-[1.75rem] border-2 border-dashed border-[var(--brand-soft-strong)] bg-white px-6 py-10 text-center">
+                  <div
+                    className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                    style={{ background: 'var(--brand)' }}
+                  >
                     <UploadCloud className="h-6 w-6" />
                   </div>
                   <p className="mt-4 font-semibold text-slate-950">Select the completed census file to upload.</p>
@@ -403,7 +409,7 @@ export default function EmployerCensusPage() {
                   </p>
                   <input
                     accept={ACCEPTED_FILE_TYPES}
-                    className="mt-5 block w-full cursor-pointer text-sm text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-blue-500"
+                    className="mt-5 block w-full cursor-pointer text-sm text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-[#bc1918] file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-[#991413]"
                     multiple
                     onChange={handleFileChange}
                     type="file"
@@ -437,7 +443,7 @@ export default function EmployerCensusPage() {
               <label className="block">
                 <span className="label mb-3 block">Notes for this upload (optional)</span>
                 <textarea
-                  className="input-field min-h-[120px] resize-y"
+                  className="input min-h-[120px] resize-y"
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="Add any notes about the census version, missing dependents, waiver counts, or other context."
                   value={description}

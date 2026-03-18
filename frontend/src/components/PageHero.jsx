@@ -45,15 +45,10 @@ export default function PageHero({
           ) : null}
         </div>
 
-        {aside ? (
-          <aside className="page-reveal stagger-1 rounded-[1.5rem] border border-blue-100 bg-white/85 p-5 backdrop-blur-sm shadow-[0_16px_40px_rgba(37,99,235,0.06)] sm:p-6">
-            {aside}
-          </aside>
-        ) : null}
+        {aside ? <aside className="page-reveal stagger-1 hero-aside-card">{aside}</aside> : null}
       </div>
 
-      {/* Subtle gradient bottom line */}
-      <div className="mt-8 h-[2px] rounded-full bg-gradient-to-r from-transparent via-blue-400/40 to-transparent" />
+      <div className="section-divider mt-8" />
     </section>
   );
 }

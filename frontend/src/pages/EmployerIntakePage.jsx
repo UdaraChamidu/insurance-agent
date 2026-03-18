@@ -162,7 +162,10 @@ export default function EmployerIntakePage() {
           <div className="surface-card max-w-3xl">
             <div className="soft-panel">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.2)]">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                  style={{ background: 'var(--brand)' }}
+                >
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div>
@@ -238,6 +241,16 @@ export default function EmployerIntakePage() {
           'Creates the CRM record automatically',
           'Ready for scheduling after submission',
         ]}
+        actions={(
+          <>
+            <Link className="btn-primary" to="/schedule">
+              Schedule a Meeting
+            </Link>
+            <Link className="btn-secondary" to="/employer-census">
+              View Census Upload
+            </Link>
+          </>
+        )}
         aside={(
           <div>
             <p className="eyebrow">What To Have Ready</p>
@@ -296,7 +309,10 @@ export default function EmployerIntakePage() {
                 className="soft-panel gradient-border reveal"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)]">
+                <div
+                  className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
+                  style={{ background: 'var(--brand)' }}
+                >
                   <item.icon className="h-5 w-5" />
                 </div>
                 <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
@@ -307,7 +323,7 @@ export default function EmployerIntakePage() {
         </div>
 
         <form className="surface-card" onSubmit={handleSubmit}>
-          <div className="rounded-[1.75rem] border border-blue-100 bg-blue-50/70 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75)]">
+          <div className="accent-panel">
             <p className="eyebrow">Employer Details</p>
             <h2 className="font-display text-2xl font-bold text-slate-950">
               Open a group case with the information needed for the first review.
@@ -535,8 +551,8 @@ export default function EmployerIntakePage() {
                       aria-pressed={isSelected}
                       className={`rounded-[1.25rem] border px-4 py-4 text-left text-sm font-medium transition ${
                         isSelected
-                          ? 'border-blue-300 bg-blue-50 text-blue-900'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40'
+                          ? 'border-[var(--brand-soft-strong)] bg-[var(--panel-soft)] text-[var(--brand-dark)]'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]'
                       }`}
                       onClick={() => toggleBenefit(benefit)}
                       type="button"

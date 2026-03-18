@@ -4,6 +4,7 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import ContactForm from '../components/ContactForm';
 import PageHero from '../components/PageHero';
 import Seo from '../components/Seo';
+import { termDefinitions } from '../content/siteContent';
 import {
   buildBreadcrumbSchema,
   buildContactPageSchema,
@@ -22,6 +23,13 @@ function buildPath(basePath, searchParams, coverageValue = null) {
   const query = nextParams.toString();
   return query ? `${basePath}?${query}` : basePath;
 }
+
+const employerPreviewFields = [
+  'Company name and state',
+  'Total and eligible employee counts',
+  'Renewal date and current carrier',
+  'Benefits needed and contribution strategy',
+];
 
 export default function ContactPage() {
   const [searchParams] = useSearchParams();
@@ -65,12 +73,22 @@ export default function ContactPage() {
         <PageHero
           eyebrow="Individual Contact"
           title="Request ACA Marketplace help for individual or family coverage."
-          description="Use the short request form for personal coverage questions. If you are reviewing benefits for a company or employer group, switch to the employer intake so the case starts in the right workflow."
+          description="Use the short request form for personal coverage questions. ACA means Affordable Care Act Marketplace coverage for individuals and families. If you are reviewing benefits for a company or employer group, switch to the employer intake so the case starts in the right workflow."
           highlights={[
             'Individual and family coverage only',
             'Short request form',
             'Ready for scheduling after submission',
           ]}
+          actions={(
+            <>
+              <Link className="btn-primary" to="/schedule">
+                Schedule a Meeting
+              </Link>
+              <Link className="btn-secondary" to={employerPath}>
+                Need Employer Coverage Instead?
+              </Link>
+            </>
+          )}
           aside={(
             <div>
               <p className="eyebrow">Need Employer Help Instead?</p>
@@ -94,33 +112,51 @@ export default function ContactPage() {
           )}
         />
 
-        <section className="section-pad grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
-          <div className="surface-card">
-            <p className="eyebrow">Before You Submit</p>
-            <h2 className="section-title mt-2">The information that helps most</h2>
-            <div className="mt-6 space-y-4">
-              {[
-                'Your state and preferred contact information.',
-                'Any recent life event affecting enrollment timing, such as losing coverage.',
-                'Questions about subsidies, provider access, prescriptions, or plan comparison.',
-              ].map((item, index) => (
-                <div
-                  key={item}
-                  className="soft-panel text-sm leading-7 text-slate-700 reveal"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-            <p className="body-copy mt-6 text-slate-700">
-              If you want to keep researching before you submit, use the service page for{' '}
-              <Link className="link-accent" to="/individual-health-insurance">individual Marketplace insurance</Link>{' '}
-              or review the <Link className="link-accent" to="/faq">FAQ page</Link>.
-            </p>
-          </div>
-          <div className="lg:sticky lg:top-28 pulse-glow rounded-[2rem]">
+        <section className="section-pad grid gap-8 lg:grid-cols-[1.06fr_0.94fr]">
+          <div id="individual-form" className="lg:sticky lg:top-28 pulse-glow">
             <ContactForm compact={false} initialProductType="aca" lockProductType />
+          </div>
+          <div className="space-y-6">
+            <div className="surface-card">
+              <p className="eyebrow">Before You Submit</p>
+              <h2 className="section-title mt-2">The information that helps most</h2>
+              <div className="mt-6 space-y-4">
+                {[
+                  'Your state and preferred contact information.',
+                  'Any recent life event affecting enrollment timing, such as losing coverage.',
+                  'Questions about subsidies, provider access, prescriptions, or plan comparison.',
+                ].map((item, index) => (
+                  <div
+                    key={item}
+                    className="soft-panel text-sm leading-7 text-slate-700 reveal"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <p className="body-copy mt-6 text-slate-700">
+                If you want to keep researching before you submit, use the service page for{' '}
+                <Link className="link-accent" to="/individual-health-insurance">individual Marketplace insurance</Link>{' '}
+                or review the <Link className="link-accent" to="/faq">FAQ page</Link>.
+              </p>
+            </div>
+
+            <div className="surface-card">
+              <p className="eyebrow">Plain Language</p>
+              <h2 className="section-title mt-2">ACA means personal or family Marketplace coverage.</h2>
+              <p className="body-copy mt-4 text-slate-700">
+                If the request is for a business, an employer, or employee benefits, use the employer intake instead of this individual form.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link className="btn-secondary" to={employerPath}>
+                  Start Employer Intake
+                </Link>
+                <Link className="btn-primary" to="/schedule">
+                  Schedule a Meeting
+                </Link>
+              </div>
+            </div>
           </div>
         </section>
       </>
@@ -152,24 +188,36 @@ export default function ContactPage() {
       <Breadcrumbs items={breadcrumbs} />
       <PageHero
         eyebrow="Start Here"
-        title="Choose the right path before you submit anything."
-        description="Individual and employer requests now follow different workflows. Use the individual request form for personal or family coverage, and use the employer intake for group benefits, renewal reviews, and quoting."
+        title="See the forms clearly and choose the right path without guessing."
+        description="ACA means Affordable Care Act Marketplace coverage for individuals and families. SHOP means Small Business Health Options Program for eligible small employers. Use the individual request form for personal coverage, and use the employer intake for group benefits, renewal reviews, and quoting."
         highlights={[
           'Separate paths for individuals and employers',
           'Cleaner CRM routing',
           'Less back-and-forth after submission',
         ]}
+        actions={(
+          <>
+            <Link className="btn-primary" to={individualPath}>
+              Enroll Now
+            </Link>
+            <Link className="btn-secondary" to={employerPath}>
+              Start Employer Intake
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
+            </Link>
+          </>
+        )}
         aside={(
           <div>
-            <p className="eyebrow">Why This Changed</p>
+            <p className="eyebrow">What The Terms Mean</p>
             <div className="mt-4 space-y-3">
-              {[
-                'Employer cases need more detail than a short general request form can capture.',
-                'The dedicated employer intake feeds the group pipeline directly.',
-                'The individual request form stays available for ACA Marketplace support.',
-              ].map((item) => (
-                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
-                  {item}
+              {termDefinitions.map((item) => (
+                <div key={item.term} className="soft-panel text-sm leading-7 text-slate-700">
+                  <p className="font-display text-base font-bold text-slate-950">
+                    {item.term} = {item.label}
+                  </p>
+                  <p className="mt-2">{item.description}</p>
                 </div>
               ))}
             </div>
@@ -177,59 +225,61 @@ export default function ContactPage() {
         )}
       />
 
-      <section className="section-pad grid gap-6 lg:grid-cols-2">
-        {[
-          {
-            title: 'Individual / Family Coverage',
-            description:
-              'Use the short request form if you need ACA Marketplace help for yourself or your family.',
-            icon: ShieldCheck,
-            bullets: [
-              'Best for personal or family health coverage',
-              'Shorter request form',
-              'Continues into scheduling after submission',
-            ],
-            actionLabel: 'Open Individual Request Form',
-            actionTo: individualPath,
-          },
-          {
-            title: 'Employer / Group Coverage',
-            description:
-              'Use the dedicated employer intake if you are reviewing group benefits, renewal timing, or requesting quotes for a company.',
-            icon: Building2,
-            bullets: [
-              'Captures company and employee details',
-              'Built for employer and group workflow',
-              'Creates the case directly in the CRM pipeline',
-            ],
-            actionLabel: 'Open Employer Intake',
-            actionTo: employerPath,
-          },
-        ].map((item, index) => (
-          <article
-            key={item.title}
-            className="surface-card gradient-border reveal"
-            style={{ animationDelay: `${index * 120}ms` }}
-          >
-            <div className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)]">
-              <item.icon className="h-5 w-5" />
+      <section className="section-pad grid gap-8 lg:grid-cols-[1.02fr_0.98fr]">
+        <div id="individual-form" className="lg:sticky lg:top-28 pulse-glow">
+          <ContactForm compact={false} initialProductType="aca" lockProductType />
+        </div>
+
+        <div className="space-y-6">
+          <article className="surface-card gradient-border">
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                style={{ background: 'var(--brand)' }}
+              >
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="eyebrow">Employer / Small Business Coverage</p>
+                <h2 className="section-title mt-2">See the employer intake before you start.</h2>
+              </div>
             </div>
-            <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
-            <p className="body-copy mt-3 text-slate-700">{item.description}</p>
-            <div className="mt-6 space-y-3 text-sm leading-7 text-slate-700">
-              {item.bullets.map((bullet) => (
-                <div key={bullet} className="soft-panel">
-                  {bullet}
+            <p className="body-copy mt-4 text-slate-700">
+              If the request involves a company, employee benefits, renewal timing, or group coverage quotes, the employer intake is the right form.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {employerPreviewFields.map((item) => (
+                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                  {item}
                 </div>
               ))}
             </div>
-            <div className="mt-6">
-              <Link className="btn-primary" to={item.actionTo}>
-                {item.actionLabel}
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="btn-primary" to={employerPath}>
+                Start Employer Intake
+              </Link>
+              <Link className="btn-secondary" to="/schedule">
+                Schedule a Meeting
               </Link>
             </div>
           </article>
-        ))}
+
+          <article className="surface-card">
+            <p className="eyebrow">Why This Changed</p>
+            <h2 className="section-title mt-2">The forms are separate so users do not get routed into the wrong workflow.</h2>
+            <div className="mt-6 space-y-3">
+              {[
+                'Employer cases need more detail than a short general request form can capture.',
+                'The dedicated employer intake feeds the group pipeline directly.',
+                'The individual request form stays available for Affordable Care Act Marketplace support.',
+              ].map((item) => (
+                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="section-pad pt-0">
@@ -246,7 +296,7 @@ export default function ContactPage() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="soft-panel">
-                <Users className="h-5 w-5 text-blue-700" />
+                <Users className="h-5 w-5 text-[var(--brand-dark)]" />
                 <p className="mt-3 font-semibold text-slate-950">Use employer intake for:</p>
                 <p className="mt-2 text-sm leading-7 text-slate-700">
                   group quotes, benefit renewals, contribution planning, employee-count based review,
@@ -254,7 +304,7 @@ export default function ContactPage() {
                 </p>
               </div>
               <div className="soft-panel">
-                <ShieldCheck className="h-5 w-5 text-blue-700" />
+                <ShieldCheck className="h-5 w-5 text-[var(--brand-dark)]" />
                 <p className="mt-3 font-semibold text-slate-950">Use individual request form for:</p>
                 <p className="mt-2 text-sm leading-7 text-slate-700">
                   ACA Marketplace questions, family coverage, subsidy-related research, or personal
@@ -262,6 +312,17 @@ export default function ContactPage() {
                 </p>
               </div>
             </div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link className="btn-primary" to={individualPath}>
+              Enroll Now
+            </Link>
+            <Link className="btn-secondary" to={employerPath}>
+              Start Employer Intake
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
+            </Link>
           </div>
         </div>
       </section>

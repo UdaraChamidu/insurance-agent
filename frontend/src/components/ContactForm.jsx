@@ -6,8 +6,8 @@ import { getApiBaseUrl } from '../utils/network';
 const API_URL = getApiBaseUrl();
 
 const coverageOptions = [
-  { value: 'aca', label: 'Individual ACA Marketplace' },
-  { value: 'shop', label: 'SHOP Small Business Coverage' },
+  { value: 'aca', label: 'Individual / Family Coverage (Affordable Care Act Marketplace)' },
+  { value: 'shop', label: 'Employer / Small Business Coverage (SHOP)' },
 ];
 
 const stateOptions = [
@@ -32,12 +32,12 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
 
   const formGuidance =
     formData.productType === 'shop'
-      ? ['Small business review', 'SHOP-focused routing', 'Scheduling available after submission']
-      : ['Individual Marketplace help', 'ACA-focused routing', 'Scheduling available after submission'];
+      ? ['Small business review', 'SHOP guidance in plain language', 'Scheduling available after submission']
+      : ['Individual Marketplace help', 'Affordable Care Act coverage guidance', 'Scheduling available after submission'];
 
   const submitLabel = lockProductType
     ? (formData.productType === 'shop' ? 'Request SHOP Guidance' : 'Request ACA Help')
-    : 'Request ACA or SHOP Help';
+    : 'Start Here';
 
   useEffect(() => {
     if (initialProductType) {
@@ -114,14 +114,17 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
   }
 
   if (successLeadId) {
-    return (
-      <div className="surface-card">
-        <div className="soft-panel">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.2)]">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
+      return (
+        <div className="surface-card">
+          <div className="soft-panel">
+            <div className="flex items-start gap-3">
+              <div
+                className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
+                style={{ background: 'var(--brand)' }}
+              >
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
               <p className="eyebrow">Request Received</p>
               <h3 className="section-title mt-2 text-2xl">Your request is in the system.</h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">
@@ -150,9 +153,9 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
     );
   }
 
-  return (
-    <form className="surface-card" onSubmit={handleSubmit}>
-      <div className="rounded-[1.75rem] border border-blue-100 bg-blue-50/70 px-5 py-5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.75)]">
+    return (
+      <form className="surface-card" onSubmit={handleSubmit}>
+      <div className="accent-panel">
         <p className="eyebrow">Request Form</p>
         <h3 className="font-display text-2xl font-bold text-slate-950">
           {lockProductType
@@ -183,22 +186,28 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               </label>
               {lockProductType ? (
                 <div className="input flex items-center bg-slate-50 text-slate-700">
-                  {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual ACA Marketplace'}
+                  {coverageOptions.find((option) => option.value === formData.productType)?.label || 'Individual / Family Coverage (Affordable Care Act Marketplace)'}
                 </div>
               ) : (
-                <select
-                  className="input"
-                  id="productType"
-                  onChange={updateField('productType')}
-                  required
-                  value={formData.productType}
-                >
-                  {coverageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    className="input"
+                    id="productType"
+                    onChange={updateField('productType')}
+                    required
+                    value={formData.productType}
+                  >
+                    {coverageOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs leading-6 text-slate-500">
+                    ACA means individual or family Marketplace coverage. SHOP means Small Business
+                    Health Options Program for eligible employers.
+                  </p>
+                </>
               )}
             </div>
             <div>
@@ -280,15 +289,15 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
           <label className="label" htmlFor="notes">
             What kind of help do you need?
           </label>
-          <textarea
-            className="input min-h-[140px] resize-y"
-            id="notes"
-            onChange={updateField('notes')}
-            placeholder={lockProductType
-              ? 'Tell us about your ACA Marketplace question, enrollment timing, current coverage, or what kind of help you need.'
-              : 'Tell us whether you need ACA Marketplace enrollment help, SHOP plan guidance, or both.'}
-            value={formData.notes}
-          />
+            <textarea
+              className="input min-h-[140px] resize-y"
+              id="notes"
+              onChange={updateField('notes')}
+              placeholder={lockProductType
+                ? 'Tell us about your Affordable Care Act Marketplace question, enrollment timing, current coverage, or the help you need.'
+                : 'Tell us whether you need Affordable Care Act Marketplace help, SHOP plan guidance, or both.'}
+              value={formData.notes}
+            />
         </div>
 
         {error ? (

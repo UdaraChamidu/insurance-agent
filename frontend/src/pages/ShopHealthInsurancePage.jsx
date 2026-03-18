@@ -70,7 +70,7 @@ export default function ShopHealthInsurancePage() {
       <PageHero
         eyebrow="Employer Health Insurance"
         title="Employer health insurance guidance built for group coverage, renewals, and next-step clarity."
-        description="If you are evaluating health insurance for a business, the first step is not just quoting. We help employers organize the intake details, think through contribution strategy, review whether SHOP is relevant, and move toward the right group coverage path."
+        description="If you are evaluating health insurance for a business, the first step is not just quoting. We help employers organize the intake details, think through contribution strategy, review whether the Small Business Health Options Program (SHOP) is relevant, and move toward the right group coverage path."
         highlights={[
           'Employer and group coverage review',
           'Renewal and contribution context',
@@ -80,6 +80,9 @@ export default function ShopHealthInsurancePage() {
           <>
             <Link className="btn-primary" to="/employer-intake">
               Start Employer Intake
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
             </Link>
             <Link className="btn-secondary" to="/blog/tax-credits-for-small-business-health-insurance">
               Read about tax credits
@@ -96,7 +99,12 @@ export default function ShopHealthInsurancePage() {
         <div className="grid gap-4 md:grid-cols-2">
           {shopBenefits.map((item, index) => (
             <div key={item} className="reveal rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5 text-sm leading-7 text-slate-700 shadow-[0_18px_45px_rgba(15,23,42,0.05)]" style={{ animationDelay: `${index * 100}ms` }}>
-              <span className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 text-xs font-bold text-white number-pop" style={{ animationDelay: `${index * 150}ms` }}>{index + 1}</span>
+              <span
+                className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white number-pop"
+                style={{ animationDelay: `${index * 150}ms`, background: 'var(--brand)' }}
+              >
+                {index + 1}
+              </span>
               <p className="mt-1">{item}</p>
             </div>
           ))}
@@ -119,14 +127,14 @@ export default function ShopHealthInsurancePage() {
           <p className="eyebrow">Internal Resources</p>
           <h2 className="section-title mt-2">Keep researching before you move into quotes or renewal decisions.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/what-is-shop-health-insurance-for-small-businesses">
+            <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/what-is-shop-health-insurance-for-small-businesses">
               What is SHOP health insurance?
             </Link>
-            <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/how-small-businesses-can-save-on-health-insurance">
+            <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/how-small-businesses-can-save-on-health-insurance">
               How small businesses can save on coverage
             </Link>
-            <Link className="gradient-border rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100 hover:scale-[1.02]" to="/employer-intake">
-              Start the employer intake
+            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/employer-intake">
+              Start Employer Intake
             </Link>
           </div>
         </div>

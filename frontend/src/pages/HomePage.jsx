@@ -2,7 +2,7 @@ import { ArrowRight, BadgeCheck, Briefcase, FileSearch, ShieldCheck } from 'luci
 import { Link } from 'react-router-dom';
 import FaqAccordion from '../components/FaqAccordion';
 import Seo from '../components/Seo';
-import { homeFaqItems, homepageHighlights } from '../content/siteContent';
+import { homeFaqItems, homepageHighlights, termDefinitions } from '../content/siteContent';
 import {
   buildFaqSchema,
   buildItemListSchema,
@@ -35,14 +35,14 @@ const brokerAdvantages = [
 const heroStats = [
   'Employer and group health insurance intake',
   'Renewal, contribution, and quoting workflow support',
-  'Separate path for individual ACA requests',
+  'Separate path for individual Affordable Care Act (ACA) requests',
 ];
 
 const quickStartSteps = [
   {
     step: '1',
     title: 'Choose the right case type',
-    text: 'Employer and group cases follow the dedicated intake. Individual and family requests use the shorter ACA request form.',
+    text: 'Employer and group cases follow the dedicated intake. Individual and family requests use the shorter Affordable Care Act (ACA) request form.',
   },
   {
     step: '2',
@@ -93,31 +93,45 @@ export default function HomePage() {
       />
 
       <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
-        <div className="page-reveal blob-bg relative overflow-hidden rounded-[2rem] border border-blue-100 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(125,211,252,0.2),transparent_30%),linear-gradient(135deg,rgba(248,251,255,0.98),rgba(255,255,255,0.92))] px-6 py-12 shadow-[0_30px_80px_rgba(37,99,235,0.1)] sm:px-10 lg:px-12 lg:py-16">
-          <p className="eyebrow">Employer Benefits and Group Health Insurance</p>
+        <div className="page-reveal surface-card">
+          <p className="eyebrow">Elite Deal Broker</p>
           <h1 className="display-title max-w-4xl">
             A broker-led starting point for employer health insurance, benefits review, and renewal planning.
           </h1>
           <p className="body-copy mt-6 max-w-3xl text-lg text-slate-700">
             Elite Deal Broker is now positioned around employer and group health insurance work first.
             We help businesses organize intake, compare practical options, think through contribution
-            strategy, and move into quoting or discovery with less confusion. Individual ACA support
-            remains available through a separate path.
+            strategy, and move into quoting or discovery with less confusion. Individual support
+            remains available through a separate Affordable Care Act (ACA) path.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <Link className="btn-primary" to="/contact">
-              Choose Your Path
+              Start Here
             </Link>
-            <Link className="btn-secondary" to="/employer-intake">
-              Employer Intake
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
+            </Link>
+            <Link className="btn-secondary" to="/contact?coverage=aca">
+              Enroll Now
             </Link>
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {heroStats.map((item) => (
-              <div key={item} className="rounded-[1.5rem] border border-blue-100 bg-white/85 p-5 shadow-[0_12px_30px_rgba(37,99,235,0.06)]">
+              <div key={item} className="soft-panel">
                 <p className="text-sm font-semibold text-slate-900">{item}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {termDefinitions.map((item) => (
+              <div key={item.term} className="soft-panel">
+                <p className="font-display text-lg font-bold text-slate-950">
+                  {item.term} = {item.label}
+                </p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p>
               </div>
             ))}
           </div>
@@ -133,7 +147,10 @@ export default function HomePage() {
           <div className="mt-6 space-y-3">
             {quickStartSteps.map((item) => (
               <div key={item.step} className="soft-panel flex items-start gap-4">
-                <div className="number-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 to-sky-500 text-sm font-bold text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)]" style={{ animationDelay: `${(parseInt(item.step) - 1) * 150}ms` }}>
+                <div
+                  className="number-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_12px_24px_rgba(188,25,24,0.18)]"
+                  style={{ animationDelay: `${(parseInt(item.step, 10) - 1) * 150}ms`, background: 'var(--brand)' }}
+                >
                   {item.step}
                 </div>
                 <div>
@@ -147,13 +164,21 @@ export default function HomePage() {
             {homepageHighlights.map((item) => (
               <Link
                 key={item.href}
-                className="block rounded-[1.5rem] border border-blue-100 bg-white/75 px-5 py-5 transition hover:border-blue-300 hover:bg-blue-50"
+                className="block rounded-[1.5rem] border border-[var(--line)] bg-white px-5 py-5 transition hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]"
                 to={item.href}
               >
                 <p className="text-lg font-semibold text-slate-950">{item.title}</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p>
               </Link>
             ))}
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link className="btn-primary" to="/employer-intake">
+              Start Employer Intake
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
+            </Link>
           </div>
         </aside>
       </section>
@@ -162,7 +187,10 @@ export default function HomePage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {brokerAdvantages.map((item, index) => (
             <article key={item.title} className="surface-card gradient-border reveal" style={{ animationDelay: `${index * 120}ms` }}>
-              <div className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)]">
+              <div
+                className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
+                style={{ background: 'var(--brand)' }}
+              >
                 <item.icon className="h-5 w-5" />
               </div>
               <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
@@ -183,15 +211,15 @@ export default function HomePage() {
           </p>
           <ul className="mt-6 space-y-3 text-slate-700">
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Capture employee counts and benefits scope before the discovery call
             </li>
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Review renewal timing and current carrier context earlier
             </li>
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Keep employer cases in a dedicated CRM workflow instead of a generic contact path
             </li>
           </ul>
@@ -206,19 +234,20 @@ export default function HomePage() {
           <h2 className="section-title mt-2">How the individual ACA path fits into the site now</h2>
           <p className="body-copy mt-4">
             Individual and family coverage support is still available, but it now follows a separate
-            request path so personal ACA cases do not get mixed into the employer workflow.
+            Affordable Care Act (ACA) request path so personal cases do not get mixed into the
+            employer workflow.
           </p>
           <ul className="mt-6 space-y-3 text-slate-700">
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Best for personal or family coverage questions
             </li>
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Keeps ACA timing, subsidy, and plan comparison questions in a simpler short form
             </li>
             <li className="flex items-start gap-3">
-              <BadgeCheck className="mt-1 h-5 w-5 text-blue-700" />
+              <BadgeCheck className="mt-1 h-5 w-5 text-[var(--brand-dark)]" />
               Still moves into scheduling once the request is submitted
             </li>
           </ul>
@@ -276,22 +305,25 @@ export default function HomePage() {
       </section>
 
       <section className="section-pad">
-        <div className="cta-glow-border rounded-[2rem] border border-blue-200 bg-[linear-gradient(135deg,#1e3a8a,#2563eb,#38bdf8)] px-6 py-10 text-white shadow-[0_30px_80px_rgba(37,99,235,0.28)] sm:px-10">
-          <p className="eyebrow text-blue-100">Call To Action</p>
+        <div className="cta-glow-border rounded-[2rem] border border-[#7d1c1c] bg-[linear-gradient(135deg,#6f1414,#991413,#bc1918)] px-6 py-10 text-white shadow-[0_30px_80px_rgba(188,25,24,0.22)] sm:px-10">
+          <p className="eyebrow text-[#ffd8d4]">Call To Action</p>
           <h2 className="font-display text-4xl text-white">
             Ready to review employer coverage or route a case into the right workflow?
           </h2>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-blue-50">
-            Start with the right path so individual ACA requests and employer group cases go into
-            the correct workflow from the beginning. If you want to keep reading first, the blog
-            and FAQ sections are built to support that research path.
+          <p className="mt-4 max-w-3xl text-base leading-8 text-[#fff0ed]">
+            Start with the right path so individual Affordable Care Act requests and employer group
+            cases go into the correct workflow from the beginning. If you want to keep reading
+            first, the blog and FAQ sections are built to support that research path.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link className="btn-light" to="/contact">
-              Choose Coverage Path
+              Start Here
             </Link>
-            <Link className="btn-outline-light" to="/employer-intake">
-              Employer Intake
+            <Link className="btn-outline-light" to="/contact?coverage=aca">
+              Enroll Now
+            </Link>
+            <Link className="btn-outline-light" to="/schedule">
+              Schedule a Meeting
             </Link>
             <Link className="btn-outline-light" to="/blog">
               Browse Articles
@@ -326,9 +358,12 @@ export default function HomePage() {
             <p className="body-copy mt-4 text-slate-700">
               Use the shorter request form when the question is about individual or family health insurance.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-primary" to="/contact?coverage=aca">
-                Open Individual Request Form
+                Enroll Now
+              </Link>
+              <Link className="btn-secondary" to="/schedule">
+                Schedule a Meeting
               </Link>
             </div>
           </div>
@@ -338,9 +373,12 @@ export default function HomePage() {
             <p className="body-copy mt-4 text-slate-700">
               Use the employer intake when the request involves a company, employee counts, current carrier, or renewal review.
             </p>
-            <div className="mt-6">
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-secondary" to="/employer-intake">
-                Open Employer Intake
+                Start Employer Intake
+              </Link>
+              <Link className="btn-primary" to="/contact">
+                Start Here
               </Link>
             </div>
           </div>

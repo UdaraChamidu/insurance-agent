@@ -46,12 +46,22 @@ export default function FaqPage() {
       <PageHero
         eyebrow="Frequently Asked Questions"
         title="Answers to the employer, group coverage, and ACA questions people ask most."
-        description="These questions are written to support employers reviewing group coverage, renewals, tax credits, and broker support, while still keeping individual ACA topics available where they matter."
+        description="These questions are written to support employers reviewing group coverage, renewals, tax credits, and broker support, while still keeping individual Affordable Care Act (ACA) topics available where they matter."
         highlights={[
           `${faqItems.length} common questions`,
           'Built for employers and individual searchers',
           'Linked to service and contact pages',
         ]}
+        actions={(
+          <>
+            <Link className="btn-primary" to="/contact">
+              Start Here
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
+            </Link>
+          </>
+        )}
       />
 
       <section className="section-pad">
@@ -66,10 +76,16 @@ export default function FaqPage() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link className="btn-primary" to="/contact">
-              Choose Coverage Path
+              Start Here
+            </Link>
+            <Link className="btn-secondary" to="/contact?coverage=aca">
+              Enroll Now
             </Link>
             <Link className="btn-secondary" to="/employer-intake">
               Start Employer Intake
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
             </Link>
           </div>
         </div>

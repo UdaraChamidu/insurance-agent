@@ -9,13 +9,13 @@ export const navigationItems = [
     label: 'Employer Benefits',
     shortLabel: 'Employer',
     to: '/shop-health-insurance',
-    description: 'Group health insurance and benefits guidance for employers.',
+    description: 'Group health insurance guidance for employers, including SHOP questions.',
   },
   {
     label: 'Individual Marketplace',
     shortLabel: 'Individual',
     to: '/individual-health-insurance',
-    description: 'ACA Marketplace help for individuals and families.',
+    description: 'Affordable Care Act (ACA) Marketplace help for individuals and families.',
   },
   {
     label: 'Blog',
@@ -47,7 +47,7 @@ export const homepageHighlights = [
   {
     title: 'Individual Marketplace Support',
     description:
-      'Broker-guided ACA Marketplace enrollment for people who need individual or family coverage, premium tax credit guidance, and year-round qualifying event support.',
+      'Broker-guided Affordable Care Act (ACA) Marketplace enrollment for people who need individual or family coverage, premium tax credit guidance, and year-round qualifying event support.',
     href: '/individual-health-insurance',
   },
   {
@@ -195,6 +195,19 @@ export const faqItems = [
 ];
 
 export const aboutFaqItems = faqItems.slice(0, 6);
+
+export const termDefinitions = [
+  {
+    term: 'ACA',
+    label: 'Affordable Care Act',
+    description: 'The individual and family Marketplace used for personal health insurance coverage.',
+  },
+  {
+    term: 'SHOP',
+    label: 'Small Business Health Options Program',
+    description: 'A small-business coverage option that may apply to eligible employers offering group health insurance.',
+  },
+];
 
 export const aboutTrustSignals = [
   'Group-first public journey with a separate employer intake workflow',

@@ -66,7 +66,7 @@ export default function IndividualHealthInsurancePage() {
       <PageHero
         eyebrow="Individual Marketplace Insurance"
         title="ACA Marketplace insurance guidance for individuals and families."
-        description="If you need personal health coverage, the individual Marketplace is where ACA-compliant plans are compared and where subsidy eligibility is reviewed. We help you understand the process, the tradeoffs between plans, and what to do next."
+        description="If you need personal health coverage, the individual Marketplace is where Affordable Care Act (ACA) plans are compared and where subsidy eligibility is reviewed. We help you understand the process, the tradeoffs between plans, and what to do next."
         highlights={[
           'Built for individuals and families',
           'Enrollment timing support',
@@ -75,7 +75,10 @@ export default function IndividualHealthInsurancePage() {
         actions={
           <>
             <Link className="btn-primary" to="/contact?coverage=aca">
-              Request ACA Help
+              Enroll Now
+            </Link>
+            <Link className="btn-secondary" to="/schedule">
+              Schedule a Meeting
             </Link>
             <Link className="btn-secondary" to="/blog/how-to-choose-the-right-aca-plan">
               Learn how to compare plans
@@ -92,7 +95,12 @@ export default function IndividualHealthInsurancePage() {
         <div className="grid gap-4 md:grid-cols-2">
           {acaBenefits.map((item, index) => (
             <div key={item} className="reveal rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5 text-sm leading-7 text-slate-700 shadow-[0_18px_45px_rgba(15,23,42,0.05)]" style={{ animationDelay: `${index * 100}ms` }}>
-              <span className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 text-xs font-bold text-white number-pop" style={{ animationDelay: `${index * 150}ms` }}>{index + 1}</span>
+              <span
+                className="mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white number-pop"
+                style={{ animationDelay: `${index * 150}ms`, background: 'var(--brand)' }}
+              >
+                {index + 1}
+              </span>
               <p className="mt-1">{item}</p>
             </div>
           ))}
@@ -115,14 +123,14 @@ export default function IndividualHealthInsurancePage() {
           <p className="eyebrow">Internal Resources</p>
           <h2 className="section-title mt-2">Keep comparing before you apply.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/how-the-affordable-care-act-marketplace-works">
+            <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/how-the-affordable-care-act-marketplace-works">
               How the ACA Marketplace works
             </Link>
-            <Link className="rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100" to="/blog/who-qualifies-for-aca-health-insurance">
+            <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/who-qualifies-for-aca-health-insurance">
               Who qualifies for ACA insurance
             </Link>
-            <Link className="gradient-border rounded-[1.5rem] border border-blue-100 bg-blue-50/70 px-5 py-5 font-semibold text-slate-950 transition hover:bg-blue-100 hover:scale-[1.02]" to="/contact?coverage=aca">
-              Start an ACA comparison
+            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/contact?coverage=aca">
+              Enroll Now
             </Link>
           </div>
         </div>

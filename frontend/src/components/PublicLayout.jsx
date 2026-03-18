@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ArrowRight, Building2, LogIn, Menu, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ArrowRight, Building2, CalendarDays, LogIn, Menu, UserRound, X } from 'lucide-react';
 import { blogPosts } from '../content/blogPosts';
 import { navigationItems } from '../content/siteContent';
 
 const footerArticles = blogPosts.slice(0, 3);
 const serviceShortcuts = [
   {
-    title: 'Individual Coverage',
-    description: 'ACA Marketplace guidance for individuals and families.',
+    title: 'Individual / Family Coverage',
+    description: 'Affordable Care Act (ACA) Marketplace guidance for personal coverage.',
     to: '/individual-health-insurance',
     icon: UserRound,
   },
   {
-    title: 'Employer Intake',
-    description: 'Start the employer and group coverage workflow directly.',
+    title: 'Employer / Small Business Coverage',
+    description: 'Start the employer intake for group health insurance and renewals.',
     to: '/employer-intake',
     icon: Building2,
   },
@@ -28,8 +28,8 @@ function NavLinks({ mobile = false, onSelect }) {
         mobile
           ? `rounded-[1.35rem] border px-4 py-4 transition ${
               isActive
-                ? 'border-blue-300 bg-white text-slate-950 shadow-[0_16px_34px_rgba(37,99,235,0.12)]'
-                : 'border-transparent bg-transparent text-slate-700 hover:border-blue-200 hover:bg-white/80'
+                ? 'border-[var(--brand-soft-strong)] bg-white text-slate-950 shadow-[0_16px_34px_rgba(188,25,24,0.08)]'
+                : 'border-transparent bg-transparent text-slate-700 hover:border-[var(--brand-soft)] hover:bg-[var(--panel-soft)]'
             }`
           : `nav-link-modern ${isActive ? 'active' : ''}`
       }
@@ -44,7 +44,7 @@ function NavLinks({ mobile = false, onSelect }) {
               {item.description}
             </p>
           </div>
-          <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-blue-600" />
+          <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--brand)]" />
         </div>
       ) : (
         item.shortLabel || item.label
@@ -106,15 +106,19 @@ export default function PublicLayout() {
         <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isScrolled ? 'py-2.5' : 'py-3.5'}`}>
           <div className="flex items-center justify-between gap-6">
             <Link className="group flex min-w-0 items-center gap-3" to="/">
-              <div className="logo-glow flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white transition-transform duration-300 group-hover:scale-105">
-                <ShieldCheck className="h-5 w-5" />
+              <div className="logo-glow overflow-hidden rounded-2xl border border-[var(--line)] bg-white p-1 transition-transform duration-300 group-hover:scale-105">
+                <img
+                  alt="Elite Deal Broker logo"
+                  className="h-11 w-11 rounded-[0.9rem] object-cover"
+                  src="/logo.jpeg"
+                />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-lg font-bold text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-public-display)' }}>
                   Elite Deal Broker
                 </p>
-                <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-blue-600/80">
-                  Employer Benefits Brokerage
+                <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--brand-dark)]">
+                  Health Insurance Brokerage
                 </p>
               </div>
             </Link>
@@ -127,14 +131,24 @@ export default function PublicLayout() {
 
             <div className="hidden items-center gap-3 lg:flex">
               <Link
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                className="btn-secondary px-4 py-2.5"
+                to="/contact?coverage=aca"
+              >
+                Enroll Now
+              </Link>
+              <Link
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
+                to="/schedule"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Schedule a Meeting
+              </Link>
+              <Link
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand-soft-strong)] hover:bg-[var(--panel-soft)]"
                 to="/admin/login"
               >
                 <LogIn className="h-4 w-4" />
                 Admin Login
-              </Link>
-              <Link className="btn-secondary" to="/faq">
-                View FAQs
               </Link>
               <Link className="btn-primary" to="/contact">
                 Start Here
@@ -143,7 +157,7 @@ export default function PublicLayout() {
 
             <button
               aria-label="Toggle navigation"
-              className="inline-flex items-center gap-2 rounded-2xl border border-blue-100/80 bg-white/90 px-4 py-3 text-slate-900 shadow-sm transition-all duration-200 hover:bg-blue-50 hover:shadow-md lg:hidden"
+              className="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-slate-900 shadow-sm transition-all duration-200 hover:bg-[var(--panel-soft)] hover:shadow-md lg:hidden"
               onClick={() => setIsMenuOpen((value) => !value)}
               type="button"
             >
@@ -157,7 +171,7 @@ export default function PublicLayout() {
         </div>
 
         {isMenuOpen ? (
-          <div className="border-t border-blue-100/90 bg-white/98 px-4 pb-5 pt-4 shadow-[0_24px_60px_rgba(37,99,235,0.08)] lg:hidden">
+          <div className="border-t border-[var(--line)] bg-white px-4 pb-5 pt-4 shadow-[0_24px_60px_rgba(59,33,29,0.08)] lg:hidden">
             <div className="mx-auto max-w-lg space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 {serviceShortcuts.map((item) => {
@@ -165,11 +179,11 @@ export default function PublicLayout() {
                   return (
                     <Link
                       key={item.to}
-                      className="rounded-[1.6rem] border border-blue-100 bg-blue-50/65 p-4 shadow-[0_14px_30px_rgba(37,99,235,0.05)] transition hover:border-blue-300 hover:bg-white"
+                      className="rounded-[1.6rem] border border-[var(--line)] bg-[var(--panel-soft)] p-4 shadow-[0_14px_30px_rgba(59,33,29,0.05)] transition hover:border-[var(--brand-soft-strong)] hover:bg-white"
                       onClick={() => setIsMenuOpen(false)}
                       to={item.to}
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 to-sky-500 text-white shadow-[0_12px_26px_rgba(37,99,235,0.2)]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--brand)] text-white shadow-[0_12px_26px_rgba(188,25,24,0.18)]">
                         <Icon className="h-5 w-5" />
                       </div>
                       <p className="mt-4 font-display text-lg font-bold text-slate-950">{item.title}</p>
@@ -179,8 +193,8 @@ export default function PublicLayout() {
                 })}
               </div>
 
-              <div className="rounded-[1.6rem] border border-blue-100 bg-blue-50/55 p-3">
-                <p className="px-2 text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">
+              <div className="rounded-[1.6rem] border border-[var(--line)] bg-[var(--panel-soft)] p-3">
+                <p className="px-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--brand-dark)]">
                   Browse the Site
                 </p>
                 <div className="mt-2 grid gap-2">
@@ -188,9 +202,12 @@ export default function PublicLayout() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Link className="btn-secondary justify-center text-center" to="/faq">
-                  View FAQs
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Link className="btn-secondary justify-center text-center" to="/contact?coverage=aca">
+                  Enroll Now
+                </Link>
+                <Link className="btn-secondary justify-center text-center" to="/schedule">
+                  Schedule
                 </Link>
                 <Link className="btn-primary justify-center text-center" to="/contact">
                   Start Here
@@ -198,7 +215,7 @@ export default function PublicLayout() {
               </div>
 
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                className="inline-flex items-center justify-center gap-2 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
                 onClick={() => setIsMenuOpen(false)}
                 to="/admin/login"
               >
@@ -216,9 +233,9 @@ export default function PublicLayout() {
 
       {showMobileActionBar ? (
         <div className="fixed inset-x-0 bottom-4 z-30 px-4 lg:hidden">
-          <div className="mx-auto flex max-w-md items-center gap-3 rounded-[1.75rem] border border-blue-100 bg-white/92 p-3 shadow-[0_24px_50px_rgba(37,99,235,0.18)] backdrop-blur-xl">
-            <Link className="btn-secondary flex-1 justify-center px-4 py-3" to="/faq">
-              View FAQ
+          <div className="mx-auto flex max-w-md items-center gap-3 rounded-[1.75rem] border border-[var(--line)] bg-white p-3 shadow-[0_24px_50px_rgba(59,33,29,0.14)]">
+            <Link className="btn-secondary flex-1 justify-center px-4 py-3" to="/schedule">
+              Schedule
             </Link>
             <Link className="btn-primary flex-1 justify-center px-4 py-3" to="/contact">
               Start Here
@@ -227,10 +244,22 @@ export default function PublicLayout() {
         </div>
       ) : null}
 
-      <footer className="border-t border-white/10 bg-[linear-gradient(135deg,#0f172a,#102a4c,#1d4ed8)] text-slate-200">
+      <footer className="border-t border-[#511414] bg-[linear-gradient(135deg,#2b0d0d,#4b1111,#6f1414)] text-slate-200">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.3fr_0.8fr_0.9fr] lg:px-8">
           <div>
-            <p className="eyebrow text-blue-200">Elite Deal Broker</p>
+            <div className="flex items-center gap-3">
+              <div className="overflow-hidden rounded-2xl border border-white/15 bg-white p-1">
+                <img
+                  alt="Elite Deal Broker logo"
+                  className="h-12 w-12 rounded-[0.95rem] object-cover"
+                  src="/logo.jpeg"
+                />
+              </div>
+              <div>
+                <p className="eyebrow text-[#f8d9d5]">Elite Deal Broker</p>
+                <p className="text-sm text-[#f0b8b1]">Health Insurance Brokerage</p>
+              </div>
+            </div>
             <h2 className="font-display text-3xl text-white">
               Group health insurance and employer benefits guidance without the noise.
             </h2>
@@ -240,12 +269,15 @@ export default function PublicLayout() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-primary" to="/contact">
-                Choose Coverage Path
+                Start Here
               </Link>
-              <Link className="btn-secondary" to="/employer-intake">
-                Employer Intake
+              <Link className="btn-light" to="/contact?coverage=aca">
+                Enroll Now
               </Link>
-              <Link className="inline-flex items-center gap-2 text-sm font-semibold text-blue-200 transition hover:text-white" to="/blog">
+              <Link className="btn-outline-light" to="/schedule">
+                Schedule a Meeting
+              </Link>
+              <Link className="inline-flex items-center gap-2 text-sm font-semibold text-[#f6cfc9] transition hover:text-white" to="/blog">
                 Read the resource center
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -271,11 +303,11 @@ export default function PublicLayout() {
             </h3>
             <div className="mt-5 flex flex-col gap-4">
               {footerArticles.map((post) => (
-                <Link key={post.slug} className="group rounded-3xl border border-white/10 px-5 py-4 transition hover:border-blue-300/40 hover:bg-white/5" to={`/blog/${post.slug}`}>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-200">
+                <Link key={post.slug} className="group rounded-3xl border border-white/10 px-5 py-4 transition hover:border-[#f1b8b1] hover:bg-[#7a1c1d]" to={`/blog/${post.slug}`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f6cfc9]">
                     {post.category}
                   </p>
-                  <p className="mt-2 font-semibold text-white transition group-hover:text-blue-100">
+                  <p className="mt-2 font-semibold text-white transition group-hover:text-[#fff3f1]">
                     {post.title}
                   </p>
                 </Link>
