@@ -541,12 +541,20 @@ export default function EmployerIntakePage() {
         )}
         children={(
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="soft-panel">
-              <p className="font-semibold text-slate-950">Have these basics ready</p>
-              <p className="mt-2 text-sm leading-7 text-slate-700">
-                Company details, your best contact information, approximate employee counts, current
-                coverage context, and renewal timing.
-              </p>
+            <div className="surface-card sm:col-span-2">
+              <p className="eyebrow">What To Have Ready</p>
+              <h2 className="section-title mt-2">Bring the basics and we can start from there.</h2>
+              <div className="mt-6 space-y-3">
+                {[
+                  'Basic company details and your best contact information.',
+                  'Approximate employee counts and current coverage context.',
+                  'Renewal timing and the benefits you want reviewed.',
+                ].map((item) => (
+                  <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
+                    {item}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="soft-panel">
               <p className="font-semibold text-slate-950">What happens next</p>
@@ -555,80 +563,52 @@ export default function EmployerIntakePage() {
                 forward into census collection or scheduling without re-entry.
               </p>
             </div>
+            <div className="soft-panel">
+              <p className="font-semibold text-slate-950">Why this form exists</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                This intake is separate from the individual flow so employer requests can start with
+                the right pipeline stages, renewal context, and group-specific notes.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+              {[
+                {
+                  icon: Building2,
+                  title: 'Company profile',
+                  text: 'Capture the employer name, state, industry, and basic team size before quoting starts.',
+                },
+                {
+                  icon: Users,
+                  title: 'Benefits scope',
+                  text: 'Identify whether the case involves medical, dental, vision, life, disability, or mixed benefits.',
+                },
+                {
+                  icon: CalendarDays,
+                  title: 'Renewal timing',
+                  text: 'Log the current carrier and renewal date now so follow-up can happen on the right timeline.',
+                },
+                {
+                  icon: ShieldCheck,
+                  title: 'Next-step ready',
+                  text: 'Once submitted, the lead is saved to the group CRM and can move directly into scheduling.',
+                },
+              ].map((item) => (
+                <article key={item.title} className="soft-panel gradient-border">
+                  <div
+                    className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
+                    style={{ background: 'var(--brand)' }}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
+                  <p className="body-copy mt-3 text-slate-700">{item.text}</p>
+                </article>
+              ))}
+            </div>
           </div>
         )}
         aside={employerForm}
       />
-
-      <section className="section-pad grid gap-8 lg:grid-cols-[0.86fr_1.14fr]">
-        <div className="space-y-6">
-          <article className="surface-card">
-            <p className="eyebrow">What To Have Ready</p>
-            <h2 className="section-title mt-2">Bring the basics and we can start from there.</h2>
-            <div className="mt-6 space-y-3">
-              {[
-                'Basic company details and your best contact information.',
-                'Approximate employee counts and current coverage context.',
-                'Renewal timing and the benefits you want reviewed.',
-              ].map((item) => (
-                <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="surface-card">
-            <p className="eyebrow">Why This Form Exists</p>
-            <h2 className="section-title mt-2">A cleaner start for employer cases</h2>
-            <p className="body-copy mt-4 text-slate-700">
-              This intake is separate from the individual contact flow so employer requests can be
-              tracked with the right pipeline stages, renewal context, and group-specific notes
-              from the beginning.
-            </p>
-          </article>
-        </div>
-
-        <div className="grid gap-4">
-          {[
-            {
-              icon: Building2,
-              title: 'Company profile',
-              text: 'Capture the employer name, state, industry, and basic team size before quoting starts.',
-            },
-            {
-              icon: Users,
-              title: 'Benefits scope',
-              text: 'Identify whether the case involves medical, dental, vision, life, disability, or mixed benefits.',
-            },
-            {
-              icon: CalendarDays,
-              title: 'Renewal timing',
-              text: 'Log the current carrier and renewal date now so follow-up can happen on the right timeline.',
-            },
-            {
-              icon: ShieldCheck,
-              title: 'Next-step ready',
-              text: 'Once submitted, the lead is saved to the group CRM and can move directly into scheduling.',
-            },
-          ].map((item, index) => (
-            <article
-              key={item.title}
-              className="soft-panel gradient-border reveal"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div
-                className="icon-float flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.2)]"
-                style={{ background: 'var(--brand)' }}
-              >
-                <item.icon className="h-5 w-5" />
-              </div>
-              <h2 className="section-title mt-5 text-2xl">{item.title}</h2>
-              <p className="body-copy mt-3 text-slate-700">{item.text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
     </>
   );
 }
