@@ -8,8 +8,8 @@ const footerArticles = blogPosts.slice(0, 3);
 const serviceShortcuts = [
   {
     title: 'Individual / Family Coverage',
-    description: 'Affordable Care Act (ACA) Marketplace guidance for personal coverage.',
-    to: '/individual-health-insurance',
+    description: 'Start the individual intake for ACA Marketplace guidance and personal coverage.',
+    to: '/individual-intake',
     icon: UserRound,
   },
   {
@@ -57,7 +57,7 @@ export default function PublicLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
-  const showMobileActionBar = !['/contact', '/employer-intake', '/employer-census'].includes(location.pathname) && !isMenuOpen;
+  const showMobileActionBar = !['/contact', '/individual-intake', '/employer-intake', '/employer-census'].includes(location.pathname) && !isMenuOpen;
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -262,7 +262,7 @@ export default function PublicLayout() {
               <Link className="btn-primary" to="/contact">
                 Start Here
               </Link>
-              <Link className="btn-light" to="/contact?coverage=aca">
+              <Link className="btn-light" to="/individual-intake">
                 Enroll Now
               </Link>
               <Link className="btn-outline-light" to="/schedule">

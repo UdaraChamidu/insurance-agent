@@ -78,7 +78,7 @@ export default function FaqPage() {
             <Link className="btn-primary" to="/contact">
               Start Here
             </Link>
-            <Link className="btn-secondary" to="/contact?coverage=aca">
+            <Link className="btn-secondary" to="/individual-intake">
               Enroll Now
             </Link>
             <Link className="btn-secondary" to="/employer-intake">

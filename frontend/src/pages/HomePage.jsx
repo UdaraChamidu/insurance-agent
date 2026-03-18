@@ -112,7 +112,7 @@ export default function HomePage() {
             <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
             </Link>
-            <Link className="btn-secondary" to="/contact?coverage=aca">
+            <Link className="btn-secondary" to="/individual-intake">
               Enroll Now
             </Link>
           </div>
@@ -251,7 +251,7 @@ export default function HomePage() {
               Still moves into scheduling once the request is submitted
             </li>
           </ul>
-          <Link className="link-arrow pt-6" to="/contact?coverage=aca">
+          <Link className="link-arrow pt-6" to="/individual-intake">
             Open the individual request form
             <ArrowRight className="arrow-animate h-4 w-4" />
           </Link>
@@ -319,7 +319,7 @@ export default function HomePage() {
             <Link className="btn-light" to="/contact">
               Start Here
             </Link>
-            <Link className="btn-outline-light" to="/contact?coverage=aca">
+            <Link className="btn-outline-light" to="/individual-intake">
               Enroll Now
             </Link>
             <Link className="btn-outline-light" to="/schedule">
@@ -359,7 +359,7 @@ export default function HomePage() {
               Use the shorter request form when the question is about individual or family health insurance.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-primary" to="/contact?coverage=aca">
+              <Link className="btn-primary" to="/individual-intake">
                 Enroll Now
               </Link>
               <Link className="btn-secondary" to="/schedule">

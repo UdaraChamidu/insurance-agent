@@ -18,6 +18,7 @@ const EmployerCensusPage = lazy(() => import('./pages/EmployerCensusPage'));
 const EmployerIntakePage = lazy(() => import('./pages/EmployerIntakePage'));
 const FaqPage = lazy(() => import('./pages/FaqPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
+const IndividualIntakePage = lazy(() => import('./pages/IndividualIntakePage'));
 const IndividualHealthInsurancePage = lazy(() => import('./pages/IndividualHealthInsurancePage'));
 const LeadsPage = lazy(() => import('./pages/LeadsPage'));
 const ManageAppointmentPage = lazy(() => import('./pages/ManageAppointmentPage'));
@@ -85,6 +86,7 @@ function App() {
                 <Route element={<AboutPage />} path="/about-us" />
                 <Route element={<ShopHealthInsurancePage />} path="/shop-health-insurance" />
                 <Route element={<IndividualHealthInsurancePage />} path="/individual-health-insurance" />
+                <Route element={<IndividualIntakePage />} path="/individual-intake" />
                 <Route element={<BlogIndexPage />} path="/blog" />
                 <Route element={<BlogPostPage />} path="/blog/:slug" />
                 <Route element={<FaqPage />} path="/faq" />
@@ -94,7 +96,7 @@ function App() {
                 <Route element={<NotFoundPage />} path="*" />
               </Route>
 
-              <Route element={<Navigate to="/contact" replace />} path="/intake" />
+              <Route element={<Navigate to="/individual-intake" replace />} path="/intake" />
               <Route element={<Navigate to="/employer-intake" replace />} path="/group-intake" />
               <Route element={<Navigate to="/employer-census" replace />} path="/census-upload" />
               <Route element={<SchedulePage />} path="/schedule" />

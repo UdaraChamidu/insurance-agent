@@ -74,7 +74,7 @@ export default function IndividualHealthInsurancePage() {
         ]}
         actions={
           <>
-            <Link className="btn-primary" to="/contact?coverage=aca">
+            <Link className="btn-primary" to="/individual-intake">
               Enroll Now
             </Link>
             <Link className="btn-secondary" to="/schedule">
@@ -129,7 +129,7 @@ export default function IndividualHealthInsurancePage() {
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/who-qualifies-for-aca-health-insurance">
               Who qualifies for ACA insurance
             </Link>
-            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/contact?coverage=aca">
+            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/individual-intake">
               Enroll Now
             </Link>
           </div>
