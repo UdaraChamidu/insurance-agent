@@ -77,9 +77,9 @@ export default function IndividualHealthInsurancePage() {
             <Link className="btn-primary" to="/individual-intake">
               Enroll Now
             </Link>
-            <Link className="btn-secondary" to="/schedule">
+            {/* <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
-            </Link>
+            </Link> */}
             <Link className="btn-secondary" to="/blog/how-to-choose-the-right-aca-plan">
               Learn how to compare plans
             </Link>

@@ -81,9 +81,9 @@ export default function ShopHealthInsurancePage() {
             <Link className="btn-primary" to="/employer-intake">
               Start Employer Intake
             </Link>
-            <Link className="btn-secondary" to="/schedule">
+           {/*  <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
-            </Link>
+            </Link> */}
             <Link className="btn-secondary" to="/blog/tax-credits-for-small-business-health-insurance">
               Read about tax credits
             </Link>

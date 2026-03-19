@@ -265,9 +265,9 @@ export default function PublicLayout() {
               <Link className="btn-light" to="/individual-intake">
                 Enroll Now
               </Link>
-              <Link className="btn-outline-light" to="/schedule">
+              {/* <Link className="btn-outline-light" to="/schedule">
                 Schedule a Meeting
-              </Link>
+              </Link> */}
               <Link className="inline-flex items-center gap-2 text-sm font-semibold text-[#f6cfc9] transition hover:text-white" to="/blog">
                 Read the resource center
                 <ArrowRight className="h-4 w-4" />

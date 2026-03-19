@@ -227,9 +227,9 @@ export default function ContactPage() {
             <Link className="btn-secondary" to={employerPath}>
               Open Employer Intake
             </Link>
-            <Link className="btn-secondary" to="/schedule">
+            {/* <Link className="btn-secondary" to="/schedule">
               Schedule a Meeting
-            </Link>
+            </Link> */}
           </div>
         </div>
       </section>
