@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle2, Loader2, Send } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/network';
 
@@ -16,7 +16,6 @@ const stateOptions = [
 
 export default function ContactForm({ initialProductType = 'aca', compact = false, lockProductType = false }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     productType: initialProductType,
     state: 'FL',
@@ -32,12 +31,12 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
 
   const formGuidance =
     formData.productType === 'shop'
-      ? ['Small business review', 'Employer coverage questions', 'Scheduling available after submission']
-      : ['Personal coverage help', 'Plan comparison support', 'Scheduling available after submission'];
+      ? ['Small business review', 'Employer coverage questions', 'We will follow up after submission']
+      : ['Personal coverage help', 'Plan comparison support', 'We will follow up after submission'];
 
   const submitLabel = lockProductType
-    ? (formData.productType === 'shop' ? 'Request Employer Coverage Help' : 'Request Personal Coverage Help')
-    : 'Start Here';
+    ? 'Send My Information'
+    : 'Send My Information';
 
   useEffect(() => {
     if (initialProductType) {
@@ -126,7 +125,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               </div>
               <div>
               <p className="eyebrow">Request Received</p>
-              <h3 className="section-title mt-2 text-2xl">Your request is in the system.</h3>
+              <h3 className="section-title mt-2 text-2xl">We received your information.</h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">
                 Reference ID: <span className="font-semibold text-slate-950">{successLeadId}</span>
               </p>
@@ -134,17 +133,12 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
           </div>
         </div>
         <p className="body-copy mt-6">
-          We saved your information and prepared the next step. If you want to continue now, you
-          can move into scheduling.
+          Thank you. Our team will review your request and contact you soon.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            className="btn-primary"
-            onClick={() => navigate('/schedule')}
-            type="button"
-          >
-            Continue to Scheduling
-          </button>
+          <Link className="btn-primary" to="/">
+            Back to Home
+          </Link>
           <Link className="btn-secondary" to="/faq">
             Review FAQs
           </Link>
@@ -159,13 +153,13 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
         <p className="eyebrow">Request Form</p>
         <h3 className="font-display text-2xl font-bold text-slate-950">
           {lockProductType
-            ? 'Start with a few basics so we can prepare your individual coverage request.'
-            : 'Start with a few basics so we can route your request correctly.'}
+            ? 'Share a few basics so we can follow up about your personal coverage request.'
+            : 'Share a few basics so we can route your request and follow up.'}
         </h3>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           {lockProductType
-            ? 'Share the best contact details and any timing or enrollment notes that will help us understand your personal coverage situation.'
-            : 'Choose the coverage type, share the best contact details, and add any timing or enrollment notes that will help us understand your situation.'}
+            ? 'This short form gives us the contact details and context we need before we reach out.'
+            : 'Choose the coverage type, share a few basics, and our team will follow up directly.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {formGuidance.map((item) => (
@@ -294,8 +288,8 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
               id="notes"
               onChange={updateField('notes')}
               placeholder={lockProductType
-                ? 'Tell us about your coverage question, enrollment timing, current coverage, or the help you need.'
-                : 'Tell us whether you need personal coverage help, employer coverage help, or both.'}
+                ? 'Tell us about your coverage question, timing, current coverage, or anything helpful before we contact you.'
+                : 'Tell us what kind of help you need and anything helpful before we contact you.'}
               value={formData.notes}
             />
         </div>
@@ -311,7 +305,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
             {loading ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Sending request
+                Sending information
               </span>
             ) : (
               <span className="inline-flex items-center gap-2">
@@ -321,7 +315,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
             )}
           </button>
           <p className="text-sm leading-7 text-slate-500">
-            After submission, you can continue directly into scheduling if you are ready for the next step.
+            After submission, our team will review your request and contact you directly.
           </p>
         </div>
       </div>

@@ -29,7 +29,7 @@ export default function IndividualIntakePage() {
   return (
     <>
       <Seo
-        description="Request ACA Marketplace guidance for individual or family health coverage and continue into scheduling when ready."
+        description="Request individual or family health coverage help with a short form, and our team will follow up directly."
         keywords={[
           'ACA Marketplace help',
           'individual health insurance broker',
@@ -39,14 +39,14 @@ export default function IndividualIntakePage() {
         path="/individual-intake"
         structuredData={[
           buildOrganizationSchema(),
-          buildContactPageSchema({
-            path: '/individual-intake',
-            title: 'Individual Intake',
-            description:
-              'Request ACA Marketplace guidance for individual or family health coverage and continue into scheduling when ready.',
-          }),
-          buildBreadcrumbSchema(breadcrumbs),
-        ]}
+            buildContactPageSchema({
+              path: '/individual-intake',
+              title: 'Individual Intake',
+              description:
+                'Request individual or family health coverage help with a short form, and our team will follow up directly.',
+            }),
+            buildBreadcrumbSchema(breadcrumbs),
+          ]}
         title="Individual Intake"
       />
 
@@ -54,18 +54,18 @@ export default function IndividualIntakePage() {
       <PageHero
         eyebrow="Individual Intake"
         title="Request help with individual or family health coverage."
-        description="Use the short request form for personal coverage questions. If you are reviewing benefits for a company or employer group, switch to the employer intake so the case starts in the right workflow."
+        description="Use this short request form for personal or family coverage questions. Share a few basics and our team will contact you directly after reviewing your request."
         highlights={[
           'Individual and family coverage only',
           'Short request form',
-          'Ready for scheduling after submission',
+          'We follow up after you submit',
         ]}
         layoutClassName="grid gap-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-start"
         asideClassName="border-0 bg-transparent p-0 shadow-none"
         actions={(
           <>
-            <Link className="btn-primary" to="/schedule">
-              Schedule a Meeting
+            <Link className="btn-primary" to="/individual-health-insurance">
+              Review Coverage Guide
             </Link>
             <Link className="btn-secondary" to={employerPath}>
               Need Employer Coverage Instead?
@@ -77,8 +77,8 @@ export default function IndividualIntakePage() {
             <div className="soft-panel">
               <p className="font-semibold text-slate-950">Have these basics ready</p>
               <p className="mt-2 text-sm leading-7 text-slate-700">
-                Your state, the best contact details to reach you, and any enrollment timing details
-                that affect when you need coverage.
+                Your state, the best contact details to reach you, and any timing details that help
+                us understand when you need coverage.
               </p>
             </div>
             <div className="soft-panel">
@@ -108,32 +108,6 @@ export default function IndividualIntakePage() {
                 or review the <Link className="link-accent" to="/faq">FAQ page</Link>.
               </p>
             </div>
-            {/* <div className="surface-card sm:col-span-2">
-              <p className="eyebrow">Need Employer Help Instead?</p>
-              <h2 className="section-title mt-2">Use the employer intake if the request is for a company.</h2>
-              <p className="body-copy mt-4 text-slate-700">
-                If the request is for a business, an employer, or employee benefits, use the employer intake instead of this individual form.
-              </p>
-              <div className="mt-6 space-y-3">
-                {[
-                  'Employer and group cases use a separate intake with company details, employee counts, and renewal timing.',
-                  'That intake creates the CRM case directly in the group pipeline.',
-                  'Use the employer intake if you are gathering quotes for a business.',
-                ].map((item) => (
-                  <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
-                    {item}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link className="btn-secondary" to={employerPath}>
-                  Open Employer Intake
-                </Link>
-                <Link className="btn-primary" to="/schedule">
-                  Schedule a Meeting
-                </Link>
-              </div>
-            </div> */}
           </div>
         )}
         aside={(
