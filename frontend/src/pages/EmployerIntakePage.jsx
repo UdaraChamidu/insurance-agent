@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Building2, CalendarDays, CheckCircle2, Loader2, ShieldCheck, Users } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Building2, CalendarDays, Loader2, ShieldCheck, Users } from 'lucide-react';
 import Breadcrumbs from '../components/Breadcrumbs';
+import NextStepModal from '../components/NextStepModal';
 import PageHero from '../components/PageHero';
 import Seo from '../components/Seo';
 import leadsService from '../services/leadsService';
@@ -38,6 +39,7 @@ function toOptionalInteger(value) {
 }
 
 export default function EmployerIntakePage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
@@ -66,8 +68,8 @@ export default function EmployerIntakePage() {
     },
     {
       icon: ShieldCheck,
-      title: 'Clear follow-up',
-      text: 'After you submit the form, our team reviews it and reaches out with the right next step.',
+      title: 'Clear next step',
+      text: 'After you submit the form, you can continue directly into scheduling and choose a meeting time.',
     },
   ];
 
@@ -100,11 +102,11 @@ export default function EmployerIntakePage() {
       }
 
       localStorage.setItem('currentLeadId', response.leadId);
+      setFormData(initialFormData);
       setSuccessLead({
         id: response.leadId,
         companyName: response.companyName || payload.companyName,
       });
-      setFormData(initialFormData);
     } catch (submitError) {
       setError(submitError.message || 'Unable to submit the employer intake right now.');
     } finally {
@@ -112,83 +114,18 @@ export default function EmployerIntakePage() {
     }
   }
 
-  if (successLead) {
-    return (
-      <>
-        <Seo
-          description="Submit a short employer group request form, and our team will follow up directly."
-          keywords={[
-            'employer health insurance intake',
-            'group health insurance intake',
-            'small business employee benefits intake',
-          ]}
-          path="/employer-intake"
-          structuredData={[
-            buildOrganizationSchema(),
-            buildContactPageSchema({
-              path: '/employer-intake',
-              title: 'Employer Intake',
-              description: 'Submit a short employer group request form, and our team will follow up directly.',
-            }),
-            buildBreadcrumbSchema(breadcrumbs),
-          ]}
-          title="Employer Intake"
-        />
-
-        <Breadcrumbs items={breadcrumbs} />
-        <section className="section-pad">
-          <div className="surface-card max-w-3xl">
-            <div className="soft-panel">
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
-                  style={{ background: 'var(--brand)' }}
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="eyebrow">Employer Intake Received</p>
-                  <h1 className="section-title mt-2 text-2xl">We received your employer request.</h1>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
-                    Company: <span className="font-semibold text-slate-950">{successLead.companyName}</span>
-                  </p>
-                  <p className="mt-1 text-sm leading-7 text-slate-600">
-                    Reference ID: <span className="font-semibold text-slate-950">{successLead.id}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <p className="body-copy mt-6 text-slate-700">
-              Thank you. Our team will review your request and contact you soon.
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-primary" to="/">
-                Back to Home
-              </Link>
-              <Link className="btn-secondary" to="/shop-health-insurance">
-                Review Group Coverage Info
-              </Link>
-            </div>
-          </div>
-        </section>
-      </>
-    );
-  }
-
   const employerForm = (
     <form className="surface-card" onSubmit={handleSubmit}>
       <div className="accent-panel">
         <p className="eyebrow">Employer Details</p>
         <h2 className="font-display text-2xl font-bold text-slate-950">
-          Share a few basics and we will follow up about your employer coverage request.
+          Share a few basics so you can continue to scheduling for your employer coverage request.
         </h2>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          This short form gives us the company and contact details we need before we reach out.
+          This short form gives us the company and contact details we need before you choose a meeting time.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {['Employer coverage questions', 'Short first-step form', 'We will follow up directly'].map((item) => (
+          {['Employer coverage questions', 'Short first-step form', 'Scheduling opens after submission'].map((item) => (
             <span key={item} className="chip-pill">
               {item}
             </span>
@@ -328,7 +265,7 @@ export default function EmployerIntakePage() {
             )}
           </button>
           <p className="text-sm leading-7 text-slate-500">
-            After submission, our team will review your request and contact you directly.
+            After submission, we will show the next step so you can continue into scheduling.
           </p>
         </div>
       </div>
@@ -338,7 +275,7 @@ export default function EmployerIntakePage() {
   return (
     <>
       <Seo
-        description="Submit a short employer intake form for group health coverage questions, and our team will follow up directly."
+        description="Submit a short employer intake form for group health coverage questions, then continue to scheduling."
         keywords={[
           'employer intake form',
           'group health insurance review',
@@ -347,12 +284,12 @@ export default function EmployerIntakePage() {
         ]}
         path="/employer-intake"
         structuredData={[
-          buildOrganizationSchema(),
-            buildContactPageSchema({
-              path: '/employer-intake',
-              title: 'Employer Intake',
-              description: 'Submit a short employer intake form for group health coverage questions, and our team will follow up directly.',
-            }),
+            buildOrganizationSchema(),
+              buildContactPageSchema({
+                path: '/employer-intake',
+                title: 'Employer Intake',
+                description: 'Submit a short employer intake form for group health coverage questions, then continue to scheduling.',
+              }),
             buildBreadcrumbSchema(breadcrumbs),
           ]}
         title="Employer Intake"
@@ -362,11 +299,11 @@ export default function EmployerIntakePage() {
       <PageHero
         eyebrow="Employer Intake"
         title="Start your group health insurance review with the employer details that matter."
-        description="Use this short form for company or group coverage questions. Share a few basics and our team will contact you directly after reviewing your request."
+        description="Use this short form for company or group coverage questions. Share a few basics, save the intake, and then continue to scheduling."
         highlights={[
           'Built for employer and group cases',
           'Short first-step form',
-          'We follow up after you submit',
+          'Scheduling opens after you submit',
         ]}
         layoutClassName="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start"
         asideClassName="border-0 bg-transparent p-0 shadow-none"
@@ -400,8 +337,7 @@ export default function EmployerIntakePage() {
             <div className="soft-panel">
               <p className="font-semibold text-slate-950">What happens next</p>
               <p className="mt-2 text-sm leading-7 text-slate-700">
-                We review the information you submit, keep the request in the employer workflow,
-                and contact you directly about the next step.
+                Once the intake is saved, you can continue to scheduling and pick a time for the employer review.
               </p>
             </div>
             <div className="soft-panel">
@@ -431,6 +367,18 @@ export default function EmployerIntakePage() {
           ))}
         </div>
       </section>
+      <NextStepModal
+        description="Your employer intake was submitted successfully. Continue to scheduling to choose a meeting time."
+        eyebrow="Employer Intake Saved"
+        onClose={() => setSuccessLead(null)}
+        onPrimary={() => navigate('/schedule')}
+        onSecondary={() => setSuccessLead(null)}
+        open={Boolean(successLead)}
+        primaryLabel="Continue to Scheduling"
+        referenceId={successLead?.id}
+        secondaryLabel="Stay on This Page"
+        title={successLead?.companyName ? `${successLead.companyName} is ready.` : 'Your employer request is ready.'}
+      />
     </>
   );
 }

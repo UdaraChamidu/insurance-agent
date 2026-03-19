@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { CheckCircle2, Loader2, Send } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Loader2, Send } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/network';
+import NextStepModal from './NextStepModal';
 
 const API_URL = getApiBaseUrl();
 
@@ -16,6 +17,7 @@ const stateOptions = [
 
 export default function ContactForm({ initialProductType = 'aca', compact = false, lockProductType = false }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     productType: initialProductType,
     state: 'FL',
@@ -31,8 +33,8 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
 
   const formGuidance =
     formData.productType === 'shop'
-      ? ['Small business review', 'Employer coverage questions', 'We will follow up after submission']
-      : ['Personal coverage help', 'Plan comparison support', 'We will follow up after submission'];
+      ? ['Small business review', 'Employer coverage questions', 'Scheduling opens after submission']
+      : ['Personal coverage help', 'Plan comparison support', 'Scheduling opens after submission'];
 
   const submitLabel = lockProductType
     ? 'Send My Information'
@@ -96,7 +98,6 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
         }).catch(() => null);
       }
 
-      setSuccessLeadId(data.leadId);
       setFormData((current) => ({
         ...current,
         firstName: '',
@@ -105,6 +106,7 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
         phone: '',
         notes: '',
       }));
+      setSuccessLeadId(data.leadId);
     } catch (submitError) {
       setError(submitError.message || 'Unable to submit your request right now.');
     } finally {
@@ -112,54 +114,20 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
     }
   }
 
-  if (successLeadId) {
-      return (
-        <div className="surface-card">
-          <div className="soft-panel">
-            <div className="flex items-start gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-[0_14px_30px_rgba(188,25,24,0.18)]"
-                style={{ background: 'var(--brand)' }}
-              >
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-              <div>
-              <p className="eyebrow">Request Received</p>
-              <h3 className="section-title mt-2 text-2xl">We received your information.</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Reference ID: <span className="font-semibold text-slate-950">{successLeadId}</span>
-              </p>
-            </div>
-          </div>
-        </div>
-        <p className="body-copy mt-6">
-          Thank you. Our team will review your request and contact you soon.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link className="btn-primary" to="/">
-            Back to Home
-          </Link>
-          <Link className="btn-secondary" to="/faq">
-            Review FAQs
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
     return (
+      <>
       <form className="surface-card" onSubmit={handleSubmit}>
       <div className="accent-panel">
         <p className="eyebrow">Request Form</p>
         <h3 className="font-display text-2xl font-bold text-slate-950">
           {lockProductType
-            ? 'Share a few basics so we can follow up about your personal coverage request.'
-            : 'Share a few basics so we can route your request and follow up.'}
+            ? 'Share a few basics so you can continue to scheduling for your personal coverage request.'
+            : 'Share a few basics so we can route your request and open the scheduling step.'}
         </h3>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           {lockProductType
-            ? 'This short form gives us the contact details and context we need before we reach out.'
-            : 'Choose the coverage type, share a few basics, and our team will follow up directly.'}
+            ? 'This short form gives us the contact details and context we need before you choose a meeting time.'
+            : 'Choose the coverage type, share a few basics, and then continue into scheduling.'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {formGuidance.map((item) => (
@@ -315,10 +283,22 @@ export default function ContactForm({ initialProductType = 'aca', compact = fals
             )}
           </button>
           <p className="text-sm leading-7 text-slate-500">
-            After submission, our team will review your request and contact you directly.
+            After submission, we will show the next step so you can continue into scheduling.
           </p>
         </div>
       </div>
     </form>
+    <NextStepModal
+      description="Your request was submitted successfully. Continue to scheduling to choose a meeting time."
+      onClose={() => setSuccessLeadId('')}
+      onPrimary={() => navigate('/schedule')}
+      onSecondary={() => setSuccessLeadId('')}
+      open={Boolean(successLeadId)}
+      primaryLabel="Continue to Scheduling"
+      referenceId={successLeadId}
+      secondaryLabel="Stay on This Page"
+      title="Your information is ready."
+    />
+    </>
   );
 }
