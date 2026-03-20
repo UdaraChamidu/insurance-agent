@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     TWILIO_PHONE_NUMBER: str = ""
 
     # App
-    APP_BASE_URL: str = "http://localhost:5173"
+    APP_BASE_URL: str = "http://localhost:3000"
     
     # Application Params
     PORT: int = 8000

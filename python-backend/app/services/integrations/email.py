@@ -6,27 +6,29 @@ logger = logging.getLogger(__name__)
 class EmailService:
     """
     Email service for backend-side email handling.
-    
-    Actual emails are sent from the frontend using EmailJS.
-    This service handles:
-    - Logging email events for audit trail
-    - Generating email data payloads
-    - Server-side email triggers (mock/development mode)
+
+    Actual emails are currently sent from the frontend using EmailJS.
+    This service keeps a backend-side audit trail and can be extended later.
     """
 
     def send_email(self, to: str, subject: str, body: str):
         """
         Log email send event.
-        In production, this logs the event. Actual sending is done via
-        frontend EmailJS or can be extended to use SMTP/SES later.
+        In production, this can be extended to use SMTP or an email API.
         """
-        logger.info(f"📧 EMAIL: To={to} | Subject={subject}")
+        logger.info(f"EMAIL: To={to} | Subject={subject}")
         logger.info(f"   Body preview: {body[:200]}...")
-        # In production, integrate with SMTP or email API here
         return {"success": True, "to": to, "subject": subject}
 
+    def get_status(self) -> dict:
+        return {
+            "provider": "frontend_emailjs",
+            "serverDelivery": False,
+            "mode": "log_only",
+        }
+
     def generate_booking_confirmation_payload(self, appointment: dict) -> dict:
-        """Generate structured data for EmailJS template"""
+        """Generate structured data for EmailJS template."""
         return {
             "to_email": appointment.get("customerEmail", ""),
             "to_name": appointment.get("customerName", ""),
@@ -39,7 +41,7 @@ class EmailService:
         }
 
     def generate_reminder_payload(self, appointment: dict) -> dict:
-        """Generate structured data for reminder EmailJS template"""
+        """Generate structured data for reminder EmailJS template."""
         return {
             "to_email": appointment.get("customerEmail", ""),
             "to_name": appointment.get("customerName", ""),
