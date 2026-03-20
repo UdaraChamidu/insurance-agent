@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
-import { 
-  Users, 
-  FileText, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  Users,
+  FileText,
+  Settings,
+  LogOut,
+  Menu,
   X,
   Search,
   Calendar,
   Sun,
-  Moon
+  Moon,
+  Mail,
+  BarChart3,
+  Kanban
 } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 import { useTheme } from '../context/ThemeContext';
@@ -24,7 +27,10 @@ export default function AdminLayout() {
   const menuItems = [
     { path: '/admin/bookings', label: 'Appointments', icon: Calendar },
     { path: '/admin/leads', label: 'Clients', icon: Users },
+    { path: '/admin/pipeline', label: 'Pipeline Board', icon: Kanban },
+    { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/admin/documents', label: 'Knowledge Base', icon: FileText },
+    { path: '/admin/templates', label: 'Templates', icon: Mail },
     { path: '/admin/profile', label: 'Settings', icon: Settings },
   ];
 

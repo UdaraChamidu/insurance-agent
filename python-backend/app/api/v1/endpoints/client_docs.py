@@ -4,13 +4,39 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models import Document, Lead, PipelineHistory
+from app.core.database import get_db as get_sql_db
 from app.core.supabase import supabase
 import uuid
 import os
+import secrets
 
 router = APIRouter()
 
 ALLOWED_CENSUS_EXTENSIONS = {".csv", ".xlsx", ".xls", ".pdf"}
+ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".xlsx", ".xls", ".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".tiff"}
+MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB
+
+DOCUMENT_FOLDERS = [
+    "Prospecting",
+    "Active Quotes",
+    "Sold Groups",
+    "Renewals",
+    "Compliance-Docs",
+]
+
+STAGE_TO_FOLDER = {
+    "new_lead": "Prospecting",
+    "contacted": "Prospecting",
+    "discovery_scheduled": "Prospecting",
+    "census_requested": "Active Quotes",
+    "census_received": "Active Quotes",
+    "sent_to_warner": "Active Quotes",
+    "quotes_received": "Active Quotes",
+    "proposal_presented": "Active Quotes",
+    "closed_won": "Sold Groups",
+    "closed_lost": "Prospecting",
+    "renewal_followup": "Renewals",
+}
 GROUP_STAGES_BEFORE_CENSUS_RECEIVED = {
     "new_lead",
     "contacted",
@@ -272,3 +298,198 @@ def download_document(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate download link: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Secure File Collection Portal (token-based public upload)
+# ---------------------------------------------------------------------------
+
+@router.get("/portal/{token}")
+def get_portal_info(token: str, db: Session = Depends(deps.get_db)):
+    """
+    Public endpoint: validate an upload token and return lead info
+    so the upload page can show the company name.
+    """
+    sql_db = next(get_sql_db())
+    try:
+        lead = sql_db.query(Lead).filter(Lead.uploadToken == token).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Invalid or expired upload link")
+        return {
+            "success": True,
+            "lead": {
+                "id": lead.id,
+                "companyName": lead.companyName or "",
+                "contactPerson": lead.contactPerson or f"{lead.firstName or ''} {lead.lastName or ''}".strip(),
+            },
+        }
+    finally:
+        sql_db.close()
+
+
+@router.post("/portal/{token}/upload")
+async def portal_upload(
+    token: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    description: str = Form(None),
+    folder: str = Form(None),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Public endpoint: upload a document using a secure token.
+    Validates file type/size and stores under the lead's folder.
+    """
+    sql_db = next(get_sql_db())
+    try:
+        lead = sql_db.query(Lead).filter(Lead.uploadToken == token).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Invalid or expired upload link")
+
+        file_ext = os.path.splitext(file.filename or "")[1].lower()
+        if file_ext not in ALLOWED_UPLOAD_EXTENSIONS:
+            allowed = ", ".join(sorted(ALLOWED_UPLOAD_EXTENSIONS))
+            raise HTTPException(status_code=400, detail=f"File type not allowed. Accepted: {allowed}")
+
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024*1024)} MB")
+
+        folder_category = folder if folder in DOCUMENT_FOLDERS else STAGE_TO_FOLDER.get(lead.pipelineStatus, "Prospecting")
+        path_prefix = folder_category.lower().replace(" ", "-")
+
+        new_doc = _store_document(
+            db=sql_db,
+            lead_id=lead.id,
+            filename=file.filename,
+            content=content,
+            content_type=file.content_type,
+            description=_build_document_description("Portal upload", description),
+            path_prefix=path_prefix,
+        )
+        new_doc.folderCategory = folder_category
+
+        sql_db.commit()
+        sql_db.refresh(new_doc)
+
+        from app.services.notification_service import notification_service
+        company_label = lead.companyName or lead.contactPerson or lead.email or lead.id
+        background_tasks.add_task(
+            notification_service.create_notification,
+            type="file",
+            title="Document Uploaded via Portal",
+            message=f"{company_label} uploaded {file.filename}",
+            metadata={
+                "leadId": lead.id,
+                "documentId": new_doc.id,
+                "folder": folder_category,
+                "source": "secure_portal",
+            },
+        )
+
+        return {
+            "success": True,
+            "document": {
+                "id": new_doc.id,
+                "filename": new_doc.filename,
+                "folder": folder_category,
+                "uploadedAt": new_doc.createdAt.isoformat() if new_doc.createdAt else None,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        sql_db.rollback()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+    finally:
+        sql_db.close()
+
+
+# ---------------------------------------------------------------------------
+# Upload token generation (admin)
+# ---------------------------------------------------------------------------
+
+@router.post("/generate-token/{lead_id}")
+def generate_upload_token(lead_id: str, db: Session = Depends(deps.get_db)):
+    """Admin endpoint: generate a unique upload token for a lead."""
+    sql_db = next(get_sql_db())
+    try:
+        lead = sql_db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        if not lead.uploadToken:
+            lead.uploadToken = secrets.token_urlsafe(32)
+            sql_db.commit()
+            sql_db.refresh(lead)
+
+        return {
+            "success": True,
+            "uploadToken": lead.uploadToken,
+            "uploadUrl": f"/upload/{lead.uploadToken}",
+        }
+    finally:
+        sql_db.close()
+
+
+# ---------------------------------------------------------------------------
+# Document folder management
+# ---------------------------------------------------------------------------
+
+@router.get("/folders")
+def list_folder_categories():
+    """Return the available document folder categories."""
+    return {"success": True, "folders": DOCUMENT_FOLDERS}
+
+
+@router.get("/folders/{lead_id}")
+def get_lead_folders(lead_id: str, db: Session = Depends(deps.get_db)):
+    """Get documents grouped by folder for a lead."""
+    sql_db = next(get_sql_db())
+    try:
+        docs = (
+            sql_db.query(Document)
+            .filter(Document.leadId == lead_id)
+            .order_by(Document.createdAt.desc())
+            .all()
+        )
+
+        folders = {f: [] for f in DOCUMENT_FOLDERS}
+        folders["Uncategorized"] = []
+
+        for doc in docs:
+            cat = doc.folderCategory if doc.folderCategory in DOCUMENT_FOLDERS else "Uncategorized"
+            folders[cat].append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "fileType": doc.fileType,
+                "fileSize": doc.fileSize,
+                "description": doc.description,
+                "folderCategory": doc.folderCategory,
+                "createdAt": doc.createdAt.isoformat() if doc.createdAt else None,
+            })
+
+        return {"success": True, "folders": folders}
+    finally:
+        sql_db.close()
+
+
+@router.patch("/move/{doc_id}")
+def move_document_folder(doc_id: str, folder: str = Form(...), db: Session = Depends(deps.get_db)):
+    """Move a document to a different folder category."""
+    if folder not in DOCUMENT_FOLDERS:
+        raise HTTPException(status_code=400, detail=f"Invalid folder. Options: {', '.join(DOCUMENT_FOLDERS)}")
+
+    sql_db = next(get_sql_db())
+    try:
+        doc = sql_db.query(Document).filter(Document.id == doc_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        doc.folderCategory = folder
+        sql_db.commit()
+        return {"success": True, "documentId": doc_id, "folder": folder}
+    finally:
+        sql_db.close()

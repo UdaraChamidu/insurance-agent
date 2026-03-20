@@ -9,10 +9,11 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
 from app.core.supabase import supabase
-from app.models import Lead, Session as DbSession, Transcript, Appointment, Document, PipelineHistory
+from app.models import Lead, Session as DbSession, Transcript, Appointment, Document, PipelineHistory, MessageTemplate
 from app.schemas.lead import LeadCreate, Lead as LeadSchema, SessionCreate, SessionUpdate, EmployerLeadCreate
 from app.schemas.common import INDIVIDUAL_PIPELINE_STAGES, GROUP_PIPELINE_STAGES, ALL_PIPELINE_STAGES
 from app.services.integrations.ghl import ghl_service
+from app.api.v1.endpoints.templates import _build_variables_from_lead, _render_template
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -536,13 +537,39 @@ async def update_lead_pipeline_status(
         db.commit()
         db.refresh(lead)
 
+        # Auto-send template triggered by this pipeline stage (if any)
+        template_sent = None
+        triggered = (
+            db.query(MessageTemplate)
+            .filter(MessageTemplate.triggerStage == next_status, MessageTemplate.isActive == True)
+            .first()
+        )
+        if triggered:
+            try:
+                from app.services.communication_service import communication_service
+                variables = _build_variables_from_lead(lead)
+                rendered_body = _render_template(triggered.body, variables)
+                rendered_subject = _render_template(triggered.subject or "", variables)
+
+                if triggered.type == "email" and lead.email:
+                    communication_service.email_service.send_email(
+                        lead.email, rendered_subject, rendered_body
+                    )
+                    template_sent = {"name": triggered.name, "channel": "email"}
+                elif triggered.type == "sms" and lead.phone:
+                    communication_service.twilio_service.send_sms(lead.phone, rendered_body)
+                    template_sent = {"name": triggered.name, "channel": "sms"}
+            except Exception as exc:
+                print(f"Auto-send template failed: {exc}")
+
         return {
             "success": True,
             "lead": {
                 "id": lead.id,
                 "pipelineStatus": lead.pipelineStatus or "new",
                 "previousStatus": previous_status,
-            }
+            },
+            "templateSent": template_sent,
         }
     except HTTPException:
         raise

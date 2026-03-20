@@ -26,7 +26,11 @@ const MeetingPage = lazy(() => import('./pages/MeetingPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SchedulePage = lazy(() => import('./pages/SchedulePage'));
+const SecureUploadPage = lazy(() => import('./pages/SecureUploadPage'));
 const ShopHealthInsurancePage = lazy(() => import('./pages/ShopHealthInsurancePage'));
+const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
+const PipelineBoardPage = lazy(() => import('./pages/PipelineBoardPage'));
+const TemplatesPage = lazy(() => import('./pages/TemplatesPage'));
 
 function RouteFallback() {
   return (
@@ -102,6 +106,7 @@ function App() {
               <Route element={<SchedulePage />} path="/schedule" />
               <Route element={<MeetingPage />} path="/meeting" />
               <Route element={<ManageAppointmentPage />} path="/appointment/manage/:token" />
+              <Route element={<SecureUploadPage />} path="/upload/:token" />
               <Route element={<AdminLoginRedirectIfAuth />} path="/admin/login" />
 
               <Route
@@ -117,8 +122,11 @@ function App() {
                 <Route element={<Navigate to="/admin/leads" replace />} path="clients" />
                 <Route element={<ClientProfilePage />} path="clients/:leadId" />
                 <Route element={<LeadsPage />} path="leads" />
+                <Route element={<PipelineBoardPage />} path="pipeline" />
+                <Route element={<AnalyticsDashboard />} path="analytics" />
                 <Route element={<ClientProfilePage />} path="leads/:leadId" />
                 <Route element={<DocumentsPage />} path="documents" />
+                <Route element={<TemplatesPage />} path="templates" />
                 <Route element={<ProfilePage />} path="profile" />
               </Route>
 

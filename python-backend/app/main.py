@@ -44,7 +44,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 async def startup_event():
     # Create any new database tables
     from app.core.database import engine, Base
-    from app.models import Lead, Session, Transcript, Notification, Appointment, AvailabilitySlot, PipelineHistory
+    from app.models import Lead, Session, Transcript, Notification, Appointment, AvailabilitySlot, PipelineHistory, Document, MessageTemplate
     Base.metadata.create_all(bind=engine)
 
     # Add missing columns to existing tables (create_all won't alter existing tables)
@@ -74,6 +74,8 @@ async def startup_event():
             ("Lead", "contributionStrategy", "VARCHAR"),
             ("Lead", "benefitsNeeded", "JSONB"),
             ("Lead", "groupNotes", "TEXT"),
+            ("Lead", "uploadToken", "VARCHAR UNIQUE"),
+            ("Document", "folderCategory", "VARCHAR"),
         ]
         for table, column, col_type in migrations:
             try:
@@ -88,8 +90,10 @@ async def startup_event():
 
     from app.services.document.poller import document_poller
     from app.services.appointment_reminder_poller import appointment_reminder_poller
+    from app.services.renewal_reminder_poller import renewal_reminder_poller
     await document_poller.start()
     await appointment_reminder_poller.start()
+    await renewal_reminder_poller.start()
 
     # Phase 4C: Pre-warm the RAG pipeline so the first real request has no cold-start penalty
     try:
@@ -102,8 +106,10 @@ async def startup_event():
 async def shutdown_event():
     from app.services.document.poller import document_poller
     from app.services.appointment_reminder_poller import appointment_reminder_poller
+    from app.services.renewal_reminder_poller import renewal_reminder_poller
     await document_poller.stop()
     await appointment_reminder_poller.stop()
+    await renewal_reminder_poller.stop()
 
 @app.get("/health")
 def health_check():

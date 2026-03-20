@@ -11,6 +11,8 @@ from app.api.v1.endpoints import (
     communications,
     client_docs,
     public_chat,
+    templates,
+    analytics,
 )
 
 api_router = APIRouter()
@@ -26,4 +28,6 @@ api_router.include_router(scheduling.router, prefix="/scheduling", tags=["schedu
 api_router.include_router(communications.router, prefix="/communications", tags=["communications"])
 api_router.include_router(client_docs.router, prefix="/client-docs", tags=["client_docs"])
 api_router.include_router(public_chat.router, prefix="/public", tags=["public"])
+api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 

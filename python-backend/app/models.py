@@ -52,6 +52,9 @@ class Lead(Base):
     benefitsNeeded = Column(JSON, nullable=True)  # e.g. ["medical","dental","vision"]
     groupNotes = Column(Text, nullable=True)
 
+    # Secure upload token for public file collection portal
+    uploadToken = Column(String, unique=True, nullable=True, index=True)
+
     # Relation to Session
     session = relationship("Session", uselist=False, back_populates="lead")
     appointments = relationship("Appointment", back_populates="lead")
@@ -184,6 +187,7 @@ class Document(Base):
     fileSize = Column(Integer, default=0)
     
     description = Column(String, nullable=True) # Notes from user
+    folderCategory = Column(String, nullable=True)  # Prospecting, Active Quotes, Sold Groups, Renewals, Compliance-Docs
 
     lead = relationship("Lead", back_populates="documents")
 
@@ -200,3 +204,19 @@ class PipelineHistory(Base):
     notes = Column(Text, nullable=True)
 
     lead = relationship("Lead", back_populates="pipelineHistory")
+
+
+class MessageTemplate(Base):
+    __tablename__ = "MessageTemplate"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    name = Column(String, nullable=False, unique=True)
+    type = Column(String, nullable=False)  # "email" or "sms"
+    subject = Column(String, nullable=True)  # email subject line (null for SMS)
+    body = Column(Text, nullable=False)
+    variables = Column(JSON, nullable=True)  # e.g. ["company_name", "contact_name"]
+    triggerStage = Column(String, nullable=True)  # pipeline stage that triggers this template
+    isActive = Column(Boolean, default=True)

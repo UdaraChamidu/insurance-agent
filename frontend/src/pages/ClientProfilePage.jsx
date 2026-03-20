@@ -7,6 +7,7 @@ import {
   Building2
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
+import clientDocsService from '../services/clientDocsService';
 import { getApiBaseUrl } from '../utils/network';
 
 const API_URL = getApiBaseUrl();
@@ -83,6 +84,9 @@ export default function ClientProfilePage() {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [docFolders, setDocFolders] = useState(null);
+  const [uploadToken, setUploadToken] = useState('');
+  const [tokenCopied, setTokenCopied] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState('');
   const [recordingPath, setRecordingPath] = useState('');
   const [recordingLoading, setRecordingLoading] = useState(false);
@@ -206,6 +210,14 @@ export default function ClientProfilePage() {
         }
       } catch (err) {
          console.error('Error fetching docs:', err);
+      }
+
+      // Fetch document folders
+      try {
+        const folderData = await clientDocsService.getLeadFolders(leadId);
+        if (folderData.success) setDocFolders(folderData.folders);
+      } catch (err) {
+        console.error('Error fetching doc folders:', err);
       }
 
     } catch (err) {
@@ -710,8 +722,87 @@ export default function ClientProfilePage() {
       )}
 
       {activeTab === 'documents' && (
-        <div className="space-y-3">
-          {documents.length === 0 ? (
+        <div className="space-y-4">
+          {/* Upload Token Section */}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">Secure Upload Portal</p>
+                <p className="text-xs text-gray-400 mt-0.5">Generate a link for the client to upload documents securely.</p>
+              </div>
+              {uploadToken ? (
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-white/10 px-2 py-1 rounded text-blue-300 truncate max-w-[200px]">
+                    /upload/{uploadToken.slice(0, 12)}...
+                  </code>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/upload/${uploadToken}`;
+                      navigator.clipboard.writeText(url);
+                      setTokenCopied(true);
+                      setTimeout(() => setTokenCopied(false), 2000);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-all"
+                  >
+                    {tokenCopied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await clientDocsService.generateUploadToken(leadId);
+                      setUploadToken(result.uploadToken);
+                    } catch (err) {
+                      console.error('Error generating token:', err);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-all"
+                >
+                  Generate Upload Link
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Folder-organized documents */}
+          {docFolders ? (
+            Object.entries(docFolders).map(([folderName, docs]) => (
+              <div key={folderName} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/5 border-b border-white/10 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-white">{folderName}</span>
+                  <span className="text-xs text-gray-500 ml-1">({docs.length})</span>
+                </div>
+                {docs.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-gray-500">No documents in this folder.</div>
+                ) : (
+                  docs.map((doc) => (
+                    <div key={doc.id} className="px-4 py-3 flex items-center justify-between border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-medium truncate">{doc.filename}</p>
+                          <p className="text-xs text-gray-400">
+                            {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ''} {doc.fileSize ? `• ${(doc.fileSize / 1024).toFixed(0)} KB` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(doc.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-xs transition-all border border-white/10 shrink-0"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))
+          ) : documents.length === 0 ? (
             <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
               <FileText className="w-10 h-10 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400">No documents uploaded.</p>
@@ -730,7 +821,7 @@ export default function ClientProfilePage() {
                      </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => handleDownload(doc.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-sm transition-all border border-white/10"
                 >

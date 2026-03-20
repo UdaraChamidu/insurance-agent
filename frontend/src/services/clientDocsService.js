@@ -106,6 +106,61 @@ class ClientDocsService {
     setLegacyUploadMode(false);
     return await response.json();
   }
+  async getPortalInfo(token) {
+    const response = await fetch(`${API_URL}/api/client-docs/portal/${token}`);
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  async portalUpload({ token, file, description, folder }) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (description?.trim()) formData.append('description', description.trim());
+    if (folder) formData.append('folder', folder);
+
+    const response = await fetch(`${API_URL}/api/client-docs/portal/${token}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  async generateUploadToken(leadId) {
+    const response = await fetch(`${API_URL}/api/client-docs/generate-token/${leadId}`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  async getLeadFolders(leadId) {
+    const response = await fetch(`${API_URL}/api/client-docs/folders/${leadId}`);
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  async moveDocument(docId, folder) {
+    const formData = new FormData();
+    formData.append('folder', folder);
+    const response = await fetch(`${API_URL}/api/client-docs/move/${docId}`, {
+      method: 'PATCH',
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+    return response.json();
+  }
 }
 
 export default new ClientDocsService();
