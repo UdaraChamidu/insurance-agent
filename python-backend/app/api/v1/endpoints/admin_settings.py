@@ -3,6 +3,7 @@ from typing import Any, Dict
 from fastapi import APIRouter
 from app.core.config import settings
 from app.services.integrations.pinecone import pinecone_service
+from app.services.communication_service import communication_service
 from app.services.llm.usage_tracker import gemini_usage_tracker
 
 router = APIRouter()
@@ -70,6 +71,7 @@ def get_admin_settings():
         "success": True,
         "environment": settings.ENVIRONMENT,
         "geminiUsage": gemini_usage_tracker.get_snapshot(),
+        "communicationStatus": communication_service.get_status(),
         "providers": {
             "gemini": {
                 "configured": bool(gemini_key),

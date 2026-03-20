@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar, CheckCircle, Clock, Sun, Loader, RefreshCw, Search } from 'lucide-react';
+import { User, Shield, Bell, Moon, Lock, LogOut, TrendingUp, Calendar, CheckCircle, Clock, Sun, RefreshCw, Search, Smartphone, Mail, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import bookingsService from '../services/bookingsService';
 import { getApiBaseUrl } from '../utils/network';
+import { isEmailJsConfigured } from '../services/frontendEmailService';
 
 const API_URL = getApiBaseUrl();
 
@@ -117,6 +118,24 @@ export default function ProfilePage() {
     loadStats();
     loadIntegrationStatus();
   };
+
+  const emailJsTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+  const emailJsCancelTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_CANCEL;
+  const emailJsRescheduleTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_RESCHEDULE;
+  const frontendEmailStatus = {
+    serviceConfigured: Boolean(import.meta.env.VITE_EMAILJS_SERVICE_ID && import.meta.env.VITE_EMAILJS_PUBLIC_KEY),
+    bookingReady: isEmailJsConfigured(emailJsTemplateId),
+    cancellationReady: isEmailJsConfigured(emailJsCancelTemplateId || emailJsTemplateId),
+    rescheduleReady: isEmailJsConfigured(emailJsRescheduleTemplateId || emailJsTemplateId),
+    usingRescheduleFallback: !emailJsRescheduleTemplateId && isEmailJsConfigured(emailJsTemplateId),
+    hasDedicatedRescheduleTemplate: Boolean(emailJsRescheduleTemplateId),
+  };
+
+  const communicationStatus = integrationStatus?.communicationStatus || null;
+  const smsStatus = communicationStatus?.sms;
+  const backendEmailStatus = communicationStatus?.email;
+  const appBaseUrl = communicationStatus?.appBaseUrl || 'Not set';
+  const communicationStatusAvailable = Boolean(communicationStatus);
 
   const filteredProviders = (integrationStatus?.providers && searchTerm.trim())
     ? Object.entries(integrationStatus.providers).filter(([name, data]) => {
@@ -358,6 +377,114 @@ export default function ProfilePage() {
         )}
       </div>
 
+      <div className="bg-white dark:bg-slate-800 backdrop-blur-md rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm transition-colors duration-300">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+              Communication Status
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Twilio delivery, frontend EmailJS readiness, and the app link base used in messages.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              label={smsStatus?.live ? 'SMS Live' : smsStatus?.configured ? 'SMS Pending' : 'SMS Missing'}
+              tone={smsStatus?.live ? 'green' : smsStatus?.configured ? 'amber' : 'red'}
+            />
+            <StatusPill
+              label={frontendEmailStatus.bookingReady ? 'Email Ready' : 'Email Missing'}
+              tone={frontendEmailStatus.bookingReady ? 'green' : 'red'}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {!communicationStatusAvailable ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+              Communication status from the backend is not available in the current admin settings response yet. The frontend checks below are still shown, and the full backend status will appear after the backend is restarted with the latest changes.
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <CommunicationCard
+              icon={Smartphone}
+              title="Twilio SMS"
+              statusLabel={smsStatus?.live ? 'Live' : smsStatus?.configured ? 'Configured' : 'Unavailable'}
+              tone={smsStatus?.live ? 'green' : smsStatus?.configured ? 'amber' : 'red'}
+              detail={
+                communicationStatusAvailable
+                  ? smsStatus?.live
+                    ? `Sending from ${smsStatus?.fromNumber || 'configured number'}`
+                    : smsStatus?.configured
+                      ? `Configured, but backend is still using ${smsStatus?.mode || 'mock'} mode`
+                      : 'Twilio status is not available from the backend.'
+                  : 'Waiting for backend communication status.'
+              }
+            />
+            <CommunicationCard
+              icon={Mail}
+              title="Frontend EmailJS"
+              statusLabel={frontendEmailStatus.bookingReady ? 'Ready' : 'Missing'}
+              tone={frontendEmailStatus.bookingReady ? 'green' : 'red'}
+              detail={
+                frontendEmailStatus.bookingReady
+                  ? frontendEmailStatus.hasDedicatedRescheduleTemplate
+                    ? 'Booking, cancellation, and reschedule templates are available.'
+                    : 'Booking and cancellation are ready. Reschedule is using the main template fallback.'
+                  : 'EmailJS service, key, or template is missing.'
+              }
+            />
+            <CommunicationCard
+              icon={LinkIcon}
+              title="App Base URL"
+              statusLabel={communicationStatusAvailable && appBaseUrl !== 'Not set' ? 'Ready' : 'Unavailable'}
+              tone={communicationStatusAvailable && appBaseUrl !== 'Not set' ? 'green' : 'red'}
+              detail={communicationStatusAvailable ? appBaseUrl : 'Waiting for backend communication status.'}
+            />
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-900/50 p-4">
+            <p className="text-sm font-semibold text-gray-800 dark:text-white">Message Flow Checklist</p>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <ChecklistRow
+                label="Booking email template"
+                ready={frontendEmailStatus.bookingReady}
+                note={frontendEmailStatus.bookingReady ? 'Main confirmation template is ready.' : 'Add the main EmailJS template ID.'}
+              />
+              <ChecklistRow
+                label="Cancellation email template"
+                ready={frontendEmailStatus.cancellationReady}
+                note={frontendEmailStatus.cancellationReady ? 'Cancellation flow can send user email.' : 'Add the cancellation EmailJS template ID.'}
+              />
+              <ChecklistRow
+                label="Reschedule email template"
+                ready={frontendEmailStatus.rescheduleReady}
+                note={
+                  frontendEmailStatus.hasDedicatedRescheduleTemplate
+                    ? 'Dedicated reschedule template is configured.'
+                    : frontendEmailStatus.usingRescheduleFallback
+                      ? 'Using the main template as a fallback until a dedicated reschedule template is added.'
+                      : 'Add the reschedule EmailJS template ID.'
+                }
+              />
+              <ChecklistRow
+                label="Backend email delivery"
+                ready={backendEmailStatus?.serverDelivery}
+                note={
+                  communicationStatusAvailable
+                    ? backendEmailStatus?.serverDelivery
+                      ? 'Server-side email delivery is active.'
+                      : 'Backend email is currently log-only. Frontend EmailJS handles user-facing delivery.'
+                    : 'Backend delivery status will appear after the backend picks up the latest admin settings response.'
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -398,6 +525,61 @@ function ProviderCard({ name, configured, detail }) {
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">{detail}</p>
     </div>
+  );
+}
+
+function CommunicationCard({ icon: Icon, title, statusLabel, tone, detail }) {
+  const toneClasses = {
+    green: 'bg-emerald-500/15 text-emerald-500',
+    amber: 'bg-amber-500/15 text-amber-500',
+    red: 'bg-red-500/15 text-red-500',
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-slate-900/50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-white dark:bg-slate-800/60 p-2 border border-gray-200 dark:border-white/10">
+            <Icon className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white">{title}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 break-all">{detail}</p>
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${toneClasses[tone] || toneClasses.red}`}>
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ChecklistRow({ label, ready, note }) {
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800/60 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">{label}</p>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ready ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'}`}>
+          {ready ? 'Ready' : 'Needs Setup'}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{note}</p>
+    </div>
+  );
+}
+
+function StatusPill({ label, tone }) {
+  const toneClasses = {
+    green: 'bg-emerald-500/15 text-emerald-500',
+    amber: 'bg-amber-500/15 text-amber-500',
+    red: 'bg-red-500/15 text-red-500',
+  };
+
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${toneClasses[tone] || toneClasses.red}`}>
+      {label}
+    </span>
   );
 }
 
