@@ -78,7 +78,7 @@ export default function ShopHealthInsurancePage() {
         ]}
         actions={
           <>
-            <Link className="btn-primary" to="/employer-intake">
+            <Link className="btn-primary" to="/contact?tab=employer">
               Start Employer Intake
             </Link>
            {/*  <Link className="btn-secondary" to="/schedule">
@@ -133,7 +133,7 @@ export default function ShopHealthInsurancePage() {
             <Link className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:border-[var(--brand-soft-strong)] hover:bg-white" to="/blog/how-small-businesses-can-save-on-health-insurance">
               How small businesses can save on coverage
             </Link>
-            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/employer-intake">
+            <Link className="gradient-border rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-soft)] px-5 py-5 font-semibold text-slate-950 transition hover:bg-white hover:scale-[1.02]" to="/contact?tab=employer">
               Start Employer Intake
             </Link>
           </div>

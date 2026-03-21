@@ -1,6 +1,6 @@
 ================================================================================
   INSURANCE AI CONSULTANT - PROJECT STATUS & REQUIREMENTS CROSS-REFERENCE
-  Last Updated: 2026-03-21
+  Last Updated: 2026-03-21 (v2)
   Generated from: Client requirements + full codebase audit
 ================================================================================
 
@@ -82,12 +82,21 @@ MAPPING: Steps map to the 11-stage group pipeline:
 | Website (Public Pages)    | DONE     | All pages employer/group focused.        |
 |                           |          | HomePage, AboutPage, FaqPage,            |
 |                           |          | ShopHealthInsurancePage, ContactPage      |
-|                           |          | (chooser), BlogIndexPage all updated.    |
-|                           |          | Two CTA paths: /employer-intake and      |
-|                           |          | /individual-intake. Logo + red theme.    |
-|                           |          | "Schedule a Meeting" button active       |
-|                           |          | consistently across all pages (navbar,   |
-|                           |          | footer, ContactPage, CTAs).              |
+|                           |          | all updated. Logo + red theme.           |
+|                           |          |                                          |
+|                           |          | CONTACT PAGE (/contact) now contains     |
+|                           |          | BOTH intake forms with tab switcher:     |
+|                           |          | Individual/Family | Employer/Group.      |
+|                           |          | Forms are at the TOP of the page.        |
+|                           |          | Left column = form, right = info panel.  |
+|                           |          | /individual-intake and /employer-intake   |
+|                           |          | redirect to /contact with ?tab= param.   |
+|                           |          |                                          |
+|                           |          | "Schedule a Meeting" button REMOVED from |
+|                           |          | all pages. Users must fill an intake     |
+|                           |          | form first. After submission, a success  |
+|                           |          | modal offers "Continue to Scheduling".   |
+|                           |          | This enforces form-first workflow.       |
 +---------------------------+----------+------------------------------------------+
 | Booking System            | DONE     | Full calendar UI with month navigation,  |
 |                           |          | 6 US timezones (ET/CT/MT/PT/AKT/HT),    |
@@ -120,8 +129,9 @@ MAPPING: Steps map to the 11-stage group pipeline:
 |                           |          | renewal reminder poller,                 |
 |                           |          | 6 email/SMS templates with auto-trigger. |
 +---------------------------+----------+------------------------------------------+
-| Employer Intake Form      | DONE     | Public form at /employer-intake collects  |
-|                           |          | ALL 14 client-required fields:           |
+| Employer Intake Form      | DONE     | Now embedded in /contact page under the  |
+|                           |          | "Employer / Group" tab. Collects ALL 14  |
+|                           |          | client-required fields:                  |
 |                           |          | companyName, state, numEmployees,        |
 |                           |          | numEligible, industry, contactPerson,    |
 |                           |          | email, phone, currentCarrier,            |
@@ -425,11 +435,22 @@ ALL PREVIOUSLY IDENTIFIED GAPS HAVE BEEN RESOLVED:
      Backend endpoint: GET /api/compliance/overview.
      Shows session compliance records, action items, audit trail.
 
-  4. "SCHEDULE A MEETING" BUTTON - FIXED (was: inconsistent)
-     Un-commented in PublicLayout (navbar header + footer) and
-     ContactPage. Now active consistently across all pages.
+  4. "SCHEDULE A MEETING" BUTTON - REMOVED (client requirement)
+     Removed from ALL pages: navbar, footer, mobile action bar,
+     HomePage, FaqPage, ContactPage, EmployerCensusPage.
+     Users must fill an intake form first. After form submission,
+     success modal offers "Continue to Scheduling" button.
+     This enforces the form-first workflow the client wants.
 
-  5. RENEWAL DATE COLLECTION - FIXED (was: not in intake form)
+  5. CONTACT PAGE CONSOLIDATED - DONE (client requirement)
+     Both intake forms (individual + employer) now live on /contact
+     with tab switcher at the top. Form is immediately visible.
+     /individual-intake and /employer-intake redirect to /contact
+     with appropriate ?tab= parameter.
+     All "Enroll Now", "Start Employer Intake" links across all
+     pages now point to /contact?tab=individual or /contact?tab=employer.
+
+  6. RENEWAL DATE COLLECTION - FIXED (was: not in intake form)
      renewalDate field now collected by the employer intake form.
      Renewal reminder poller can now function for all leads.
 
@@ -482,14 +503,14 @@ FRONTEND PAGES:
   frontend/src/pages/HomePage.jsx               - Public home page
   frontend/src/pages/AboutPage.jsx              - About page
   frontend/src/pages/FaqPage.jsx                - FAQ page
-  frontend/src/pages/ContactPage.jsx            - Contact chooser page
+  frontend/src/pages/ContactPage.jsx            - Contact page (both intake forms)
   frontend/src/pages/ShopHealthInsurancePage.jsx - Employer insurance guide
   frontend/src/pages/BlogIndexPage.jsx          - Blog listing
   frontend/src/pages/SchedulePage.jsx           - Booking page
   frontend/src/pages/MeetingPage.jsx            - WebRTC meeting UI
-  frontend/src/pages/EmployerIntakePage.jsx     - Group employer intake form
+  frontend/src/pages/EmployerIntakePage.jsx     - (redirects to /contact?tab=employer)
   frontend/src/pages/EmployerCensusPage.jsx     - Census template + upload
-  frontend/src/pages/IndividualIntakePage.jsx   - Individual ACA intake
+  frontend/src/pages/IndividualIntakePage.jsx   - (redirects to /contact?tab=individual)
   frontend/src/pages/SecureUploadPage.jsx       - Public secure upload portal
   frontend/src/pages/ManageAppointmentPage.jsx  - Public reschedule/cancel
   frontend/src/pages/BookingsPage.jsx           - Admin appointments
@@ -617,7 +638,8 @@ Notification
 WHAT'S DONE (matches ALL client requirements):
   - Website with group insurance focus
   - Full booking system with reschedule/cancel
-  - "Schedule a Meeting" button consistent across all pages
+  - Form-first workflow (no standalone "Schedule" buttons)
+  - Both intake forms on /contact page with tabs at top
   - WebRTC phone system with Deepgram STT
   - CRM with individual + group lead separation
   - 11-stage group pipeline (matches client's 10-step workflow)

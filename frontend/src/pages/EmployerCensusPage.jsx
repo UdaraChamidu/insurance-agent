@@ -211,9 +211,6 @@ export default function EmployerCensusPage() {
               <Download className="h-4 w-4" />
               Download CSV Template
             </a>
-            <Link className="btn-secondary" to="/schedule">
-              Continue to Scheduling
-            </Link>
           </>
         )}
         aside={(
@@ -244,7 +241,7 @@ export default function EmployerCensusPage() {
               document bucket.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-primary" to="/employer-intake">
+              <Link className="btn-primary" to="/contact?tab=employer">
                 Open Employer Intake
               </Link>
               <Link className="btn-secondary" to="/contact">
@@ -273,7 +270,7 @@ export default function EmployerCensusPage() {
             <h2 className="section-title mt-2">We could not open this employer census request.</h2>
             <p className="body-copy mt-4 text-slate-700">{leadError}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-primary" to="/employer-intake">
+              <Link className="btn-primary" to="/contact?tab=employer">
                 Back to Employer Intake
               </Link>
               <Link className="btn-secondary" to="/contact">
@@ -472,8 +469,8 @@ export default function EmployerCensusPage() {
                   <Download className="h-4 w-4" />
                   Download Template
                 </a>
-                <Link className="btn-secondary" to="/schedule">
-                  Continue to Scheduling
+                <Link className="btn-secondary" to="/contact">
+                  Back to Contact
                 </Link>
               </div>
             </div>

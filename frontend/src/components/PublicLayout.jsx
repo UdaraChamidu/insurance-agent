@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ArrowRight, Building2, CalendarDays, LogIn, Menu, UserRound, X } from 'lucide-react';
+import { ArrowRight, Building2, LogIn, Menu, UserRound, X } from 'lucide-react';
 import { blogPosts } from '../content/blogPosts';
 import { navigationItems } from '../content/siteContent';
 
@@ -131,13 +131,6 @@ export default function PublicLayout() {
 
             <div className="hidden shrink-0 items-center gap-2.5 lg:flex">
               <Link
-                className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[var(--brand)] hover:bg-[var(--panel-soft)] hover:text-[var(--brand-dark)]"
-                to="/schedule"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Schedule a Meeting
-              </Link>
-              <Link
                 className="inline-flex items-center gap-2 whitespace-nowrap px-2 py-2 text-sm font-semibold text-slate-600 transition hover:text-[var(--brand-dark)]"
                 to="/admin/login"
               >
@@ -196,10 +189,7 @@ export default function PublicLayout() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Link className="btn-secondary justify-center text-center" to="/schedule">
-                  Schedule
-                </Link>
+              <div className="grid gap-3">
                 <Link className="btn-primary justify-center text-center" to="/contact">
                   Start Here
                 </Link>
@@ -225,9 +215,6 @@ export default function PublicLayout() {
       {showMobileActionBar ? (
         <div className="fixed inset-x-0 bottom-4 z-30 px-4 lg:hidden">
           <div className="mx-auto flex max-w-md items-center gap-3 rounded-[1.75rem] border border-[var(--line)] bg-white p-3 shadow-[0_24px_50px_rgba(59,33,29,0.14)]">
-            <Link className="btn-secondary flex-1 justify-center px-4 py-3" to="/schedule">
-              Schedule
-            </Link>
             <Link className="btn-primary flex-1 justify-center px-4 py-3" to="/contact">
               Start Here
             </Link>
@@ -262,11 +249,8 @@ export default function PublicLayout() {
               <Link className="btn-primary" to="/contact">
                 Start Here
               </Link>
-              <Link className="btn-light" to="/individual-intake">
+              <Link className="btn-light" to="/contact?tab=individual">
                 Enroll Now
-              </Link>
-              <Link className="btn-outline-light" to="/schedule">
-                Schedule a Meeting
               </Link>
               <Link className="inline-flex items-center gap-2 text-sm font-semibold text-[#f6cfc9] transition hover:text-white" to="/blog">
                 Read the resource center

@@ -91,18 +91,18 @@ function App() {
                 <Route element={<AboutPage />} path="/about-us" />
                 <Route element={<ShopHealthInsurancePage />} path="/shop-health-insurance" />
                 <Route element={<IndividualHealthInsurancePage />} path="/individual-health-insurance" />
-                <Route element={<IndividualIntakePage />} path="/individual-intake" />
+                <Route element={<Navigate to="/contact?tab=individual" replace />} path="/individual-intake" />
                 <Route element={<BlogIndexPage />} path="/blog" />
                 <Route element={<BlogPostPage />} path="/blog/:slug" />
                 <Route element={<FaqPage />} path="/faq" />
                 <Route element={<ContactPage />} path="/contact" />
-                <Route element={<EmployerIntakePage />} path="/employer-intake" />
+                <Route element={<Navigate to="/contact?tab=employer" replace />} path="/employer-intake" />
                 <Route element={<EmployerCensusPage />} path="/employer-census" />
                 <Route element={<NotFoundPage />} path="*" />
               </Route>
 
-              <Route element={<Navigate to="/individual-intake" replace />} path="/intake" />
-              <Route element={<Navigate to="/employer-intake" replace />} path="/group-intake" />
+              <Route element={<Navigate to="/contact?tab=individual" replace />} path="/intake" />
+              <Route element={<Navigate to="/contact?tab=employer" replace />} path="/group-intake" />
               <Route element={<Navigate to="/employer-census" replace />} path="/census-upload" />
               <Route element={<SchedulePage />} path="/schedule" />
               <Route element={<MeetingPage />} path="/meeting" />

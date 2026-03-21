@@ -57,9 +57,6 @@ export default function FaqPage() {
             <Link className="btn-primary" to="/contact">
               Start Here
             </Link>
-            <Link className="btn-secondary" to="/schedule">
-              Schedule a Meeting
-            </Link>
           </>
         )}
       />
@@ -72,20 +69,17 @@ export default function FaqPage() {
         <div className="cta-glow-border rounded-[2rem] border border-slate-200 bg-white px-6 py-10 shadow-[0_30px_80px_rgba(15,23,42,0.06)] sm:px-10">
           <h2 className="section-title">Still need help applying this to your situation?</h2>
           <p className="body-copy mt-4 max-w-3xl text-slate-700">
-            Move into the next step through the <Link className="link-accent" to="/contact">path selector</Link>, use the <Link className="link-accent" to="/employer-intake">employer intake</Link> for group cases, or go deeper with the service guides for <Link className="link-accent" to="/individual-health-insurance">individual Marketplace coverage</Link> and <Link className="link-accent" to="/shop-health-insurance">employer coverage guidance</Link>.
+            Move into the next step through the <Link className="link-accent" to="/contact">path selector</Link>, use the <Link className="link-accent" to="/contact?tab=employer">employer intake</Link> for group cases, or go deeper with the service guides for <Link className="link-accent" to="/individual-health-insurance">individual Marketplace coverage</Link> and <Link className="link-accent" to="/shop-health-insurance">employer coverage guidance</Link>.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link className="btn-primary" to="/contact">
               Start Here
             </Link>
-            <Link className="btn-secondary" to="/individual-intake">
+            <Link className="btn-secondary" to="/contact?tab=individual">
               Enroll Now
             </Link>
-            <Link className="btn-secondary" to="/employer-intake">
+            <Link className="btn-secondary" to="/contact?tab=employer">
               Start Employer Intake
-            </Link>
-            <Link className="btn-secondary" to="/schedule">
-              Schedule a Meeting
             </Link>
           </div>
         </div>

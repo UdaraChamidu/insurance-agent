@@ -455,7 +455,7 @@ export default function EmployerIntakePage() {
             <Link className="btn-primary" to="/shop-health-insurance">
               Review Group Coverage Info
             </Link>
-            <Link className="btn-secondary" to="/individual-intake">
+            <Link className="btn-secondary" to="/contact?tab=individual">
               Need Personal Coverage Instead?
             </Link>
           </>

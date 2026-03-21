@@ -109,10 +109,7 @@ export default function HomePage() {
             <Link className="btn-primary" to="/contact">
               Start Here
             </Link>
-            {/* <Link className="btn-secondary" to="/schedule">
-              Schedule a Meeting
-            </Link> */}
-            <Link className="btn-secondary" to="/individual-intake">
+            <Link className="btn-secondary" to="/contact?tab=individual">
               Enroll Now
             </Link>
           </div>
@@ -173,11 +170,8 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link className="btn-primary" to="/employer-intake">
+            <Link className="btn-primary" to="/contact?tab=employer">
               Start Employer Intake
-            </Link>
-            <Link className="btn-secondary" to="/schedule">
-              Schedule a Meeting
             </Link>
           </div>
         </aside>
@@ -223,7 +217,7 @@ export default function HomePage() {
               Keep employer cases in a dedicated CRM workflow instead of a generic contact path
             </li>
           </ul>
-          <Link className="link-arrow pt-6" to="/employer-intake">
+          <Link className="link-arrow pt-6" to="/contact?tab=employer">
             Open the employer intake
             <ArrowRight className="arrow-animate h-4 w-4" />
           </Link>
@@ -251,7 +245,7 @@ export default function HomePage() {
               Still moves into scheduling once the request is submitted
             </li>
           </ul>
-          <Link className="link-arrow pt-6" to="/individual-intake">
+          <Link className="link-arrow pt-6" to="/contact?tab=individual">
             Open the individual request form
             <ArrowRight className="arrow-animate h-4 w-4" />
           </Link>
@@ -319,11 +313,8 @@ export default function HomePage() {
             <Link className="btn-light" to="/contact">
               Start Here
             </Link>
-            <Link className="btn-outline-light" to="/individual-intake">
+            <Link className="btn-outline-light" to="/contact?tab=individual">
               Enroll Now
-            </Link>
-            <Link className="btn-outline-light" to="/schedule">
-              Schedule a Meeting
             </Link>
             <Link className="btn-outline-light" to="/blog">
               Browse Articles
@@ -359,11 +350,8 @@ export default function HomePage() {
               Use the shorter request form when the question is about individual or family health insurance.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-primary" to="/individual-intake">
+              <Link className="btn-primary" to="/contact?tab=individual">
                 Enroll Now
-              </Link>
-              <Link className="btn-secondary" to="/schedule">
-                Schedule a Meeting
               </Link>
             </div>
           </div>
@@ -374,7 +362,7 @@ export default function HomePage() {
               Use the employer intake when the request involves a company, employee counts, current carrier, or renewal review.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="btn-secondary" to="/employer-intake">
+              <Link className="btn-secondary" to="/contact?tab=employer">
                 Start Employer Intake
               </Link>
               <Link className="btn-primary" to="/contact">
