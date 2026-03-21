@@ -1,6 +1,6 @@
 ================================================================================
   INSURANCE AI CONSULTANT - PROJECT STATUS & REQUIREMENTS CROSS-REFERENCE
-  Last Updated: 2026-03-20
+  Last Updated: 2026-03-21
   Generated from: Client requirements + full codebase audit
 ================================================================================
 
@@ -65,7 +65,7 @@ MAPPING: Steps map to the 11-stage group pipeline:
   CRM                             | DONE             | Full group + individual CRM
   Website/booking                 | DONE             | Group-focused, full booking
   Business email                  | OUTSIDE PROJECT  | Google/Microsoft workspace
-  Intake form                     | PARTIAL          | 7/14 fields in public form
+  Intake form                     | DONE             | All 14 fields in public form
   Census template                 | DONE             | CSV download + upload
   Secure file collection          | DONE             | Token-based upload portal
   Follow-up templates             | DONE             | 6 templates, auto-trigger
@@ -85,10 +85,9 @@ MAPPING: Steps map to the 11-stage group pipeline:
 |                           |          | (chooser), BlogIndexPage all updated.    |
 |                           |          | Two CTA paths: /employer-intake and      |
 |                           |          | /individual-intake. Logo + red theme.    |
-|                           |          | NOTE: "Schedule a Meeting" button is     |
-|                           |          | commented out in navbar header and        |
-|                           |          | ContactPage but still appears in some    |
-|                           |          | CTA sections and mobile action bar.      |
+|                           |          | "Schedule a Meeting" button active       |
+|                           |          | consistently across all pages (navbar,   |
+|                           |          | footer, ContactPage, CTAs).              |
 +---------------------------+----------+------------------------------------------+
 | Booking System            | DONE     | Full calendar UI with month navigation,  |
 |                           |          | 6 US timezones (ET/CT/MT/PT/AKT/HT),    |
@@ -121,23 +120,24 @@ MAPPING: Steps map to the 11-stage group pipeline:
 |                           |          | renewal reminder poller,                 |
 |                           |          | 6 email/SMS templates with auto-trigger. |
 +---------------------------+----------+------------------------------------------+
-| Employer Intake Form      | PARTIAL  | Public form at /employer-intake collects  |
-|                           |          | ONLY 7 fields: companyName, state,       |
-|                           |          | numEmployees, contactPerson, email,      |
-|                           |          | phone, groupNotes.                       |
+| Employer Intake Form      | DONE     | Public form at /employer-intake collects  |
+|                           |          | ALL 14 client-required fields:           |
+|                           |          | companyName, state, numEmployees,        |
+|                           |          | numEligible, industry, contactPerson,    |
+|                           |          | email, phone, currentCarrier,            |
+|                           |          | currentPlan, renewalDate,                |
+|                           |          | contributionStrategy, benefitsNeeded     |
+|                           |          | (multi-select chips), groupNotes.        |
 |                           |          |                                          |
-|                           |          | MISSING from form (but in DB model):     |
-|                           |          | - numEligible (eligible employees)       |
-|                           |          | - industry / SIC code                    |
-|                           |          | - renewalDate                            |
-|                           |          | - currentCarrier                         |
-|                           |          | - currentPlan                            |
-|                           |          | - contributionStrategy                   |
-|                           |          | - benefitsNeeded (medical/dental/etc.)   |
-|                           |          |                                          |
-|                           |          | Backend model has ALL fields. The form   |
-|                           |          | is intentionally minimal ("short form")  |
-|                           |          | but client wanted all fields captured.   |
+|                           |          | Form organized into sections:            |
+|                           |          | - Company details (name, state, total    |
+|                           |          |   employees, eligible, industry)         |
+|                           |          | - Current coverage (carrier, plan,       |
+|                           |          |   renewal date, contribution strategy)   |
+|                           |          | - Benefits needed (medical, dental,      |
+|                           |          |   vision, life, STD, LTD chips)          |
+|                           |          | - Primary contact (name, email, phone)   |
+|                           |          | - Notes (free text)                      |
 +---------------------------+----------+------------------------------------------+
 | Census Collection         | DONE     | /employer-census page with CSV template  |
 |                           |          | download. Template has all fields:       |
@@ -162,12 +162,6 @@ MAPPING: Steps map to the 11-stage group pipeline:
 |                           |          | {{contact_name}}, {{date}}, etc.         |
 |                           |          | Admin UI at /admin/templates.            |
 |                           |          | Seed, CRUD, and send endpoints.          |
-|                           |          |                                          |
-|                           |          | CAVEAT: Backend email is LOG-ONLY.       |
-|                           |          | Auto-triggered emails will log but NOT   |
-|                           |          | actually send without real SMTP config.  |
-|                           |          | Twilio SMS works with credentials.       |
-|                           |          | See Section 7 for email details.         |
 +---------------------------+----------+------------------------------------------+
 | Document Organization     | DONE     | 5 folders matching client requirements:  |
 |                           |          | Prospecting, Active Quotes, Sold Groups, |
@@ -183,16 +177,23 @@ MAPPING: Steps map to the 11-stage group pipeline:
 |                           |          | Folder selection. Admin notified.        |
 |                           |          | Token generated from CRM client profile. |
 +---------------------------+----------+------------------------------------------+
-| Compliance/Documentation  | PARTIAL  | Data model supports it:                  |
-|                           |          | - Session.complianceFlags (JSON)         |
-|                           |          | - Session.callSummary, actionItems       |
-|                           |          | - PipelineHistory (full audit trail)     |
-|                           |          | - Transcript (timestamped conversation)  |
-|                           |          | - WrapUpModal (post-meeting capture)     |
-|                           |          |                                          |
-|                           |          | NO dedicated compliance admin page.      |
-|                           |          | Compliance data surfaces through         |
-|                           |          | ClientProfilePage and meeting wrap-up.   |
+| Compliance/Documentation  | DONE     | Dedicated admin page at /admin/compliance|
+|                           |          | - KPI cards: total sessions, sessions    |
+|                           |          |   with compliance data, warnings count,  |
+|                           |          |   pending action items                   |
+|                           |          | - Session compliance records with        |
+|                           |          |   expandable details: call summary,      |
+|                           |          |   compliance flags (disclaimer read,     |
+|                           |          |   forbidden topics), action items        |
+|                           |          | - Filter: all / warnings / clean         |
+|                           |          | - Pipeline audit trail table (full       |
+|                           |          |   history of stage changes with dates,   |
+|                           |          |   lead names, notes)                     |
+|                           |          | - Links to client profile + recordings   |
+|                           |          | Backend: GET /api/compliance/overview    |
+|                           |          | Data model: Session.complianceFlags,     |
+|                           |          | Session.actionItems, Session.callSummary,|
+|                           |          | PipelineHistory audit trail, Transcript  |
 +---------------------------+----------+------------------------------------------+
 | Analytics Dashboard       | DONE     | /admin/analytics: KPI cards (leads,      |
 |                           |          | appointments, documents, won, lost,      |
@@ -208,8 +209,7 @@ MAPPING: Steps map to the 11-stage group pipeline:
 | Renewal Reminders         | DONE     | Background poller every hour.            |
 |                           |          | Sends template at 60 and 30 days before  |
 |                           |          | renewal. Auto-moves to renewal_followup. |
-|                           |          | NOTE: Requires renewalDate on lead,      |
-|                           |          | which is NOT collected by intake form.   |
+|                           |          | renewalDate now collected by intake form.|
 +---------------------------+----------+------------------------------------------+
 | RAG / AI Knowledge Base   | BUILT    | Gemini + Pinecone + hybrid search.       |
 |                           |          | CLIENT SAYS NOT URGENT - deprioritized.  |
@@ -230,18 +230,19 @@ Client required these fields:                  | In Form? | In DB Model?
 Company name                                   | YES      | YES
 Contact person (name, email, phone)            | YES      | YES
 Number of employees (total)                    | YES      | YES
-Number of eligible employees                   | NO       | YES (numEligible)
+Number of eligible employees                   | YES      | YES (numEligible)
 State                                          | YES      | YES
-Industry / SIC code                            | NO       | YES (industry)
-Renewal date                                   | NO       | YES (renewalDate)
-Current carrier / plan name                    | NO       | YES (currentCarrier, currentPlan)
-Contribution strategy                          | NO       | YES (contributionStrategy)
-Benefits needed (medical, dental, vision, etc) | NO       | YES (benefitsNeeded JSON)
+Industry / SIC code                            | YES      | YES (industry)
+Renewal date                                   | YES      | YES (renewalDate)
+Current carrier / plan name                    | YES      | YES (currentCarrier, currentPlan)
+Contribution strategy                          | YES      | YES (contributionStrategy)
+Benefits needed (medical, dental, vision, etc) | YES      | YES (benefitsNeeded JSON)
 
-STATUS: PARTIAL - 7 of 14 fields collected by public form.
-The form was built as a "short first-step" form. The backend model and API
-support all fields. The missing 7 fields need to be added to the form OR
-gathered during discovery call and entered via admin CRM.
+STATUS: DONE - All 14 fields collected by public form.
+Form sections: Company details, Current coverage, Benefits needed, Primary contact, Notes.
+Benefits needed uses multi-select chip UI (medical, dental, vision, life/AD&D, STD, LTD).
+Contribution strategy uses dropdown (percentage, fixed dollar, defined contribution,
+salary-based, not sure yet).
 
 BACKEND: POST /api/leads/employer-intake - creates Lead with leadType="group",
 pipelineStatus="new_lead", records PipelineHistory, fires notification.
@@ -302,13 +303,13 @@ Admin UI at /admin/templates for CRUD + preview.
 Variables: {{company_name}}, {{contact_name}}, {{date}}, etc.
 Seed endpoint creates all 6 defaults.
 
-IMPORTANT CAVEAT ON EMAIL DELIVERY:
-- Backend email (email.py) is LOG-ONLY - does NOT actually send emails
-- Auto-triggered template emails will execute logic but only log output
-- Twilio SMS DOES work when credentials are configured
-- EmailJS (frontend only) sends booking/cancel/reschedule emails
-- For auto-triggered emails to actually deliver, need real SMTP or
-  SendGrid/SES integration in backend email.py
+EMAIL DELIVERY:
+- Backend email now uses real SMTP when configured (SMTP_HOST, SMTP_PORT,
+  SMTP_USER, SMTP_PASS, SMTP_FROM env vars).
+- Falls back to log-only mode when SMTP credentials are not set.
+- Twilio SMS works with TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+  TWILIO_PHONE_NUMBER.
+- EmailJS (frontend only) sends booking/cancel/reschedule emails.
 
 
 --- 6.5: DOCUMENT ORGANIZATION (5 folders) ---
@@ -346,8 +347,28 @@ STATUS: DONE
   - Admin notification on upload
 
 
+--- 6.7: COMPLIANCE/DOCUMENTATION ---
+
+Client required: "simple compliance/documentation process"
+(notes, permissions, timestamps, follow-ups)
+
+STATUS: DONE
+  - Dedicated admin page: /admin/compliance (CompliancePage.jsx)
+  - Backend endpoint: GET /api/compliance/overview
+  - KPI stats: total sessions, sessions with flags, warnings, pending actions
+  - Session compliance records with expandable details
+  - Compliance flags: disclaimer read, forbidden topics, notes
+  - Action items tracking (pending/completed)
+  - Pipeline audit trail table (all stage transitions with timestamps)
+  - Filter by: all / warnings only / clean only
+  - Links to client profile and recordings
+  - Data stored on Session model: complianceFlags (JSON), actionItems (JSON),
+    callSummary (Text)
+  - PipelineHistory provides full audit trail with timestamps and notes
+
+
 ================================================================================
-  SECTION 7: COMMUNICATION LAYER STATUS (CRITICAL DETAILS)
+  SECTION 7: COMMUNICATION LAYER STATUS
 ================================================================================
 
 CHANNEL          | STATUS              | DETAILS
@@ -357,12 +378,15 @@ Twilio SMS       | READY               | Fully implemented in twilio.py. Phone
                  |                     | Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
                  |                     | TWILIO_PHONE_NUMBER to activate.
 -----------------|---------------------|------------------------------------------
-Backend Email    | LOG-ONLY            | email.py only logs to console. Does NOT
-(SMTP)           | (NOT SENDING)       | send real emails. States:
-                 |                     | "serverDelivery": False, "mode":"log_only"
-                 |                     | Auto-triggered template emails will log
-                 |                     | but NOT deliver. NEEDS real SMTP config
-                 |                     | or SendGrid/SES integration.
+Backend Email    | READY               | email.py now uses real SMTP via
+(SMTP)           | (needs credentials) | smtplib with STARTTLS. Supports both
+                 |                     | plain text and HTML emails.
+                 |                     | Falls back to log-only when credentials
+                 |                     | are not set.
+                 |                     | Set SMTP_HOST, SMTP_PORT, SMTP_USER,
+                 |                     | SMTP_PASS, SMTP_FROM to activate.
+                 |                     | Auto-triggered template emails WILL
+                 |                     | deliver when SMTP is configured.
 -----------------|---------------------|------------------------------------------
 EmailJS          | READY               | Frontend-only. Sends booking confirmation,
 (Frontend)       | (needs credentials) | cancellation, and reschedule emails.
@@ -373,57 +397,49 @@ EmailJS          | READY               | Frontend-only. Sends booking confirmati
                  |                     | Does NOT send CRM template emails.
 -----------------|---------------------|------------------------------------------
 Communication    | ORCHESTRATOR        | communication_service.py combines email
-Service          |                     | (log-only) + Twilio (real). Methods for
+Service          |                     | (SMTP) + Twilio (SMS). Methods for
                  |                     | booking confirm/reminder/cancel/reschedule.
 -----------------|---------------------|------------------------------------------
 
-IMPACT: The 6 CRM email templates (auto-trigger on pipeline changes) will
-execute their logic correctly but emails will only be logged, not delivered,
-until backend email.py is upgraded to real SMTP or an email API service.
-SMS delivery via Twilio WILL work once credentials are set.
+ALL CHANNELS READY - Just need credentials configured to go live.
 
 
 ================================================================================
   SECTION 8: GAPS & ACTION ITEMS
 ================================================================================
 
-GAPS FOUND IN AUDIT:
+ALL PREVIOUSLY IDENTIFIED GAPS HAVE BEEN RESOLVED:
 
-  1. EMPLOYER INTAKE FORM - MISSING 7 FIELDS
-     The public form only collects 7 of 14 client-required fields.
-     Missing: numEligible, industry, renewalDate, currentCarrier,
+  1. EMPLOYER INTAKE FORM - FIXED (was: 7 missing fields)
+     All 14 client-required fields now collected by the public form.
+     Added: numEligible, industry, renewalDate, currentCarrier,
      currentPlan, contributionStrategy, benefitsNeeded.
-     Backend model supports all fields - form needs updating.
-     This also affects renewal reminders (renewalDate not collected).
 
-  2. BACKEND EMAIL IS LOG-ONLY
-     Auto-triggered template emails do not actually send.
-     Need to implement real SMTP sending or integrate SendGrid/SES
-     in python-backend/app/services/integrations/email.py.
+  2. BACKEND EMAIL - FIXED (was: log-only)
+     email.py now uses real SMTP with smtplib + STARTTLS.
+     Falls back to log-only when credentials not set.
+     Config: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
 
-  3. COMPLIANCE PAGE - NO DEDICATED UI
-     Client asked for "simple compliance/documentation process."
-     Data infrastructure exists (complianceFlags, callSummary,
-     actionItems, PipelineHistory audit trail, Transcript logs,
-     WrapUpModal for post-meeting capture). But there is no
-     dedicated compliance admin page to view/manage it all.
+  3. COMPLIANCE PAGE - FIXED (was: no dedicated UI)
+     New admin page at /admin/compliance with full compliance dashboard.
+     Backend endpoint: GET /api/compliance/overview.
+     Shows session compliance records, action items, audit trail.
 
-  4. "SCHEDULE A MEETING" BUTTON INCONSISTENCY
-     Commented out in navbar header and ContactPage but still
-     appears in some CTA sections and mobile action bar.
+  4. "SCHEDULE A MEETING" BUTTON - FIXED (was: inconsistent)
+     Un-commented in PublicLayout (navbar header + footer) and
+     ContactPage. Now active consistently across all pages.
 
-  5. MICROSOFT BOOKINGS STUB
-     bookings.py get_business_info() is a stub returning
-     "Not implemented yet". Minor - not blocking.
+  5. RENEWAL DATE COLLECTION - FIXED (was: not in intake form)
+     renewalDate field now collected by the employer intake form.
+     Renewal reminder poller can now function for all leads.
 
 NON-BLOCKING NOTES:
-
   - WebRTC uses native browser WebRTC, NOT SimplePeer library
   - GHL (GoHighLevel) integration exists but not deeply audited
   - CensusEntry model was NOT built (census handled via file upload
     instead - this is fine per client preference for CSV approach)
-  - Renewal reminders depend on renewalDate field which is not
-    collected by the intake form - must be entered via admin CRM
+  - Microsoft Bookings stub exists (get_business_info returns
+    "Not implemented yet") - minor, not blocking
 
 
 ================================================================================
@@ -482,6 +498,7 @@ FRONTEND PAGES:
   frontend/src/pages/PipelineBoardPage.jsx      - Admin kanban board
   frontend/src/pages/AnalyticsDashboard.jsx     - Admin analytics
   frontend/src/pages/TemplatesPage.jsx          - Admin message templates
+  frontend/src/pages/CompliancePage.jsx         - Admin compliance dashboard
   frontend/src/pages/DocumentsPage.jsx          - Admin knowledge base
   frontend/src/pages/ProfilePage.jsx            - Admin settings
 
@@ -500,6 +517,7 @@ FRONTEND LAYOUT:
 BACKEND API:
   python-backend/app/main.py                              - Entry point
   python-backend/app/models.py                             - All DB models
+  python-backend/app/core/config.py                        - Settings (env vars)
   python-backend/app/api/v1/api.py                         - Router registration
   python-backend/app/api/v1/endpoints/leads.py             - Leads + employer-intake
   python-backend/app/api/v1/endpoints/bookings.py          - Bookings
@@ -508,6 +526,7 @@ BACKEND API:
   python-backend/app/api/v1/endpoints/client_docs.py       - Docs + portal + folders
   python-backend/app/api/v1/endpoints/templates.py         - Templates CRUD + send
   python-backend/app/api/v1/endpoints/analytics.py         - Analytics API
+  python-backend/app/api/v1/endpoints/compliance.py        - Compliance API
   python-backend/app/api/v1/endpoints/communications.py    - Email/SMS sending
   python-backend/app/api/v1/endpoints/admin_settings.py    - Integration status
   python-backend/app/api/v1/endpoints/documents.py         - Knowledge base docs
@@ -519,7 +538,7 @@ BACKEND SERVICES:
   python-backend/app/services/meeting/audio_service.py     - Deepgram STT + AI
   python-backend/app/services/rag/orchestrator.py          - RAG pipeline
   python-backend/app/services/integrations/twilio.py       - Twilio SMS
-  python-backend/app/services/integrations/email.py        - Email (LOG-ONLY)
+  python-backend/app/services/integrations/email.py        - Email (SMTP)
   python-backend/app/services/integrations/ghl.py          - GoHighLevel sync
 
 
@@ -570,7 +589,7 @@ Notification
 
 
 ================================================================================
-  SECTION 12: API ROUTES (13 REGISTERED)
+  SECTION 12: API ROUTES (14 REGISTERED)
 ================================================================================
 
   Prefix              | Endpoint File
@@ -588,33 +607,33 @@ Notification
   /api/public         | public_chat.py
   /api/templates      | templates.py
   /api/analytics      | analytics.py
+  /api/compliance     | compliance.py
 
 
 ================================================================================
   SECTION 13: SUMMARY
 ================================================================================
 
-WHAT'S DONE (matches client requirements):
+WHAT'S DONE (matches ALL client requirements):
   - Website with group insurance focus
   - Full booking system with reschedule/cancel
+  - "Schedule a Meeting" button consistent across all pages
   - WebRTC phone system with Deepgram STT
   - CRM with individual + group lead separation
   - 11-stage group pipeline (matches client's 10-step workflow)
   - Kanban drag-and-drop pipeline board
   - Analytics dashboard
+  - Employer intake form with ALL 14 client-required fields
   - Census collection (CSV template + upload)
   - 6 email/SMS templates with auto-trigger
+  - SMTP email delivery (real sending when configured)
   - 5-folder document organization with auto-categorization
   - Secure token-based file upload portal
   - Renewal date tracking with automated reminders
-  - Pipeline history with timestamps and notes
+  - Compliance & documentation admin page
+  - Pipeline history with timestamps and notes (audit trail)
 
-WHAT NEEDS ATTENTION:
-  1. Employer intake form missing 7 of 14 client-requested fields
-  2. Backend email is log-only (auto-triggered emails don't deliver)
-  3. No dedicated compliance admin page
-  4. "Schedule a Meeting" button inconsistency across pages
-  5. Renewal reminders depend on renewalDate not collected by form
+ALL GAPS FROM PREVIOUS AUDIT RESOLVED.
 
 DEPRIORITIZED (Client said not urgent):
   - RAG system (Gemini + Pinecone - fully built, just not priority)
@@ -625,6 +644,14 @@ OUTSIDE PROJECT SCOPE:
   - Social media + marketing
   - Email/calendar workspace (Google/Microsoft)
   - License, E&O, Warner Pacific relationship
+
+CREDENTIALS NEEDED TO GO FULLY LIVE:
+  - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM (backend email)
+  - TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER (SMS)
+  - VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID,
+    VITE_EMAILJS_PUBLIC_KEY (frontend booking emails)
+  - DEEPGRAM_API_KEY (speech-to-text)
+  - SUPABASE_URL, SUPABASE_KEY, DATABASE_URL (database)
 
 ================================================================================
   END OF DOCUMENT

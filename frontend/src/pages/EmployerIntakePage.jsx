@@ -19,13 +19,29 @@ const stateOptions = [
   'VA', 'VT', 'WA', 'WI', 'WV', 'WY',
 ];
 
+const benefitsOptions = [
+  { value: 'medical', label: 'Medical' },
+  { value: 'dental', label: 'Dental' },
+  { value: 'vision', label: 'Vision' },
+  { value: 'life', label: 'Life / AD&D' },
+  { value: 'std', label: 'Short-Term Disability' },
+  { value: 'ltd', label: 'Long-Term Disability' },
+];
+
 const initialFormData = {
   companyName: '',
   contactPerson: '',
   email: '',
   phone: '',
   numEmployees: '',
+  numEligible: '',
   state: 'FL',
+  industry: '',
+  renewalDate: '',
+  currentCarrier: '',
+  currentPlan: '',
+  contributionStrategy: '',
+  benefitsNeeded: [],
   groupNotes: '',
 };
 
@@ -54,7 +70,7 @@ export default function EmployerIntakePage() {
     {
       icon: Building2,
       title: 'Company basics',
-      text: 'Start with the company name, state, and a few core details instead of a long intake.',
+      text: 'Company name, state, industry, team size, and eligible employees to start your case.',
     },
     {
       icon: Users,
@@ -64,7 +80,7 @@ export default function EmployerIntakePage() {
     {
       icon: CalendarDays,
       title: 'Timing notes',
-      text: 'Share any renewal date, urgency, or current coverage concerns that matter right now.',
+      text: 'Current carrier, renewal date, and contribution strategy help us prepare options sooner.',
     },
     {
       icon: ShieldCheck,
@@ -88,7 +104,14 @@ export default function EmployerIntakePage() {
       email: formData.email.trim() || undefined,
       phone: formData.phone.trim() || undefined,
       numEmployees: toOptionalInteger(formData.numEmployees),
+      numEligible: toOptionalInteger(formData.numEligible),
       state: formData.state,
+      industry: formData.industry.trim() || undefined,
+      renewalDate: formData.renewalDate || undefined,
+      currentCarrier: formData.currentCarrier.trim() || undefined,
+      currentPlan: formData.currentPlan.trim() || undefined,
+      contributionStrategy: formData.contributionStrategy || undefined,
+      benefitsNeeded: formData.benefitsNeeded.length > 0 ? formData.benefitsNeeded : undefined,
       groupNotes: formData.groupNotes.trim() || undefined,
       utmSource: searchParams.get('utm_source') || undefined,
       utmMedium: searchParams.get('utm_medium') || undefined,
@@ -119,13 +142,13 @@ export default function EmployerIntakePage() {
       <div className="accent-panel">
         <p className="eyebrow">Employer Details</p>
         <h2 className="font-display text-2xl font-bold text-slate-950">
-          Share a few basics so you can continue to scheduling for your employer coverage request.
+          Complete your employer intake so we can prepare coverage options.
         </h2>
         <p className="mt-3 text-sm leading-7 text-slate-600">
-          This short form gives us the company and contact details we need before you choose a meeting time.
+          This form captures the company, coverage, and contact details we need to start quoting your group case.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {['Employer coverage questions', 'Short first-step form', 'Scheduling opens after submission'].map((item) => (
+          {['Employer coverage questions', 'Full employer intake', 'Scheduling opens after submission'].map((item) => (
             <span key={item} className="chip-pill">
               {item}
             </span>
@@ -170,7 +193,7 @@ export default function EmployerIntakePage() {
             </div>
             <div>
               <label className="label" htmlFor="numEmployees">
-                Approximate Team Size
+                Total Employees
               </label>
               <input
                 className="input"
@@ -179,9 +202,129 @@ export default function EmployerIntakePage() {
                 onChange={updateField('numEmployees')}
                 type="number"
                 value={formData.numEmployees}
-                placeholder="Example: 12"
+                placeholder="Example: 25"
               />
             </div>
+            <div>
+              <label className="label" htmlFor="numEligible">
+                Eligible Employees
+              </label>
+              <input
+                className="input"
+                id="numEligible"
+                min="1"
+                onChange={updateField('numEligible')}
+                type="number"
+                value={formData.numEligible}
+                placeholder="Example: 18"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="industry">
+                Industry
+              </label>
+              <input
+                className="input"
+                id="industry"
+                onChange={updateField('industry')}
+                type="text"
+                value={formData.industry}
+                placeholder="e.g. Construction, Restaurant, Technology"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="label mb-3">Current coverage</p>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="currentCarrier">
+                Current Carrier
+              </label>
+              <input
+                className="input"
+                id="currentCarrier"
+                onChange={updateField('currentCarrier')}
+                type="text"
+                value={formData.currentCarrier}
+                placeholder="e.g. Blue Cross, Aetna, UnitedHealthcare"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="currentPlan">
+                Current Plan Name
+              </label>
+              <input
+                className="input"
+                id="currentPlan"
+                onChange={updateField('currentPlan')}
+                type="text"
+                value={formData.currentPlan}
+                placeholder="e.g. PPO Gold 500"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="renewalDate">
+                Renewal Date
+              </label>
+              <input
+                className="input"
+                id="renewalDate"
+                onChange={updateField('renewalDate')}
+                type="date"
+                value={formData.renewalDate}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="contributionStrategy">
+                Contribution Strategy
+              </label>
+              <select
+                className="input"
+                id="contributionStrategy"
+                onChange={updateField('contributionStrategy')}
+                value={formData.contributionStrategy}
+              >
+                <option value="">Select...</option>
+                <option value="percentage">Percentage of Premium</option>
+                <option value="fixed_dollar">Fixed Dollar Amount</option>
+                <option value="defined_contribution">Defined Contribution</option>
+                <option value="salary_based">Salary-Based</option>
+                <option value="unsure">Not Sure Yet</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="label mb-3">Benefits needed</p>
+          <div className="flex flex-wrap gap-3">
+            {benefitsOptions.map((opt) => (
+              <label
+                key={opt.value}
+                className={`cursor-pointer rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                  formData.benefitsNeeded.includes(opt.value)
+                    ? 'border-red-600 bg-red-50 text-red-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={formData.benefitsNeeded.includes(opt.value)}
+                  onChange={(e) => {
+                    setFormData((current) => ({
+                      ...current,
+                      benefitsNeeded: e.target.checked
+                        ? [...current.benefitsNeeded, opt.value]
+                        : current.benefitsNeeded.filter((v) => v !== opt.value),
+                    }));
+                  }}
+                />
+                {opt.label}
+              </label>
+            ))}
           </div>
         </div>
 
@@ -299,10 +442,10 @@ export default function EmployerIntakePage() {
       <PageHero
         eyebrow="Employer Intake"
         title="Start your group health insurance review with the employer details that matter."
-        description="Use this short form for company or group coverage questions. Share a few basics, save the intake, and then continue to scheduling."
+        description="Complete this form for group coverage. Share your company details, current coverage, and benefits needed so we can start quoting."
         highlights={[
           'Built for employer and group cases',
-          'Short first-step form',
+          'Full employer intake with all key fields',
           'Scheduling opens after you submit',
         ]}
         layoutClassName="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start"
@@ -324,9 +467,9 @@ export default function EmployerIntakePage() {
               <h2 className="section-title mt-2">Bring the basics and we can start from there.</h2>
               <div className="mt-6 space-y-3">
                 {[
-                  'Your company name and the best contact details to reach you.',
-                  'Approximate team size if you already know it.',
-                  'Any timing, renewal, or coverage questions you want us to review first.',
+                  'Company name, state, industry, and team size.',
+                  'Current carrier, plan name, and renewal date if you have them.',
+                  'Your contribution approach and which benefits you need (medical, dental, vision, etc.).',
                 ].map((item) => (
                   <div key={item} className="soft-panel text-sm leading-7 text-slate-700">
                     {item}

@@ -13,7 +13,8 @@ import {
   Moon,
   Mail,
   BarChart3,
-  Kanban
+  Kanban,
+  ShieldCheck
 } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 import { useTheme } from '../context/ThemeContext';
@@ -31,6 +32,7 @@ export default function AdminLayout() {
     { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/admin/documents', label: 'Knowledge Base', icon: FileText },
     { path: '/admin/templates', label: 'Templates', icon: Mail },
+    { path: '/admin/compliance', label: 'Compliance', icon: ShieldCheck },
     { path: '/admin/profile', label: 'Settings', icon: Settings },
   ];
 

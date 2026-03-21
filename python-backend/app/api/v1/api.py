@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     public_chat,
     templates,
     analytics,
+    compliance,
 )
 
 api_router = APIRouter()
@@ -30,4 +31,5 @@ api_router.include_router(client_docs.router, prefix="/client-docs", tags=["clie
 api_router.include_router(public_chat.router, prefix="/public", tags=["public"])
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(compliance.router, prefix="/compliance", tags=["compliance"])
 

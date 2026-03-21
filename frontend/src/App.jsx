@@ -31,6 +31,7 @@ const ShopHealthInsurancePage = lazy(() => import('./pages/ShopHealthInsurancePa
 const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
 const PipelineBoardPage = lazy(() => import('./pages/PipelineBoardPage'));
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage'));
+const CompliancePage = lazy(() => import('./pages/CompliancePage'));
 
 function RouteFallback() {
   return (
@@ -127,6 +128,7 @@ function App() {
                 <Route element={<ClientProfilePage />} path="leads/:leadId" />
                 <Route element={<DocumentsPage />} path="documents" />
                 <Route element={<TemplatesPage />} path="templates" />
+                <Route element={<CompliancePage />} path="compliance" />
                 <Route element={<ProfilePage />} path="profile" />
               </Route>
 

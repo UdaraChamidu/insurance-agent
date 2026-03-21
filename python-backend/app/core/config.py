@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_PHONE_NUMBER: str = ""
 
+    # SMTP Email
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = ""
+
     # App
     APP_BASE_URL: str = "http://localhost:3000"
     
