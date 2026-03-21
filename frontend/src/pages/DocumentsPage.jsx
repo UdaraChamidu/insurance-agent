@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Database, FileText, Activity, RefreshCw, 
+import {
+  Database, FileText, Activity, RefreshCw,
   CheckCircle, AlertCircle, Clock, Zap, HardDrive,
   RotateCcw, XCircle, ChevronDown, ChevronUp, Bell, Search
 } from 'lucide-react';
@@ -26,7 +26,7 @@ export default function DocumentsPage() {
   // Fetch stats and files
   const fetchData = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
-    
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
@@ -107,7 +107,7 @@ export default function DocumentsPage() {
 
       const data = await res.json();
       showToast(`🔄 "${data.fileName}" queued for re-processing`, 'success');
-      
+
       // Refresh data
       await fetchData();
     } catch (err) {
@@ -124,10 +124,10 @@ export default function DocumentsPage() {
   // Status badge component
   const StatusBadge = ({ status }) => {
     const config = {
-      processing: { bg: 'bg-blue-500/20', text: 'text-blue-300', border: 'border-blue-500/30', icon: RefreshCw, label: 'Processing' },
-      success: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30', icon: CheckCircle, label: 'Ingested' },
-      no_vectors: { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', icon: AlertCircle, label: 'No Vectors' },
-      error: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', icon: XCircle, label: 'Error' }
+      processing: { bg: 'bg-blue-500/20', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-500/30', icon: RefreshCw, label: 'Processing' },
+      success: { bg: 'bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', icon: CheckCircle, label: 'Ingested' },
+      no_vectors: { bg: 'bg-amber-500/20', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500/30', icon: AlertCircle, label: 'No Vectors' },
+      error: { bg: 'bg-red-500/20', text: 'text-red-700 dark:text-red-400', border: 'border-red-500/30', icon: XCircle, label: 'Error' }
     };
     const c = config[status] || config.error;
     const Icon = c.icon;
@@ -151,7 +151,7 @@ export default function DocumentsPage() {
       <div className="h-full flex items-center justify-center p-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading knowledge base...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading knowledge base...</p>
         </div>
       </div>
     );
@@ -176,9 +176,9 @@ export default function DocumentsPage() {
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-2xl border backdrop-blur-md animate-slide-in
-          ${toast.type === 'success' ? 'bg-emerald-900/80 border-emerald-500/40 text-emerald-200' :
-            toast.type === 'error' ? 'bg-red-900/80 border-red-500/40 text-red-200' :
-              'bg-blue-900/80 border-blue-500/40 text-blue-200'}`}>
+          ${toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/80 border-emerald-300 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-200' :
+            toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/80 border-red-300 dark:border-red-500/40 text-red-800 dark:text-red-200' :
+              'bg-blue-50 dark:bg-blue-900/80 border-blue-300 dark:border-blue-500/40 text-blue-800 dark:text-blue-200'}`}>
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
             <span className="text-sm font-medium">{toast.message}</span>
@@ -198,13 +198,13 @@ export default function DocumentsPage() {
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <div className="relative sm:w-72 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               value={fileSearch}
               onChange={(e) => setFileSearch(e.target.value)}
               placeholder="Search files, namespaces, status..."
-              className="w-full pl-10 pr-3 py-2.5 bg-slate-900/40 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+              className="w-full pl-10 pr-3 py-2.5 bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
             />
           </div>
           <span className="text-xs text-gray-500 dark:text-gray-400 sm:inline text-center">
@@ -232,9 +232,9 @@ export default function DocumentsPage() {
       {/* Error Banner */}
       {error && (
         <div className="max-w-7xl mx-auto px-6 mt-4">
-          <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-            <p className="text-red-200 text-sm">Failed to connect to backend: {error}</p>
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0" />
+            <p className="text-red-700 dark:text-red-200 text-sm">Failed to connect to backend: {error}</p>
           </div>
         </div>
       )}
@@ -242,16 +242,16 @@ export default function DocumentsPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {/* Ingestion Status */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 hover:bg-white/10 transition-colors">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 p-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-400">Ingestion Status</p>
-              <div className={`p-2 rounded-lg ${ingestion.isRunning ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                <Activity className={`h-5 w-5 ${ingestion.isRunning ? 'text-emerald-400' : 'text-red-400'}`} />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Ingestion Status</p>
+              <div className={`p-2 rounded-lg ${ingestion.isRunning ? 'bg-emerald-100 dark:bg-emerald-500/20' : 'bg-red-100 dark:bg-red-500/20'}`}>
+                <Activity className={`h-5 w-5 ${ingestion.isRunning ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
               </div>
             </div>
             <div className="flex items-center gap-2">
               <div className={`h-2.5 w-2.5 rounded-full ${ingestion.isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-              <span className={`text-lg font-bold ${ingestion.isRunning ? 'text-emerald-400' : 'text-red-400'}`}>
+              <span className={`text-lg font-bold ${ingestion.isRunning ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                 {ingestion.isRunning ? 'Running' : 'Stopped'}
               </span>
             </div>
@@ -261,42 +261,42 @@ export default function DocumentsPage() {
           </div>
 
           {/* Processed Files */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 hover:bg-white/10 transition-colors">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 p-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-400">Processed Files</p>
-              <div className="bg-blue-500/20 p-2 rounded-lg">
-                <FileText className="h-5 w-5 text-blue-400" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Processed Files</p>
+              <div className="bg-blue-100 dark:bg-blue-500/20 p-2 rounded-lg">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
-            <p className="text-3xl font-bold text-white">{ingestion.processedFileCount || 0}</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{ingestion.processedFileCount || 0}</p>
             <p className="text-xs text-gray-500 mt-2">
               Active now: {ingestion.processingFileCount || 0} • Polls: {ingestion.totalChecks || 0}
             </p>
           </div>
 
           {/* Total Vectors */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 hover:bg-white/10 transition-colors">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 p-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-400">Total Vectors</p>
-              <div className="bg-purple-500/20 p-2 rounded-lg">
-                <HardDrive className="h-5 w-5 text-purple-400" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total Vectors</p>
+              <div className="bg-purple-100 dark:bg-purple-500/20 p-2 rounded-lg">
+                <HardDrive className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
-            <p className="text-3xl font-bold text-white">{pinecone.totalVectors?.toLocaleString() || 0}</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{pinecone.totalVectors?.toLocaleString() || 0}</p>
             <p className="text-xs text-gray-500 mt-2">
               {Object.keys(pinecone.namespaces || {}).length} namespace(s)
             </p>
           </div>
 
           {/* Errors */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 hover:bg-white/10 transition-colors">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 p-5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-400">Recent Errors</p>
-              <div className={`p-2 rounded-lg ${errors.length > 0 ? 'bg-red-500/20' : 'bg-gray-500/20'}`}>
-                <AlertCircle className={`h-5 w-5 ${errors.length > 0 ? 'text-red-400' : 'text-gray-500'}`} />
+              <p className="text-sm text-gray-500 dark:text-gray-400">Recent Errors</p>
+              <div className={`p-2 rounded-lg ${errors.length > 0 ? 'bg-red-100 dark:bg-red-500/20' : 'bg-gray-100 dark:bg-gray-500/20'}`}>
+                <AlertCircle className={`h-5 w-5 ${errors.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`} />
               </div>
             </div>
-            <p className={`text-3xl font-bold ${errors.length > 0 ? 'text-red-400' : 'text-white'}`}>
+            <p className={`text-3xl font-bold ${errors.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
               {errors.length}
             </p>
             <p className="text-xs text-gray-500 mt-2">
@@ -307,8 +307,8 @@ export default function DocumentsPage() {
 
         {/* Active Processing List */}
         {processingFiles.length > 0 && (
-          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-5 mb-8">
-            <h3 className="text-sm font-semibold text-blue-200 mb-3 flex items-center gap-2">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-500/30 rounded-xl p-5 mb-8">
+            <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-200 mb-3 flex items-center gap-2">
               <RefreshCw className="h-4 w-4 animate-spin" />
               Processing Files ({processingFiles.length})
             </h3>
@@ -316,15 +316,15 @@ export default function DocumentsPage() {
               {processingFiles.map((file) => (
                 <div
                   key={file.key}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-black/20 border border-blue-500/20 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg bg-white/60 dark:bg-black/20 border border-blue-200 dark:border-blue-500/20 px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm text-white truncate">{file.fileName}</p>
-                    <p className="text-xs text-blue-200/70">
+                    <p className="text-sm text-gray-900 dark:text-white truncate">{file.fileName}</p>
+                    <p className="text-xs text-blue-600/70 dark:text-blue-200/70">
                       Namespace: {file.namespace || 'N/A'}
                     </p>
                   </div>
-                  <div className="text-xs text-blue-200/70 whitespace-nowrap">
+                  <div className="text-xs text-blue-600/70 dark:text-blue-200/70 whitespace-nowrap">
                     Started: {formatDate(file.startedAt)}
                   </div>
                 </div>
@@ -335,24 +335,20 @@ export default function DocumentsPage() {
 
         {/* Namespace Breakdown */}
         {Object.keys(pinecone.namespaces || {}).length > 0 && (
-          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-5 mb-8">
-            <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-400" />
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 p-5 mb-8">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-500 dark:text-amber-400" />
               Pinecone Namespaces
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {Object.entries(pinecone.namespaces).map(([ns, data]) => (
-                <div key={ns} className="bg-black/20 rounded-lg px-3 py-2 border border-white/5">
-                  {/*
-                    Backend normalizes to recordCount, but keep compatibility with
-                    old/new payloads that may use vector_count or vectorCount.
-                  */}
+                <div key={ns} className="bg-gray-50 dark:bg-black/20 rounded-lg px-3 py-2 border border-gray-200 dark:border-white/5">
                   {(() => {
                     const namespaceVectors = data?.recordCount ?? data?.vector_count ?? data?.vectorCount ?? 0;
                     return (
                       <>
-                        <p className="text-xs text-gray-400 truncate">{ns || '(default)'}</p>
-                        <p className="text-sm font-bold text-white">{namespaceVectors.toLocaleString()} vectors</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{ns || '(default)'}</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{namespaceVectors.toLocaleString()} vectors</p>
                       </>
                     );
                   })()}
@@ -363,10 +359,10 @@ export default function DocumentsPage() {
         )}
 
         {/* Files Table */}
-        <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-400" />
+        <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden mb-8">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               Processed Documents
             </h2>
             <span className="text-xs text-gray-500">{filteredFiles.length} file(s)</span>
@@ -375,52 +371,52 @@ export default function DocumentsPage() {
           {filteredFiles.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-20" />
-              <p className="text-lg font-medium">No documents processed yet</p>
-              <p className="text-sm mt-1">Files will appear here once SharePoint sync completes</p>
+              <p className="text-lg font-medium text-gray-500 dark:text-gray-400">No documents processed yet</p>
+              <p className="text-sm mt-1 text-gray-400 dark:text-gray-500">Files will appear here once SharePoint sync completes</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">File Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Namespace</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Chunks</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Vectors</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Processed At</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                  <tr className="border-b border-gray-200 dark:border-white/10">
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">File Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Namespace</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Chunks</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vectors</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Processed At</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                   {filteredFiles.map((file) => (
-                    <tr key={file.key} className="hover:bg-white/5 transition-colors">
+                    <tr key={file.key} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="bg-blue-500/10 p-2 rounded-lg flex-shrink-0">
-                            <FileText className="h-4 w-4 text-blue-400" />
+                          <div className="bg-blue-100 dark:bg-blue-500/10 p-2 rounded-lg flex-shrink-0">
+                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                           </div>
-                          <span className="text-sm font-medium text-white truncate max-w-[200px]" title={file.fileName}>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]" title={file.fileName}>
                             {file.fileName}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded-md">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md">
                           {file.namespace || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center">
                         <StatusBadge status={file.status} />
                       </td>
-                      <td className="px-4 py-4 text-center text-sm text-gray-300">{file.chunks || 0}</td>
-                      <td className="px-4 py-4 text-center text-sm text-gray-300">{file.vectors || 0}</td>
-                      <td className="px-4 py-4 text-sm text-gray-400">{formatDate(file.processedAt)}</td>
+                      <td className="px-4 py-4 text-center text-sm text-gray-700 dark:text-gray-300">{file.chunks || 0}</td>
+                      <td className="px-4 py-4 text-center text-sm text-gray-700 dark:text-gray-300">{file.vectors || 0}</td>
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(file.processedAt)}</td>
                       <td className="px-4 py-4 text-center">
                         <button
                           onClick={() => handleReprocess(file.key, file.fileName)}
                           disabled={reprocessingKeys.has(file.key)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-medium transition-all disabled:opacity-40"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 rounded-lg text-xs font-medium transition-all disabled:opacity-40"
                           title="Remove from tracking and re-process on next sync"
                         >
                           <RotateCcw className={`h-3 w-3 ${reprocessingKeys.has(file.key) ? 'animate-spin' : ''}`} />
@@ -436,16 +432,16 @@ export default function DocumentsPage() {
         </div>
 
         {/* Activity Log */}
-        <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
+        <div className="bg-white dark:bg-white/5 backdrop-blur-md rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
           <button
             onClick={() => setExpandedErrors(!expandedErrors)}
-            className="w-full px-6 py-4 border-b border-white/10 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
           >
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Clock className="h-5 w-5 text-gray-400" />
               Activity Log
               {errors.length > 0 && (
-                <span className="bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full border border-red-500/30">
+                <span className="bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs px-2 py-0.5 rounded-full border border-red-200 dark:border-red-500/30">
                   {errors.length}
                 </span>
               )}
@@ -463,12 +459,12 @@ export default function DocumentsPage() {
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {[...errors].reverse().map((err, i) => (
-                    <div key={i} className="bg-red-900/20 border border-red-500/10 rounded-lg px-4 py-3 flex items-start gap-3">
-                      <XCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div key={i} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/10 rounded-lg px-4 py-3 flex items-start gap-3">
+                      <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-red-200 break-all">{err.error}</p>
+                        <p className="text-sm text-red-700 dark:text-red-200 break-all">{err.error}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          {err.file && <span className="text-xs text-red-400/60">{err.file}</span>}
+                          {err.file && <span className="text-xs text-red-500/60 dark:text-red-400/60">{err.file}</span>}
                           <span className="text-xs text-red-400/40">{formatDate(err.timestamp)}</span>
                         </div>
                       </div>
@@ -481,8 +477,8 @@ export default function DocumentsPage() {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-6 text-center text-xs text-gray-600">
-          Polling interval: {ingestion.pollingIntervalMinutes || 5} min • 
+        <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-600">
+          Polling interval: {ingestion.pollingIntervalMinutes || 5} min •
           Next check in ~{Math.max(1, Math.round((ingestion.pollingIntervalMinutes || 5) - ((Date.now() - new Date(ingestion.lastCheck).getTime()) / 60000)))} min
         </div>
 

@@ -36,23 +36,23 @@ const GROUP_PIPELINE_STAGES = [
 
 const STAGE_COLORS = {
   // Individual
-  new:                { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
-  appointment_booked: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
-  quoted:             { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
-  enrolled:           { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
-  lost:               { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
+  new:                { bg: 'bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
+  appointment_booked: { bg: 'bg-amber-500/10', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+  quoted:             { bg: 'bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+  enrolled:           { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  lost:               { bg: 'bg-red-500/10', text: 'text-red-700 dark:text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
   // Group
-  new_lead:           { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
-  contacted:          { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/30', dot: 'bg-sky-500' },
-  discovery_scheduled:{ bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
-  census_requested:   { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-500' },
-  census_received:    { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/30', dot: 'bg-yellow-500' },
-  sent_to_warner:     { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
-  quotes_received:    { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
-  proposal_presented: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/30', dot: 'bg-violet-500' },
-  closed_won:         { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
-  closed_lost:        { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
-  renewal_followup:   { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/30', dot: 'bg-teal-500' },
+  new_lead:           { bg: 'bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
+  contacted:          { bg: 'bg-sky-500/10', text: 'text-sky-700 dark:text-sky-400', border: 'border-sky-500/30', dot: 'bg-sky-500' },
+  discovery_scheduled:{ bg: 'bg-amber-500/10', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
+  census_requested:   { bg: 'bg-orange-500/10', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-500' },
+  census_received:    { bg: 'bg-yellow-500/10', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-500/30', dot: 'bg-yellow-500' },
+  sent_to_warner:     { bg: 'bg-indigo-500/10', text: 'text-indigo-700 dark:text-indigo-400', border: 'border-indigo-500/30', dot: 'bg-indigo-500' },
+  quotes_received:    { bg: 'bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
+  proposal_presented: { bg: 'bg-violet-500/10', text: 'text-violet-700 dark:text-violet-400', border: 'border-violet-500/30', dot: 'bg-violet-500' },
+  closed_won:         { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  closed_lost:        { bg: 'bg-red-500/10', text: 'text-red-700 dark:text-red-400', border: 'border-red-500/30', dot: 'bg-red-500' },
+  renewal_followup:   { bg: 'bg-teal-500/10', text: 'text-teal-700 dark:text-teal-400', border: 'border-teal-500/30', dot: 'bg-teal-500' },
 };
 
 export default function LeadsPage() {
@@ -148,7 +148,7 @@ export default function LeadsPage() {
       <div className="h-full flex items-center justify-center p-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading clients...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading clients...</p>
         </div>
       </div>
     );
@@ -159,18 +159,18 @@ export default function LeadsPage() {
       {/* Header / Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Clients</h1>
-          <p className="text-gray-400 text-sm mt-1">{leads.length} total clients</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Clients</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{leads.length} total clients</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <div className="relative sm:w-80 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name, email, phone..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/40 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
             />
           </div>
           <button
@@ -196,7 +196,7 @@ export default function LeadsPage() {
             className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
               typeFilter === key
                 ? 'bg-blue-600 text-white border-blue-500'
-                : 'border-white/20 text-gray-300 hover:border-white/40 hover:text-white'
+                : 'border-gray-300 dark:border-white/20 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-white/40 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             {Icon && <Icon className="w-4 h-4" />}
@@ -216,7 +216,7 @@ export default function LeadsPage() {
               key={stage}
               onClick={() => setStageFilter(stage)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                isActive ? 'bg-blue-600 text-white border-blue-500' : 'border-white/20 text-gray-200 hover:border-white/40'
+                isActive ? 'bg-blue-600 text-white border-blue-500' : 'border-gray-300 dark:border-white/20 text-gray-600 dark:text-gray-200 hover:border-gray-400 dark:hover:border-white/40'
               }`}
             >
               {label} {stage !== 'all' && <span className="opacity-70">({count})</span>}
@@ -226,7 +226,7 @@ export default function LeadsPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-200">
           {error}
         </div>
       )}
@@ -267,10 +267,10 @@ export default function LeadsPage() {
 /* ===== TABLE VIEW ===== */
 function TableView({ leads, navigate, onDelete, deletingLeadId }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+    <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-white/[0.03] border-b border-white/10">
+          <thead className="bg-gray-50 dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10">
             <tr>
               <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
               <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
@@ -280,7 +280,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
               <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-gray-100 dark:divide-white/5">
             {leads.length === 0 ? (
               <tr>
                 <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
@@ -294,12 +294,12 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                   <tr
                     key={lead.id}
                     onClick={() => navigate(`/admin/leads/${lead.id}`)}
-                    className="hover:bg-white/5 cursor-pointer transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold ${
-                          lead.leadType === 'group' ? 'bg-teal-600/20 text-teal-400' : 'bg-blue-600/20 text-blue-400'
+                          lead.leadType === 'group' ? 'bg-teal-100 dark:bg-teal-600/20 text-teal-700 dark:text-teal-400' : 'bg-blue-100 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400'
                         }`}>
                           {lead.leadType === 'group'
                             ? <Building2 className="w-4 h-4" />
@@ -309,12 +309,12 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                         <div>
                           {lead.leadType === 'group' && lead.companyName ? (
                             <>
-                              <p className="font-medium text-white">{lead.companyName}</p>
+                              <p className="font-medium text-gray-900 dark:text-white">{lead.companyName}</p>
                               <p className="text-xs text-gray-500">{lead.firstName} {lead.lastName}{lead.state ? ` · ${lead.state}` : ''}</p>
                             </>
                           ) : (
                             <>
-                              <p className="font-medium text-white">{lead.firstName} {lead.lastName}</p>
+                              <p className="font-medium text-gray-900 dark:text-white">{lead.firstName} {lead.lastName}</p>
                               {lead.state && <p className="text-xs text-gray-500">{lead.state}</p>}
                             </>
                           )}
@@ -324,13 +324,13 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         {lead.email && (
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <Mail className="h-3.5 w-3.5" />
                             <span>{lead.email}</span>
                           </div>
                         )}
                         {lead.phone && (
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <Phone className="h-3.5 w-3.5" />
                             <span>{lead.phone}</span>
                           </div>
@@ -338,11 +338,11 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
                         {lead.productType?.toUpperCase() || 'N/A'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-400">
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-6 py-4">
@@ -357,7 +357,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                             e.stopPropagation();
                             navigate(`/admin/leads/${lead.id}`);
                           }}
-                          className="p-1 text-gray-500 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                          className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                           title="Open client"
                         >
                           <ArrowRight className="h-4 w-4" />
@@ -368,7 +368,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
                             onDelete?.(lead);
                           }}
                           disabled={deletingLeadId === lead.id}
-                          className="p-1 text-red-400/80 hover:text-red-300 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="p-1 text-red-400/80 hover:text-red-500 dark:hover:text-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                           title="Delete client"
                         >
                           {deletingLeadId === lead.id ? (
@@ -386,7 +386,7 @@ function TableView({ leads, navigate, onDelete, deletingLeadId }) {
           </tbody>
         </table>
       </div>
-      <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between text-sm text-gray-500">
+      <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-sm text-gray-500">
         <span>Showing {leads.length} clients</span>
       </div>
     </div>

@@ -12,14 +12,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import desc
 from sqlalchemy.orm import Session as DBSession
 
-from app.core.database import get_sql_db
+from app.core.database import get_db
 from app.models import Lead, PipelineHistory, Session, Transcript
 
 router = APIRouter()
 
 
 @router.get("/overview", response_model=Dict[str, Any])
-async def compliance_overview(db: DBSession = Depends(get_sql_db)):
+async def compliance_overview(db: DBSession = Depends(get_db)):
     """
     Return aggregated compliance data:
     - Sessions with compliance flags, action items, call summaries
