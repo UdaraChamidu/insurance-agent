@@ -164,7 +164,7 @@ export default function CompliancePage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/compliance/overview`);
+      const res = await fetch(`${API_URL}/api/compliance/overview`);
       if (!res.ok) throw new Error('Failed to load compliance data');
       const json = await res.json();
       setData(json);
