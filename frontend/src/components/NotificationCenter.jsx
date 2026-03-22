@@ -1,8 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Check, Trash2, X } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 
+function getNotificationLink(notif) {
+  const meta = notif.metadata || {};
+  const type = notif.type;
+
+  // File/document notifications → client profile
+  if (type === 'file' && meta.leadId) {
+    return `/admin/leads/${meta.leadId}`;
+  }
+
+  // Lead notifications → client profile (unless deleted)
+  if (type === 'lead' && meta.leadId) {
+    if (notif.title?.toLowerCase().includes('deleted')) return '/admin/leads';
+    return `/admin/leads/${meta.leadId}`;
+  }
+
+  // Booking notifications → bookings page
+  if (type === 'booking') {
+    return '/admin/bookings';
+  }
+
+  return null;
+}
+
 const NotificationCenter = () => {
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -95,10 +120,20 @@ const NotificationCenter = () => {
                     <p className="text-sm">No notifications yet</p>
                 </div>
             ) : (
-                notifications.map((notif) => (
-                    <div 
+                notifications.map((notif) => {
+                    const link = getNotificationLink(notif);
+                    return (
+                    <button
                         key={notif.id}
-                        className={`p-4 border-b border-gray-50 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative group ${!notif.isRead ? 'bg-blue-50/30 dark:bg-blue-500/5' : ''}`}
+                        type="button"
+                        onClick={() => {
+                          if (link) {
+                            if (!notif.isRead) markAsRead(notif.id);
+                            setIsOpen(false);
+                            navigate(link);
+                          }
+                        }}
+                        className={`w-full text-left p-4 border-b border-gray-50 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors relative group ${!notif.isRead ? 'bg-blue-50/30 dark:bg-blue-500/5' : ''} ${link ? 'cursor-pointer' : ''}`}
                     >
                         <div className="flex gap-3">
                             <div className={`w-2 h-2 mt-2 rounded-full ${!notif.isRead ? 'bg-blue-500' : 'bg-transparent'}`} />
@@ -116,7 +151,7 @@ const NotificationCenter = () => {
                             {/* Individual Action */}
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity self-start flex items-center gap-1">
                                 {!notif.isRead ? (
-                                    <button 
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
                                         className="p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full"
                                         title="Mark as read"
@@ -134,8 +169,9 @@ const NotificationCenter = () => {
                                 )}
                             </div>
                         </div>
-                    </div>
-                ))
+                    </button>
+                    );
+                })
             )}
           </div>
         </div>
