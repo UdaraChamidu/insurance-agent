@@ -256,8 +256,21 @@ export default function ClientProfilePage() {
     }
   };
 
-  const handleDownload = (docId) => {
-    window.open(`${API_URL}/api/client-docs/download/${docId}`, '_blank', 'noopener,noreferrer');
+  const handleDownload = async (docId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/client-docs/download/${docId}`);
+      if (!res.ok) throw new Error('Failed to get download link');
+      const data = await res.json();
+      const url = data.url || data.signedURL;
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        alert('Could not generate download link.');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download file.');
+    }
   };
 
   const handleDownloadArtifactsJson = () => {
