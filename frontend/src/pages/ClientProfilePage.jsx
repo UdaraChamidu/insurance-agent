@@ -778,9 +778,18 @@ export default function ClientProfilePage() {
             </div>
           </div>
 
-          {/* Folder-organized documents */}
+          {/* Folder-organized documents — folders with docs first, sorted by newest document */}
           {docFolders ? (
-            Object.entries(docFolders).map(([folderName, docs]) => (
+            Object.entries(docFolders)
+              .sort(([, a], [, b]) => {
+                if (a.length && !b.length) return -1;
+                if (!a.length && b.length) return 1;
+                if (!a.length && !b.length) return 0;
+                const latestA = Math.max(...a.map(d => d.createdAt ? new Date(d.createdAt).getTime() : 0));
+                const latestB = Math.max(...b.map(d => d.createdAt ? new Date(d.createdAt).getTime() : 0));
+                return latestB - latestA;
+              })
+              .map(([folderName, docs]) => (
               <div key={folderName} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/5 border-b border-white/10 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-gray-400" />
