@@ -167,7 +167,6 @@ async def upload_census_document(
     Upload an employer census file, store it under a census-specific path,
     and advance the group lead pipeline to census_received when appropriate.
     """
-    print(f"DEBUG upload-census: db type = {type(db)}, lead_id = {lead_id}", flush=True)
     lead = db.query(Lead).filter(Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")

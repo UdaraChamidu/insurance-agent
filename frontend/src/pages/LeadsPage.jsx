@@ -206,23 +206,32 @@ export default function LeadsPage() {
       </div>
 
       {/* Stage Filter */}
-      <div className="flex flex-wrap gap-2">
-        {['all', ...visibleStages.map(s => s.key)].map(stage => {
-          const isActive = stageFilter === stage;
-          const label = stage === 'all' ? 'All' : visibleStages.find(s => s.key === stage)?.label || stage;
-          const count = stage === 'all' ? filteredLeads.length : stageCounts[stage] || 0;
-          return (
-            <button
-              key={stage}
-              onClick={() => setStageFilter(stage)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                isActive ? 'bg-blue-600 text-white border-blue-500' : 'border-gray-300 dark:border-white/20 text-gray-600 dark:text-gray-200 hover:border-gray-400 dark:hover:border-white/40'
-              }`}
-            >
-              {label} {stage !== 'all' && <span className="opacity-70">({count})</span>}
-            </button>
-          );
-        })}
+      <div className="flex items-center gap-3">
+        <label htmlFor="stage-filter" className="text-sm font-medium text-gray-500 dark:text-gray-400">Pipeline Stage:</label>
+        <select
+          id="stage-filter"
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value)}
+          className="px-4 py-2 bg-gray-100 dark:bg-slate-900/40 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-w-[200px]"
+        >
+          <option value="all">All Stages ({filteredLeads.length})</option>
+          {visibleStages.map((stage) => {
+            const count = stageCounts[stage.key] || 0;
+            return (
+              <option key={stage.key} value={stage.key}>
+                {stage.label} ({count})
+              </option>
+            );
+          })}
+        </select>
+        {stageFilter !== 'all' && (
+          <button
+            onClick={() => setStageFilter('all')}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Clear filter
+          </button>
+        )}
       </div>
 
       {error && (

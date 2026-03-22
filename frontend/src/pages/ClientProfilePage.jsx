@@ -3,8 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar,
   FileText, MessageSquare, AlertCircle,
-  Loader, Edit2, Save, X, Video, Download, RefreshCw,
-  Building2
+  Loader, Edit2, Save, X, Video, Download, RefreshCw
 } from 'lucide-react';
 import bookingsService from '../services/bookingsService';
 import clientDocsService from '../services/clientDocsService';
@@ -375,14 +374,14 @@ export default function ClientProfilePage() {
       {/* Back button */}
       <button
         onClick={() => navigate('/admin/leads')}
-        className="flex items-center text-gray-400 hover:text-blue-400 transition-colors text-sm"
+        className="flex items-center text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-sm"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
         Back to Clients
       </button>
 
       {/* Profile Header */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+      <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-6">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
           {/* Avatar */}
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-blue-600/20">
@@ -391,8 +390,8 @@ export default function ClientProfilePage() {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-white mb-1">{name}</h1>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{name}</h1>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
               {lead.email && (
                 <div className="flex items-center gap-1.5">
                   <Mail className="w-4 h-4" />
@@ -416,9 +415,17 @@ export default function ClientProfilePage() {
 
           {/* Pipeline Status */}
           <div className="flex flex-col items-end gap-2">
-            <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border ${stageColor}`}>
-              {ALL_LABELS[currentStage] || currentStage.replaceAll('_', ' ')}
-            </span>
+            <select
+              value={currentStage}
+              onChange={(e) => handleUpdatePipeline(e.target.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${stageColor} bg-transparent`}
+            >
+              {pipelineStages.map((stage) => (
+                <option key={stage} value={stage} className="bg-white dark:bg-slate-800 text-gray-900 dark:text-white">
+                  {ALL_LABELS[stage] || stage.replaceAll('_', ' ')}
+                </option>
+              ))}
+            </select>
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
               isGroup ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
             }`}>
@@ -438,7 +445,7 @@ export default function ClientProfilePage() {
                 key={stage}
                 onClick={() => handleUpdatePipeline(stage)}
                 className={`flex-1 h-2 rounded-full transition-all cursor-pointer hover:opacity-80 ${
-                  isActive ? 'bg-blue-500' : 'bg-white/10'
+                  isActive ? 'bg-blue-500' : 'bg-gray-200 dark:bg-white/10'
                 }`}
                 title={ALL_LABELS[stage] || stage}
               />
@@ -448,7 +455,7 @@ export default function ClientProfilePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+      <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-1">
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -456,7 +463,7 @@ export default function ClientProfilePage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.key
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/5'
             }`}
           >
             {tab.label}
@@ -468,8 +475,8 @@ export default function ClientProfilePage() {
       {activeTab === 'overview' && (
         <div className="grid md:grid-cols-2 gap-6">
           {/* Details Card */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
               {isGroup ? 'Employer / Group Details' : 'Lead Details'}
             </h3>
             <div className="space-y-3">
@@ -525,8 +532,8 @@ export default function ClientProfilePage() {
           </div>
 
           {/* Session Card */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Session Info</h3>
+          <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">Session Info</h3>
             {session ? (
               <div className="space-y-3">
                 <InfoRow label="Status" value={session.status} />
@@ -535,14 +542,14 @@ export default function ClientProfilePage() {
                 <InfoRow label="Premium" value={session.premium || '—'} />
                 <InfoRow label="Session Start" value={session.startTime ? new Date(session.startTime).toLocaleString() : '—'} />
 
-                <div className="pt-3 mt-3 border-t border-white/10 space-y-3">
+                <div className="pt-3 mt-3 border-t border-gray-200 dark:border-white/10 space-y-3">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">Wrap-Up Details</p>
                   {hasWrapUpDetails ? (
                     <>
                       {session.callSummary ? (
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Call Summary</p>
-                          <p className="text-sm text-gray-200 whitespace-pre-wrap">{session.callSummary}</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{session.callSummary}</p>
                         </div>
                       ) : null}
 
@@ -551,7 +558,7 @@ export default function ClientProfilePage() {
                           <p className="text-xs text-gray-500 mb-1">Action Items</p>
                           <div className="space-y-1">
                             {actionItems.map((item, idx) => (
-                              <p key={`${idx}-${item}`} className="text-sm text-gray-200">
+                              <p key={`${idx}-${item}`} className="text-sm text-gray-700 dark:text-gray-200">
                                 - {item}
                               </p>
                             ))}
@@ -589,14 +596,14 @@ export default function ClientProfilePage() {
       )}
 
       {activeTab === 'summary' && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Saved Meeting Summary</h3>
+        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Saved Meeting Summary</h3>
 
           {session?.callSummary ? (
             <>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Call Summary</p>
-                <p className="text-sm text-gray-200 whitespace-pre-wrap">{session.callSummary}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{session.callSummary}</p>
               </div>
 
               {actionItems.length > 0 && (
@@ -638,13 +645,13 @@ export default function ClientProfilePage() {
       )}
 
       {activeTab === 'recording' && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Meeting Audio Recording</h3>
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Meeting Audio Recording</h3>
             <button
               onClick={() => fetchMeetingRecording(true)}
               disabled={!hasRecording || recordingLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 rounded-lg text-xs hover:bg-white/20 transition-all disabled:opacity-60"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-200 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-white/20 transition-all disabled:opacity-60"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${recordingLoading ? 'animate-spin' : ''}`} />
               {recordingLoading ? 'Refreshing...' : 'Refresh Link'}
@@ -664,7 +671,7 @@ export default function ClientProfilePage() {
                 Your browser does not support audio playback.
               </audio>
               <p className="text-xs text-gray-400">
-                If playback fails, click <span className="text-gray-200">Refresh Link</span> to generate a new secure URL.
+                If playback fails, click <span className="text-gray-700 dark:text-gray-200">Refresh Link</span> to generate a new secure URL.
               </p>
               <a
                 href={recordingUrl}
@@ -692,13 +699,13 @@ export default function ClientProfilePage() {
       {activeTab === 'appointments' && (
         <div className="space-y-3">
           {appointments.length === 0 ? (
-            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+            <div className="text-center py-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
               <Calendar className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No appointments for this client.</p>
+              <p className="text-gray-500 dark:text-gray-400">No appointments for this client.</p>
             </div>
           ) : (
             appointments.map(apt => (
-              <div key={apt.id} className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div key={apt.id} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Calendar className="w-5 h-5 text-blue-400" />
@@ -737,10 +744,10 @@ export default function ClientProfilePage() {
       {activeTab === 'documents' && (
         <div className="space-y-4">
           {/* Upload Token Section */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-white">Secure Upload Portal</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Secure Upload Portal</p>
                 <p className="text-xs text-gray-400 mt-0.5">Generate a link for the client to upload documents securely.</p>
               </div>
               {uploadToken ? (
@@ -790,23 +797,23 @@ export default function ClientProfilePage() {
                 return latestB - latestA;
               })
               .map(([folderName, docs]) => (
-              <div key={folderName} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-white/5 border-b border-white/10 flex items-center gap-2">
+              <div key={folderName} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm font-medium text-white">{folderName}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{folderName}</span>
                   <span className="text-xs text-gray-500 ml-1">({docs.length})</span>
                 </div>
                 {docs.length === 0 ? (
                   <div className="px-4 py-3 text-xs text-gray-500">No documents in this folder.</div>
                 ) : (
                   docs.map((doc) => (
-                    <div key={doc.id} className="px-4 py-3 flex items-center justify-between border-b border-white/5 last:border-0">
+                    <div key={doc.id} className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-white/5 last:border-0">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
                           <FileText className="w-4 h-4 text-blue-400" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm text-white font-medium truncate">{doc.filename}</p>
+                          <p className="text-sm text-gray-900 dark:text-white font-medium truncate">{doc.filename}</p>
                           <p className="text-xs text-gray-400">
                             {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : ''} {doc.fileSize ? `• ${(doc.fileSize / 1024).toFixed(0)} KB` : ''}
                           </p>
@@ -814,7 +821,7 @@ export default function ClientProfilePage() {
                       </div>
                       <button
                         onClick={() => handleDownload(doc.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-xs transition-all border border-white/10 shrink-0"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 rounded-lg text-xs transition-all border border-gray-200 dark:border-white/10 shrink-0"
                       >
                         <Download className="w-3.5 h-3.5" />
                         Download
@@ -825,19 +832,19 @@ export default function ClientProfilePage() {
               </div>
             ))
           ) : documents.length === 0 ? (
-            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+            <div className="text-center py-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
               <FileText className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No documents uploaded.</p>
+              <p className="text-gray-500 dark:text-gray-400">No documents uploaded.</p>
             </div>
           ) : (
             documents.map(doc => (
-              <div key={doc.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+              <div key={doc.id} className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
                     <FileText className="w-5 h-5 text-blue-400" />
                   </div>
                   <div>
-                     <p className="text-white font-medium">{doc.filename}</p>
+                     <p className="text-gray-900 dark:text-white font-medium">{doc.filename}</p>
                      <p className="text-xs text-gray-400">
                         {new Date(doc.createdAt).toLocaleDateString()} • {(doc.fileSize / 1024).toFixed(0)} KB
                      </p>
@@ -858,9 +865,9 @@ export default function ClientProfilePage() {
 
       {activeTab === 'transcripts' && (
         <div className="space-y-4">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-white">Meeting Artifacts</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Meeting Artifacts</p>
               <p className="text-xs text-gray-400">
                 Transcriptions ({artifactTranscriptions.length}) • AI Responses ({artifactAiResponses.length}) • Full Chat ({artifactFullChat.length})
               </p>
@@ -869,14 +876,14 @@ export default function ClientProfilePage() {
               <button
                 onClick={() => fetchMeetingArtifacts(true)}
                 disabled={artifactsLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 text-gray-200 rounded-lg text-xs hover:bg-white/20 transition-all disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-200 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-white/20 transition-all disabled:opacity-60"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${artifactsLoading ? 'animate-spin' : ''}`} />
                 {artifactsLoading ? 'Refreshing...' : 'Refresh'}
               </button>
               <button
                 onClick={handleDownloadArtifactsCsv}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg text-xs transition-all"
               >
                 <Download className="w-3.5 h-3.5" />
                 CSV
@@ -898,9 +905,9 @@ export default function ClientProfilePage() {
           )}
 
           {artifactFullChat.length === 0 ? (
-            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-xl">
+            <div className="text-center py-12 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
               <MessageSquare className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No meeting artifacts for this client yet.</p>
+              <p className="text-gray-500 dark:text-gray-400">No meeting artifacts for this client yet.</p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
@@ -928,9 +935,9 @@ export default function ClientProfilePage() {
       )}
 
       {activeTab === 'notes' && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+        <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Session Notes / AI Notes
             </h3>
             {editingNotes ? (
@@ -966,7 +973,7 @@ export default function ClientProfilePage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={10}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-4 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
+              className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg p-4 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
               placeholder="Add notes about this client..."
             />
           ) : (
@@ -982,7 +989,7 @@ export default function ClientProfilePage() {
 
 function ArtifactColumn({ title, items, emptyText, badgeClass }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-3 min-h-[220px]">
+    <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-3 min-h-[220px]">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">{title}</h4>
         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClass || ''}`}>
@@ -1011,7 +1018,7 @@ function InfoRow({ label, value }) {
   return (
     <div className="flex items-start justify-between">
       <span className="text-xs text-gray-500">{label}</span>
-      <span className="text-sm text-white text-right">{value}</span>
+      <span className="text-sm text-gray-900 dark:text-white text-right">{value}</span>
     </div>
   );
 }
