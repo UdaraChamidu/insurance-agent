@@ -536,7 +536,7 @@ export default function ContactPage() {
                 <div className="soft-panel">
                   <p className="font-semibold text-slate-950">What happens next</p>
                   <p className="mt-2 text-sm leading-7 text-slate-700">
-                    After you submit, you can continue to schedule a meeting time. We review your company details and prepare coverage options.
+                    After you submit, you'll be prompted to upload your employee census file. This lets us start quoting your group case right away.
                   </p>
                 </div>
                 <div className="surface-card">
@@ -612,15 +612,15 @@ export default function ContactPage() {
         title="Your information is ready."
       />
       <NextStepModal
-        description="Your employer intake was submitted successfully. Continue to scheduling to choose a meeting time."
+        description="Your employer intake was submitted. The next step is uploading your employee census so we can start quoting."
         eyebrow="Employer Intake Saved"
         onClose={() => setEmpSuccess(null)}
-        onPrimary={() => navigate('/schedule')}
+        onPrimary={() => navigate(`/employer-census?leadId=${empSuccess?.id}`)}
         onSecondary={() => setEmpSuccess(null)}
         open={Boolean(empSuccess)}
-        primaryLabel="Continue to Scheduling"
+        primaryLabel="Upload Employee Census"
         referenceId={empSuccess?.id}
-        secondaryLabel="Stay on This Page"
+        secondaryLabel="I'll Do This Later"
         title={empSuccess?.companyName ? `${empSuccess.companyName} is ready.` : 'Your employer request is ready.'}
       />
     </>
