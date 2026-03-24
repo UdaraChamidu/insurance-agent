@@ -10,7 +10,7 @@ It combines:
 - meeting artifact storage (transcript, AI responses, summary),
 - admin workflows for leads, clients, and knowledge-base management.
  
-## What This Project Solves
+## What This Project Solves 
 
 Insurance consultations are time-sensitive and compliance-sensitive.  
 This platform helps an admin/agent:
